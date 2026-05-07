@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod — You're Owed More Money</title>
+<meta name="description" content="The average independent artist collects less than 35% of royalties owed. MusiGod handles 100+ registrations across every PRO, DSP, and territory — automatically. You keep the rest.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --black: #0A0A0A;
+    --off-black: #111111;
+    --dark: #161616;
+    --card: #1A1A1A;
+    --border: rgba(255,255,255,0.08);
+    --border-bright: rgba(255,255,255,0.15);
+    --red: #C8102E;
+    --red-dim: rgba(200,16,46,0.15);
+    --gold: #D4A017;
+    --white: #FFFFFF;
+    --gray: #888888;
+    --light-gray: #CCCCCC;
+    --font-display: 'Bebas Neue', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--black);
+    color: var(--white);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2rem;
+    height: 64px;
+    background: rgba(10,10,10,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .nav-logo {
+    font-family: var(--font-display);
+    font-size: 28px;
+    letter-spacing: 0.05em;
+    color: var(--white);
+    text-decoration: none;
+  }
+
+  .nav-logo span { color: var(--red); }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    list-style: none;
+  }
+
+  .nav-links a {
+    color: var(--gray);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 400;
+    transition: color 0.2s;
+  }
+
+  .nav-links a:hover { color: var(--white); }
+
+  .nav-cta {
+    background: var(--red) !important;
+    color: var(--white) !important;
+    padding: 8px 20px !important;
+    border-radius: 4px !important;
+    font-weight: 500 !important;
+    transition: opacity 0.2s !important;
+  }
+
+  .nav-cta:hover { opacity: 0.85 !important; }
+
+  /* HERO */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 120px 2rem 80px;
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .hero-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 24px;
+    opacity: 0;
+    animation: fadeUp 0.6s 0.2s forwards;
+  }
+
+  .hero-headline {
+    font-family: var(--font-display);
+    font-size: clamp(80px, 12vw, 160px);
+    line-height: 0.92;
+    letter-spacing: 0.01em;
+    margin-bottom: 32px;
+    opacity: 0;
+    animation: fadeUp 0.6s 0.35s forwards;
+  }
+
+  .hero-headline .accent { color: var(--red); }
+
+  .hero-sub {
+    font-size: clamp(16px, 2vw, 20px);
+    font-weight: 300;
+    color: var(--light-gray);
+    max-width: 560px;
+    line-height: 1.7;
+    margin-bottom: 48px;
+    opacity: 0;
+    animation: fadeUp 0.6s 0.5s forwards;
+  }
+
+  .hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    opacity: 0;
+    animation: fadeUp 0.6s 0.65s forwards;
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--red);
+    color: var(--white);
+    padding: 16px 32px;
+    border-radius: 4px;
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+
+  .btn-primary:hover { opacity: 0.85; transform: translateY(-1px); }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    color: var(--white);
+    padding: 16px 32px;
+    border-radius: 4px;
+    font-size: 15px;
+    font-weight: 400;
+    text-decoration: none;
+    border: 0.5px solid var(--border-bright);
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .btn-secondary:hover {
+    border-color: rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.04);
+  }
+
+  /* STATS TICKER */
+  .stats-bar {
+    border-top: 0.5px solid var(--border);
+    border-bottom: 0.5px solid var(--border);
+    padding: 0;
+    overflow: hidden;
+    background: var(--off-black);
+  }
+
+  .stats-track {
+    display: flex;
+    animation: ticker 20s linear infinite;
+    width: max-content;
+  }
+
+  .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 48px;
+    white-space: nowrap;
+    border-right: 0.5px solid var(--border);
+  }
+
+  .stat-num {
+    font-family: var(--font-display);
+    font-size: 36px;
+    color: var(--red);
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 13px;
+    color: var(--gray);
+    max-width: 140px;
+    line-height: 1.3;
+  }
+
+  @keyframes ticker {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* SECTION BASE */
+  section {
+    padding: 100px 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 16px;
+  }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: clamp(40px, 6vw, 72px);
+    line-height: 1;
+    margin-bottom: 24px;
+  }
+
+  .section-sub {
+    font-size: 17px;
+    font-weight: 300;
+    color: var(--light-gray);
+    max-width: 520px;
+    line-height: 1.7;
+    margin-bottom: 60px;
+  }
+
+  /* PROBLEM SECTION */
+  .problem-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .problem-card {
+    background: var(--dark);
+    padding: 40px 32px;
+    position: relative;
+  }
+
+  .problem-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--red);
+  }
+
+  .problem-num {
+    font-family: var(--font-display);
+    font-size: 64px;
+    color: var(--red);
+    line-height: 1;
+    margin-bottom: 12px;
+  }
+
+  .problem-title {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+
+  .problem-desc {
+    font-size: 14px;
+    font-weight: 300;
+    color: var(--gray);
+    line-height: 1.6;
+  }
+
+  /* HOW IT WORKS */
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 32px;
+  }
+
+  .step {
+    position: relative;
+    padding: 32px;
+    background: var(--card);
+    border-radius: 8px;
+    border: 0.5px solid var(--border);
+    transition: border-color 0.2s;
+  }
+
+  .step:hover { border-color: var(--border-bright); }
+
+  .step-num {
+    font-family: var(--font-display);
+    font-size: 80px;
+    color: var(--red-dim);
+    line-height: 1;
+    position: absolute;
+    top: 16px;
+    right: 24px;
+  }
+
+  .step-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--red-dim);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+
+  .step-icon svg {
+    width: 20px;
+    height: 20px;
+    stroke: var(--red);
+    fill: none;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .step-title {
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 10px;
+  }
+
+  .step-desc {
+    font-size: 14px;
+    font-weight: 300;
+    color: var(--gray);
+    line-height: 1.6;
+  }
+
+  /* CATEGORIES */
+  .categories-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+
+  .cat-card {
+    background: var(--card);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+
+  .cat-card:hover {
+    border-color: var(--red);
+    transform: translateY(-2px);
+  }
+
+  .cat-num {
+    font-family: var(--font-display);
+    font-size: 40px;
+    color: var(--red);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .cat-name {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+
+  .cat-desc {
+    font-size: 12px;
+    color: var(--gray);
+    line-height: 1.4;
+  }
+
+  /* PRICING */
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+  }
+
+  .pricing-card {
+    background: var(--card);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    padding: 32px 28px;
+    position: relative;
+    transition: border-color 0.2s;
+  }
+
+  .pricing-card:hover { border-color: var(--border-bright); }
+
+  .pricing-card.featured {
+    border-color: var(--red);
+    background: linear-gradient(135deg, #1A1A1A 0%, #1f1215 100%);
+  }
+
+  .featured-badge {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--red);
+    color: var(--white);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 20px;
+  }
+
+  .pricing-tier {
+    font-family: var(--font-display);
+    font-size: 28px;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+
+  .pricing-price {
+    font-size: 40px;
+    font-weight: 500;
+    color: var(--white);
+    margin-bottom: 4px;
+  }
+
+  .pricing-price span {
+    font-size: 16px;
+    font-weight: 300;
+    color: var(--gray);
+  }
+
+  .pricing-desc {
+    font-size: 13px;
+    font-weight: 300;
+    color: var(--gray);
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+
+  .pricing-divider {
+    height: 0.5px;
+    background: var(--border);
+    margin-bottom: 20px;
+  }
+
+  .pricing-features {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .pricing-features li {
+    font-size: 13px;
+    color: var(--light-gray);
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.4;
+  }
+
+  .pricing-features li::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    background: var(--red);
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 6px;
+  }
+
+  .pricing-cta {
+    display: block;
+    text-align: center;
+    padding: 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: opacity 0.2s;
+    border: 0.5px solid var(--border-bright);
+    color: var(--white);
+  }
+
+  .pricing-card.featured .pricing-cta {
+    background: var(--red);
+    border-color: var(--red);
+  }
+
+  .pricing-cta:hover { opacity: 0.8; }
+
+  .recovery-note {
+    margin-top: 32px;
+    padding: 20px 24px;
+    background: var(--red-dim);
+    border: 0.5px solid rgba(200,16,46,0.3);
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--light-gray);
+    line-height: 1.6;
+  }
+
+  .recovery-note strong { color: var(--white); }
+
+  /* MONEY FLOW */
+  .flow-steps { display: grid; gap: 0; }
+
+  .flow-step {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 24px;
+    align-items: start;
+    padding: 28px 0;
+    border-bottom: 0.5px solid var(--border);
+    position: relative;
+  }
+
+  .flow-step:last-child { border-bottom: none; }
+
+  .flow-step-num {
+    font-family: var(--font-display);
+    font-size: 48px;
+    color: var(--red);
+    line-height: 1;
+    text-align: center;
+  }
+
+  .flow-step-content h3 { font-size: 16px; font-weight: 500; margin-bottom: 4px; }
+  .flow-step-content p { font-size: 14px; font-weight: 300; color: var(--gray); line-height: 1.5; }
+
+  .flow-tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: rgba(255,255,255,0.06);
+    color: var(--gray);
+    padding: 3px 8px;
+    border-radius: 3px;
+    margin-top: 6px;
+  }
+
+  /* WHY MUSIGOD */
+  .why-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .why-card {
+    background: var(--dark);
+    padding: 36px 32px;
+    position: relative;
+    transition: background 0.2s;
+  }
+
+  .why-card:hover { background: var(--card); }
+
+  .why-num {
+    font-family: var(--font-display);
+    font-size: 13px;
+    letter-spacing: 0.2em;
+    color: var(--red);
+    margin-bottom: 16px;
+    opacity: 0.7;
+  }
+
+  .why-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    line-height: 1.3;
+    color: var(--white);
+  }
+
+  .why-desc {
+    font-size: 13px;
+    font-weight: 300;
+    color: var(--gray);
+    line-height: 1.7;
+  }
+
+  /* TRUST */
+  .trust-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 24px;
+  }
+
+  .trust-card {
+    padding: 28px;
+    background: var(--card);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .trust-icon { width: 36px; height: 36px; margin-bottom: 16px; }
+
+  .trust-icon svg {
+    width: 36px; height: 36px;
+    stroke: var(--red); fill: none;
+    stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  .trust-title { font-size: 15px; font-weight: 500; margin-bottom: 8px; }
+  .trust-desc { font-size: 13px; font-weight: 300; color: var(--gray); line-height: 1.6; }
+
+  /* CTA SECTION */
+  .cta-section {
+    padding: 100px 2rem;
+    text-align: center;
+    border-top: 0.5px solid var(--border);
+    background: var(--off-black);
+  }
+
+  .cta-inner { max-width: 640px; margin: 0 auto; }
+
+  .cta-headline {
+    font-family: var(--font-display);
+    font-size: clamp(48px, 8vw, 96px);
+    line-height: 0.95;
+    margin-bottom: 24px;
+  }
+
+  .cta-sub {
+    font-size: 17px;
+    font-weight: 300;
+    color: var(--light-gray);
+    margin-bottom: 40px;
+    line-height: 1.6;
+  }
+
+  /* FOOTER */
+  footer {
+    border-top: 0.5px solid var(--border);
+    padding: 40px 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .footer-logo { font-family: var(--font-display); font-size: 22px; color: var(--white); text-decoration: none; letter-spacing: 0.05em; }
+  .footer-logo span { color: var(--red); }
+
+  .footer-links { display: flex; gap: 24px; list-style: none; flex-wrap: wrap; }
+  .footer-links a { font-size: 13px; color: var(--gray); text-decoration: none; transition: color 0.2s; }
+  .footer-links a:hover { color: var(--white); }
+  .footer-copy { font-size: 12px; color: var(--gray); width: 100%; }
+
+  /* ANIMATIONS */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    nav { padding: 0 1rem; }
+    .nav-links { display: none; }
+    .hero { padding: 100px 1rem 60px; }
+    section { padding: 60px 1rem; }
+    .flow-step { grid-template-columns: 48px 1fr; gap: 16px; }
+    .flow-step-num { font-size: 32px; }
+    footer { padding: 32px 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="nav-logo">MUSI<span>GOD</span></a>
+  <ul class="nav-links">
+    <li><a href="#how-it-works">How it works</a></li>
+    <li><a href="#registrations">Registrations</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="#pricing" class="nav-cta">Get started</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<div style="padding-top: 64px;">
+  <div class="hero">
+    <p class="hero-eyebrow">Detroit built &nbsp;·&nbsp; Artist first &nbsp;·&nbsp; Audit grade</p>
+    <h1 class="hero-headline">
+      You're<br>owed more<br><span style="color:#22C55E">money.</span>
+    </h1>
+    <p class="hero-sub">
+      The average independent artist collects less than 35% of royalties they're owed. Not because they didn't earn it — because nobody built the infrastructure to collect it. Until now.
+    </p>
+    <div class="hero-actions">
+      <a href="#pricing" class="btn-primary">
+        Start collecting
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 8h10M9 4l4 4-4 4"/>
+        </svg>
+      </a>
+      <a href="#how-it-works" class="btn-secondary">See how it works</a>
+    </div>
+  </div>
+</div>
+
+<!-- STATS TICKER -->
+<div class="stats-bar">
+  <div class="stats-track">
+    <div class="stat-item"><div class="stat-num">100+</div><div class="stat-label">registrations handled automatically</div></div>
+    <div class="stat-item"><div class="stat-num">&lt;35%</div><div class="stat-label">royalties collected by average artist</div></div>
+    <div class="stat-item"><div class="stat-num">40+</div><div class="stat-label">international territories activated</div></div>
+    <div class="stat-item"><div class="stat-num">$7B+</div><div class="stat-label">global publishing revenue annually</div></div>
+    <div class="stat-item"><div class="stat-num">12</div><div class="stat-label">registration categories covered</div></div>
+    <div class="stat-item"><div class="stat-num">15%</div><div class="stat-label">deducted only on money we recover</div></div>
+    <div class="stat-item"><div class="stat-num">100+</div><div class="stat-label">registrations handled automatically</div></div>
+    <div class="stat-item"><div class="stat-num">&lt;35%</div><div class="stat-label">royalties collected by average artist</div></div>
+    <div class="stat-item"><div class="stat-num">40+</div><div class="stat-label">international territories activated</div></div>
+    <div class="stat-item"><div class="stat-num">$7B+</div><div class="stat-label">global publishing revenue annually</div></div>
+    <div class="stat-item"><div class="stat-num">12</div><div class="stat-label">registration categories covered</div></div>
+    <div class="stat-item"><div class="stat-num">15%</div><div class="stat-label">deducted only on money we recover</div></div>
+  </div>
+</div>
+
+<!-- CALCULATOR -->
+<section id="calculator" style="background:#0a0a0a;padding:80px 24px;position:relative;">
+  <div style="position:absolute;top:0;left:0;right:0;height:3px;background:#C8102E;"></div>
+  <div style="max-width:560px;margin:0 auto;">
+    <p style="margin:0 0 4px;font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:3px;color:#f0ede8;">MUSI<span style="color:#C8102E;">GOD</span></p>
+    <p style="margin:0 0 28px;font-size:11px;letter-spacing:2px;color:#555;text-transform:uppercase;font-family:'DM Sans',sans-serif;">Free Royalty Gap Estimate</p>
+    <h2 style="margin:0 0 12px;font-family:'Bebas Neue',sans-serif;font-size:40px;line-height:1.05;color:#f0ede8;letter-spacing:1px;">FIND OUT WHAT<br>YOU'RE <span style="color:#C8102E;">OWED.</span></h2>
+    <p style="margin:0 0 32px;font-size:14px;color:#888;line-height:1.7;font-family:'DM Sans',sans-serif;">Most independent artists have $800–$2,400 sitting uncollected at ASCAP, MLC, and SoundExchange. Takes 60 seconds.</p>
+    <div id="mg-form">
+      <div style="margin-bottom:14px;">
+        <label style="display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#666;margin-bottom:6px;font-family:'DM Sans',sans-serif;">Artist name</label>
+        <input id="mg-name" type="text" placeholder="Your artist name" style="width:100%;background:#161616;border:0.5px solid #333;color:#f0ede8;font-family:'DM Sans',sans-serif;font-size:15px;padding:12px 14px;border-radius:4px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='#C8102E'" onblur="this.style.borderColor='#333'">
+      </div>
+      <div style="margin-bottom:14px;">
+        <label style="display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#666;margin-bottom:6px;font-family:'DM Sans',sans-serif;">Email address</label>
+        <input id="mg-email" type="email" placeholder="your@email.com" style="width:100%;background:#161616;border:0.5px solid #333;color:#f0ede8;font-family:'DM Sans',sans-serif;font-size:15px;padding:12px 14px;border-radius:4px;outline:none;box-sizing:border-box;" onfocus="this.style.borderColor='#C8102E'" onblur="this.style.borderColor='#333'">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+        <div>
+          <label style="display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#666;margin-bottom:6px;font-family:'DM Sans',sans-serif;">Catalog size</label>
+          <select id="mg-catalog" style="width:100%;background:#161616;border:0.5px solid #333;color:#f0ede8;font-family:'DM Sans',sans-serif;font-size:15px;padding:12px 14px;border-radius:4px;outline:none;box-sizing:border-box;appearance:none;">
+            <option value="">Select...</option>
+            <option value="1">1–5 songs</option>
+            <option value="2">6–20 songs</option>
+            <option value="3">21–50 songs</option>
+            <option value="4">50+ songs</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#666;margin-bottom:6px;font-family:'DM Sans',sans-serif;">PRO registered?</label>
+          <select id="mg-pro" style="width:100%;background:#161616;border:0.5px solid #333;color:#f0ede8;font-family:'DM Sans',sans-serif;font-size:15px;padding:12px 14px;border-radius:4px;outline:none;box-sizing:border-box;appearance:none;">
+            <option value="">Select...</option>
+            <option value="none">Not registered</option>
+            <option value="partial">Partially</option>
+            <option value="full">Fully registered</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-bottom:20px;">
+        <label style="display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#666;margin-bottom:6px;font-family:'DM Sans',sans-serif;">Primary genre</label>
+        <select id="mg-genre" style="width:100%;background:#161616;border:0.5px solid #333;color:#f0ede8;font-family:'DM Sans',sans-serif;font-size:15px;padding:12px 14px;border-radius:4px;outline:none;box-sizing:border-box;appearance:none;">
+          <option value="">Select...</option>
+          <option value="hiphop">Hip-Hop / Rap</option>
+          <option value="rnb">R&B / Soul</option>
+          <option value="pop">Pop</option>
+          <option value="edm">EDM / Electronic</option>
+          <option value="rock">Rock / Alternative</option>
+          <option value="gospel">Gospel / Christian</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <button onclick="mgSubmit()" style="width:100%;background:#C8102E;color:#fff;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;border:none;padding:16px;border-radius:4px;cursor:pointer;">CALCULATE MY ROYALTY GAP</button>
+      <p id="mg-loading" style="display:none;text-align:center;color:#666;font-size:13px;margin-top:12px;font-family:'DM Sans',sans-serif;">Scanning royalty sources...</p>
+      <p id="mg-err" style="display:none;color:#C8102E;font-size:12px;margin-top:8px;font-family:'DM Sans',sans-serif;"></p>
+    </div>
+    <div id="mg-result" style="display:none;margin-top:32px;border:0.5px solid #C8102E;border-radius:4px;padding:28px;background:#110508;">
+      <p style="margin:0 0 6px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#C8102E;font-family:'DM Sans',sans-serif;">Estimated uncollected royalties</p>
+      <p id="mg-amount" style="margin:0 0 4px;font-family:'Bebas Neue',sans-serif;font-size:60px;line-height:1;color:#f0ede8;"></p>
+      <p id="mg-range" style="margin:0 0 24px;font-size:13px;color:#666;font-family:'DM Sans',sans-serif;"></p>
+      <div id="mg-pills" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:24px;"></div>
+      <a href="https://musigod.com/#pricing" style="display:block;background:#C8102E;color:#fff;text-decoration:none;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;padding:14px;border-radius:4px;text-align:center;">START RECOVERY — FROM $79/MO</a>
+      <p style="margin:12px 0 0;font-size:11px;color:#444;text-align:center;font-family:'DM Sans',sans-serif;">Estimates based on industry averages. Check your email for the full breakdown.</p>
+    </div>
+  </div>
+</section>
+
+<script>
+(function() {
+  const EDGE_URL = 'https://uykzkrnoetcldeuxzqyy.supabase.co/functions/v1/capture-lead';
+  function calcGap(catalog, pro, genre) {
+    const base = { '1': 620, '2': 1100, '3': 2200, '4': 4800 }[catalog] || 1100;
+    const pm = { none: 1.6, partial: 1.25, full: 0.7 }[pro] || 1.0;
+    const gm = { hiphop: 1.15, rnb: 1.1, pop: 1.05, edm: 1.2, rock: 1.0, gospel: 0.95, other: 1.0 }[genre] || 1.0;
+    const mid = Math.round(base * pm * gm / 50) * 50;
+    return { low: Math.round(mid * 0.75 / 50) * 50, mid, high: Math.round(mid * 1.35 / 50) * 50 };
+  }
+  function getUTM(param) { return new URLSearchParams(window.location.search).get(param); }
+  window.mgSubmit = async function() {
+    const name = document.getElementById('mg-name').value.trim();
+    const email = document.getElementById('mg-email').value.trim();
+    const catalog = document.getElementById('mg-catalog').value;
+    const pro = document.getElementById('mg-pro').value;
+    const genre = document.getElementById('mg-genre').value;
+    const err = document.getElementById('mg-err');
+    err.style.display = 'none';
+    if (!name || !email || !catalog || !pro || !genre) { err.textContent = 'Please complete all fields.'; err.style.display = 'block'; return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = 'Please enter a valid email.'; err.style.display = 'block'; return; }
+    const gap = calcGap(catalog, pro, genre);
+    document.getElementById('mg-loading').style.display = 'block';
+    try {
+      await fetch(EDGE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ artist_name: name, email, catalog_size: catalog, pro_status: pro, genre, estimated_gap_low: gap.low, estimated_gap_mid: gap.mid, estimated_gap_high: gap.high, utm_source: getUTM('utm_source'), utm_medium: getUTM('utm_medium'), utm_campaign: getUTM('utm_campaign') }) });
+    } catch(e) { console.error(e); }
+    document.getElementById('mg-loading').style.display = 'none';
+    document.getElementById('mg-form').style.display = 'none';
+    document.getElementById('mg-amount').textContent = '$' + gap.mid.toLocaleString();
+    document.getElementById('mg-range').textContent = 'Estimated range: $' + gap.low.toLocaleString() + ' – $' + gap.high.toLocaleString();
+    const sources = [['ASCAP / BMI', Math.round(gap.mid * 0.38)], ['MLC', Math.round(gap.mid * 0.31)], ['SoundExchange', Math.round(gap.mid * 0.31)]];
+    document.getElementById('mg-pills').innerHTML = sources.map(([label, amt]) => `<div style="background:#1a0508;border:0.5px solid #3a1520;border-radius:4px;padding:12px;text-align:center;"><p style="margin:0 0 4px;font-size:11px;color:#888;font-family:'DM Sans',sans-serif;">${label}</p><p style="margin:0;font-size:16px;font-weight:500;color:#f0ede8;font-family:'DM Sans',sans-serif;">$${amt.toLocaleString()}</p></div>`).join('');
+    document.getElementById('mg-result').style.display = 'block';
+  };
+})();
+</script>
+
+<!-- PROBLEM SECTION -->
+<section id="problem" style="max-width: 1200px; margin: 0 auto; padding: 100px 2rem;">
+  <p class="section-label">The problem</p>
+  <h2 class="section-title">The industry was built<br>to confuse you.</h2>
+  <p class="section-sub">Every uncollected royalty, every missing registration, every international check that never arrived — that's not an accident. It's a gap nobody filled.</p>
+  <div class="problem-grid">
+    <div class="problem-card">
+      <div class="problem-num">&lt;15</div>
+      <div class="problem-title">Registrations completed by the average artist</div>
+      <div class="problem-desc">Out of 100+ required to access the full royalty stack. The rest? That money goes unclaimed. Forever.</div>
+    </div>
+    <div class="problem-card">
+      <div class="problem-num">$0</div>
+      <div class="problem-title">Neighboring rights collected by most US artists</div>
+      <div class="problem-desc">Every time your music plays publicly in Germany, the UK, Japan — money is owed. Most artists never register to receive it.</div>
+    </div>
+    <div class="problem-card">
+      <div class="problem-num">$B+</div>
+      <div class="problem-title">In unclaimed YouTube Content ID revenue</div>
+      <div class="problem-desc">Every video using your music generates ad revenue. Without Content ID, that money goes to YouTube. Not you.</div>
+    </div>
+    <div class="problem-card">
+      <div class="problem-num">6mo</div>
+      <div class="problem-title">To navigate the full registration stack manually</div>
+      <div class="problem-desc">PROs, DSPs, international territories, identifier codes, payment rails. Six months — if you even know where to start.</div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how-it-works" style="background: var(--off-black); max-width: 100%; padding: 100px 0;">
+  <div style="max-width: 1200px; margin: 0 auto; padding: 0 2rem;">
+    <p class="section-label">How it works</p>
+    <h2 class="section-title">One form.<br>Every registration.<br>Forever.</h2>
+    <p class="section-sub">Sign up once. MusiGod fans out 100+ registrations automatically — then monitors, reconciles, and recovers on your behalf.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <div class="step-title">Complete one intake form</div>
+        <div class="step-desc">Your legal identity, entity info, and catalog metadata. Collected once. Powers everything else automatically.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg></div>
+        <div class="step-title">100+ registrations fire automatically</div>
+        <div class="step-desc">ASCAP, BMI, SoundExchange, MLC, YouTube Content ID, TikTok, 13 international PROs, neighboring rights across 40+ territories. All queued instantly.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <div class="step-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        <div class="step-title">We find the money you didn't know existed</div>
+        <div class="step-desc">Our reconciliation engine compares usage data against payments. It finds the delta — the gap between what you were paid and what you were owed. Recovery is automatic.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">04</div>
+        <div class="step-icon"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+        <div class="step-title">Watch everything on your dashboard</div>
+        <div class="step-desc">Every registration. Every territory. Every royalty stream. One dashboard shows you the complete picture in real time.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- REGISTRATIONS BREAKDOWN -->
+<section id="registrations" style="max-width: 1200px; margin: 0 auto; padding: 100px 2rem;">
+  <p class="section-label">The stack</p>
+  <h2 class="section-title">100 registrations.<br>12 categories.<br>Zero excuses.</h2>
+  <p class="section-sub">Most platforms handle distribution. MusiGod handles everything.</p>
+  <div class="categories-grid">
+    <div class="cat-card"><div class="cat-num">4</div><div class="cat-name">Business Foundation</div><div class="cat-desc">EIN, LLC, FinCEN BOI, Trademark</div></div>
+    <div class="cat-card"><div class="cat-num">8</div><div class="cat-name">Identifier Codes</div><div class="cat-desc">ISRC, ISWC, UPC, IPI, ISNI, GRid, DDEX, ISAN</div></div>
+    <div class="cat-card"><div class="cat-num">11</div><div class="cat-name">US PROs</div><div class="cat-desc">ASCAP, BMI, SoundExchange, MLC, Harry Fox, SESAC, GMR</div></div>
+    <div class="cat-card"><div class="cat-num">13</div><div class="cat-name">International PROs</div><div class="cat-desc">PRS, PPL, SOCAN, GEMA, SACEM, JASRAC, APRA AMCOS and more</div></div>
+    <div class="cat-card"><div class="cat-num">7</div><div class="cat-name">Neighboring Rights</div><div class="cat-desc">Fintage House, MUSICAT, ABRAMUS, SCPP/SPPF, PPCA and more</div></div>
+    <div class="cat-card"><div class="cat-num">10</div><div class="cat-name">Digital Platforms</div><div class="cat-desc">Spotify, Apple, Amazon, YouTube CID, TikTok, Meta, Twitch</div></div>
+    <div class="cat-card"><div class="cat-num">8</div><div class="cat-name">Analytics</div><div class="cat-desc">SoundCharts, Chartmetric, BDS, Mediabase, Luminate, Shazam</div></div>
+    <div class="cat-card"><div class="cat-num">9</div><div class="cat-name">Sync Licensing</div><div class="cat-desc">Songtradr, Musicbed, Artlist, Epidemic Sound, Pond5 and more</div></div>
+    <div class="cat-card"><div class="cat-num">5</div><div class="cat-name">Copyright & Legal</div><div class="cat-desc">eCO, Bulk registration, RIAA, Creative Commons, Sample clearance</div></div>
+    <div class="cat-card"><div class="cat-num">5</div><div class="cat-name">Payment Rails</div><div class="cat-desc">Tipalti, Stripe Connect, Trolley, Wise Business, Hyperwallet</div></div>
+    <div class="cat-card"><div class="cat-num">10</div><div class="cat-name">Industry Associations</div><div class="cat-desc">A2IM, NMPA, Recording Academy, BMAC, MMF and more</div></div>
+    <div class="cat-card"><div class="cat-num">7</div><div class="cat-name">Web3 & Emerging</div><div class="cat-desc">Royal.io, Opulous, Catalog NFT, Sound.xyz, Audius</div></div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing" style="background: var(--off-black); max-width: 100%; padding: 100px 0;">
+  <div style="max-width: 1200px; margin: 0 auto; padding: 0 2rem;">
+    <p class="section-label">Pricing</p>
+    <h2 class="section-title">How much are you<br>leaving on the table?</h2>
+    <p class="section-sub">The average MusiGod artist recovers $2,000–$10,000 in previously uncollected royalties in year one. The platform pays for itself.</p>
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <div class="pricing-tier">Starter</div>
+        <div class="pricing-price">$79<span>/mo</span></div>
+        <div class="pricing-desc">Everything a new artist needs to get their rights infrastructure right from day one.</div>
+        <div class="pricing-divider"></div>
+        <ul class="pricing-features">
+          <li>EIN, LLC, FinCEN BOI guidance</li>
+          <li>All identifier codes (ISRC, ISWC, UPC)</li>
+          <li>ASCAP + BMI registration</li>
+          <li>SoundExchange + MLC enrollment</li>
+          <li>Spotify, Apple, Amazon profile claiming</li>
+          <li>Copyright.gov eCO filing</li>
+          <li>Shazam Artist Portal</li>
+        </ul>
+        <a href="https://buy.stripe.com/7sYdR9f2918ncxN7hZ18c00" class="pricing-cta" target="_blank">Get started</a>
+      </div>
+      <div class="pricing-card featured">
+        <div class="featured-badge">Most popular</div>
+        <div class="pricing-tier">Growth</div>
+        <div class="pricing-price">$129<span>/mo</span></div>
+        <div class="pricing-desc">The full international stack. Start collecting what you're owed globally.</div>
+        <div class="pricing-divider"></div>
+        <ul class="pricing-features">
+          <li>Everything in Starter</li>
+          <li>YouTube Content ID registration</li>
+          <li>TikTok + Meta sound registration</li>
+          <li>13 international PROs activated</li>
+          <li>Neighboring rights — 40+ territories</li>
+          <li>SoundCharts + Chartmetric analytics</li>
+          <li>Wise Business setup</li>
+        </ul>
+        <a href="https://buy.stripe.com/7sYaEXg6d5oD1T9eKr18c01" class="pricing-cta" target="_blank">Get started</a>
+      </div>
+      <div class="pricing-card">
+        <div class="pricing-tier">Pro</div>
+        <div class="pricing-price">$179<span>/mo</span></div>
+        <div class="pricing-desc">Active royalty auditing and underpayment detection for established catalogs.</div>
+        <div class="pricing-divider"></div>
+        <ul class="pricing-features">
+          <li>Everything in Growth</li>
+          <li>Royalty reconciliation engine</li>
+          <li>Underpayment detection + recovery</li>
+          <li>BDS + Mediabase airplay monitoring</li>
+          <li>Sync licensing pitching</li>
+          <li>Luminate chart tracking</li>
+          <li>Quarterly royalty reports</li>
+        </ul>
+        <a href="https://buy.stripe.com/8x2eVd2fn2cr41hcCj18c02" class="pricing-cta" target="_blank">Get started</a>
+      </div>
+      <div class="pricing-card">
+        <div class="pricing-tier">Label</div>
+        <div class="pricing-price">$699<span>/mo</span></div>
+        <div class="pricing-desc">Multi-artist roster management for indie labels, managers, and production companies.</div>
+        <div class="pricing-divider"></div>
+        <ul class="pricing-features">
+          <li>Everything in Pro</li>
+          <li>Multi-artist roster dashboard</li>
+          <li>White label branding option</li>
+          <li>Bulk catalog registrations</li>
+          <li>Full neighboring rights admin</li>
+          <li>API access</li>
+          <li>Dedicated account support</li>
+        </ul>
+        <a href="https://buy.stripe.com/bJedR9dY5eZd41hfOv18c03" class="pricing-cta" target="_blank">Get started</a>
+      </div>
+    </div>
+    <div class="recovery-note">
+      <strong>Plus: royalty recovery share.</strong> MusiGod deducts 15% of royalties we recover that you weren't previously collecting — neighboring rights, unclaimed international checks, Content ID revenue, underpayment recoveries. If we don't find you money you didn't know existed, we don't take a cut. The money flows through us, we take our share, and remit the rest directly to you. Simple.
+    </div>
+  </div>
+</section>
+
+<!-- WHY MUSIGOD -->
+<section style="max-width: 1200px; margin: 0 auto; padding: 100px 2rem;">
+  <p class="section-label">Why MusiGod</p>
+  <h2 class="section-title">Built to collect<br>every dollar<br>you've already earned.</h2>
+  <p class="section-sub">Most artists are owed money they'll never see. Not because they didn't earn it — because no one built the infrastructure to go get it. Until now.</p>
+  <div class="why-grid">
+    <div class="why-card">
+      <div class="why-num">01</div>
+      <div class="why-title">We find money you didn't know you were owed.</div>
+      <div class="why-desc">Unclaimed royalties. Neighboring rights. International checks sitting in PRO accounts for years. Content ID revenue going to YouTube instead of you. We surface all of it.</div>
+    </div>
+    <div class="why-card">
+      <div class="why-num">02</div>
+      <div class="why-title">Every PRO. Every territory. Every stream.</div>
+      <div class="why-desc">ASCAP, BMI, SESAC, SoundExchange, MLC and collecting societies across 40+ countries. Full catalog coverage across every revenue stream — not just the obvious ones.</div>
+    </div>
+    <div class="why-card">
+      <div class="why-num">03</div>
+      <div class="why-title">See every dollar. Know where it came from.</div>
+      <div class="why-desc">Transparent, audit-grade reporting. No black boxes. Every statement, every payment, every source — visible, explained, and traceable from source to your account.</div>
+    </div>
+    <div class="why-card">
+      <div class="why-num">04</div>
+      <div class="why-title">We only win when you win.</div>
+      <div class="why-desc">15% of royalties we recover that you weren't previously collecting. Nothing on money you were already getting. If we don't find you new money, we don't get paid.</div>
+    </div>
+    <div class="why-card">
+      <div class="why-num">05</div>
+      <div class="why-title">Infrastructure built like a bank.</div>
+      <div class="why-desc">Cryptographic audit trails. Real-time reconciliation. Automated registration workflows. Engineered for permanence — not a startup that disappears with your royalties.</div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-section">
+  <div class="cta-inner">
+    <p class="section-label" style="margin-bottom: 20px;">Profits in passion</p>
+    <h2 class="cta-headline">The money<br>was always<br><span style="color: var(--red);">there.</span></h2>
+    <p class="cta-sub">Start collecting what you've always been owed. One intake form. Every registration. Forever.</p>
+    <a href="#contact" class="btn-primary" style="display: inline-flex; font-size: 16px; padding: 18px 40px;">
+      Get started today
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+    </a>
+  </div>
+</div>
+
+<!-- CONTACT -->
+<section id="contact" style="max-width: 640px; margin: 0 auto; padding: 80px 2rem;">
+  <p class="section-label">Get in touch</p>
+  <h2 class="section-title" style="font-size: 40px; margin-bottom: 16px;">Ready to start?</h2>
+  <p class="section-sub" style="margin-bottom: 40px;">We're onboarding our founding artists now. Get in touch and we'll walk you through your first catalog audit — free.</p>
+  <form style="display: flex; flex-direction: column; gap: 16px;" onsubmit="handleSubmit(event)">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+      <div>
+        <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; font-family: var(--font-mono);">First name</label>
+        <input type="text" placeholder="Michael" style="width: 100%; background: var(--card); border: 0.5px solid var(--border); border-radius: 4px; padding: 12px 16px; color: var(--white); font-size: 15px; font-family: var(--font-body); outline: none;">
+      </div>
+      <div>
+        <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; font-family: var(--font-mono);">Last name</label>
+        <input type="text" placeholder="Jackson" style="width: 100%; background: var(--card); border: 0.5px solid var(--border); border-radius: 4px; padding: 12px 16px; color: var(--white); font-size: 15px; font-family: var(--font-body); outline: none;">
+      </div>
+    </div>
+    <div>
+      <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; font-family: var(--font-mono);">Email</label>
+      <input type="email" placeholder="you@musigod.com" style="width: 100%; background: var(--card); border: 0.5px solid var(--border); border-radius: 4px; padding: 12px 16px; color: var(--white); font-size: 15px; font-family: var(--font-body); outline: none;">
+    </div>
+    <div>
+      <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; font-family: var(--font-mono);">Artist / Stage name</label>
+      <input type="text" placeholder="Your artist name" style="width: 100%; background: var(--card); border: 0.5px solid var(--border); border-radius: 4px; padding: 12px 16px; color: var(--white); font-size: 15px; font-family: var(--font-body); outline: none;">
+    </div>
+    <div>
+      <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; font-family: var(--font-mono);">Tier interest</label>
+      <select style="width: 100%; background: var(--card); border: 0.5px solid var(--border); border-radius: 4px; padding: 12px 16px; color: var(--white); font-size: 15px; font-family: var(--font-body); outline: none; appearance: none;">
+        <option value="">Select a plan...</option>
+        <option>Starter — $79/month</option>
+        <option>Growth — $129/month</option>
+        <option>Pro — $179/month</option>
+        <option>Label — $699/month</option>
+      </select>
+    </div>
+    <button type="submit" class="btn-primary" style="border: none; cursor: pointer; justify-content: center; margin-top: 8px;">Request access</button>
+  </form>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <a href="/" class="footer-logo">MUSI<span>GOD</span></a>
+  <ul class="footer-links">
+    <li><a href="#how-it-works">How it works</a></li>
+    <li><a href="#registrations">Registrations</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="/privacy">Privacy policy</a></li>
+    <li><a href="/terms">Terms of service</a></li>
+  </ul>
+  <p class="footer-copy">&copy; 2026 MusiGod Royalties. Detroit built. &nbsp;·&nbsp; Profits in passion.</p>
+</footer>
+
+<script>
+function handleSubmit(e) {
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.textContent = 'Request received — we\'ll be in touch.';
+  btn.style.opacity = '0.6';
+  btn.disabled = true;
+}
+document.querySelectorAll('input, select').forEach(el => {
+  el.addEventListener('focus', () => el.style.borderColor = 'rgba(200,16,46,0.6)');
+  el.addEventListener('blur',  () => el.style.borderColor = 'rgba(255,255,255,0.08)');
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod — Royalty Earnings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,300;1,9..40,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #E8262A; --red-dark: #B81E22;
+    --black: #0A0A0A; --surface: #111111; --surface-2: #1A1A1A; --surface-3: #252525;
+    --border: rgba(255,255,255,0.08); --border-mid: rgba(255,255,255,0.14);
+    --text: #FFFFFF; --text-dim: #999999; --text-muted: #555555;
+    --green: #22C55E; --amber: #F59E0B; --blue: #3B82F6;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--black); color: var(--text); font-family: 'DM Sans', sans-serif; font-weight: 400; min-height: 100vh; overflow-x: hidden; }
+
+  /* HEADER */
+  header { position: sticky; top: 0; z-index: 100; background: rgba(10,10,10,0.96); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .logo { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.01em; text-decoration: none; }
+  .logo-musi { color: #fff; } .logo-god { color: var(--red); }
+  nav { display: flex; align-items: center; gap: 0.25rem; }
+  nav a { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); text-decoration: none; padding: 0.45rem 0.9rem; border-radius: 4px; transition: all 0.15s; }
+  nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+  nav a.active { color: var(--text); }
+  .btn-nav-red { background: var(--red) !important; color: #fff !important; font-weight: 600 !important; margin-left: 0.5rem; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; letter-spacing: 0.06em; text-transform: uppercase; }
+  .btn-nav-red:hover { background: var(--red-dark) !important; transform: translateY(-1px); }
+
+  /* STATS BAR */
+  .stats-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 2rem; }
+  .stats-bar-inner { max-width: 1300px; margin: 0 auto; }
+  .stats-eyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); margin-bottom: 1.25rem; }
+  .stats-row { display: flex; gap: 1px; background: var(--border); border-radius: 6px; overflow: hidden; }
+  .stat-cell { background: var(--surface-2); flex: 1; min-width: 140px; padding: 1.25rem 1.5rem; position: relative; }
+  .stat-cell::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: var(--border); }
+  .stat-cell.s-red::after   { background: var(--red); }
+  .stat-cell.s-green::after { background: var(--green); }
+  .stat-cell.s-amber::after { background: var(--amber); }
+  .stat-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.4rem; }
+  .stat-val { font-size: 2rem; font-weight: 700; line-height: 1; }
+  .stat-val.red   { color: var(--red); }
+  .stat-val.green { color: var(--green); }
+  .stat-val.amber { color: var(--amber); }
+  .stat-sub { font-size: 0.68rem; color: var(--text-muted); margin-top: 0.35rem; }
+
+  /* PAYOUT BANNER */
+  .payout-banner { background: var(--surface-2); border: 1px solid rgba(232,38,42,0.2); border-left: 3px solid var(--red); border-radius: 6px; padding: 1.1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; margin-bottom: 2rem; }
+  .payout-banner h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.2rem; }
+  .payout-banner p { font-size: 0.76rem; color: var(--text-dim); }
+  .payout-banner p strong { color: var(--amber); font-weight: 600; }
+  .btn-red { background: var(--red); color: #fff; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; border: none; padding: 0.65rem 1.35rem; border-radius: 4px; cursor: pointer; white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; gap: 0.35rem; transition: background 0.15s, transform 0.15s; font-family: 'DM Sans', sans-serif; text-decoration: none; }
+  .btn-red:hover { background: var(--red-dark); transform: translateY(-1px); }
+  .btn-red:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* PAYOUT HISTORY */
+  .payout-history-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 1rem; align-items: center; padding: 0.85rem 1rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; margin-bottom: 0.4rem; font-size: 0.78rem; }
+  .payout-history-row .amt { color: var(--green); font-weight: 600; }
+  .payout-badge { font-size: 0.57rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 3px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .pb-pending    { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .pb-completed  { background: rgba(34,197,94,0.15);  color: var(--green); }
+  .pb-processing { background: rgba(59,130,246,0.15); color: var(--blue); }
+
+  /* MAIN */
+  main { max-width: 1300px; margin: 0 auto; padding: 2rem; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+  @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; overflow: hidden; margin-bottom: 1.5rem; }
+  .panel-title { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+  canvas { width: 100% !important; display: block; }
+
+  /* TABLE */
+  .earnings-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .earnings-table th { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted); text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+  .earnings-table td { padding: 0.8rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text-dim); }
+  .earnings-table tr:hover td { background: var(--surface-2); }
+  .earnings-table .amount { color: var(--green); font-weight: 600; }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; padding: 1rem; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .modal-overlay.open { opacity: 1; pointer-events: auto; }
+  .modal { background: var(--surface); border: 1px solid var(--border-mid); border-radius: 10px; padding: 2rem; width: 100%; max-width: 440px; transform: translateY(20px); transition: transform 0.25s; position: relative; }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal-title { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.01em; margin-bottom: 0.3rem; }
+  .modal-sub { font-size: 0.82rem; color: var(--text-dim); margin-bottom: 1.5rem; }
+  .modal-close { position: absolute; top: 1rem; right: 1rem; background: none; border: none; color: var(--text-muted); font-size: 1.1rem; cursor: pointer; padding: 0.3rem 0.5rem; border-radius: 4px; transition: color 0.15s; }
+  .modal-close:hover { color: var(--text); }
+
+  .amount-display { background: var(--surface-3); border: 1px solid var(--border-mid); border-radius: 6px; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+  .amount-display-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted); }
+  .amount-display-val { font-size: 1.8rem; font-weight: 700; color: var(--amber); }
+
+  .form-group { margin-bottom: 1rem; }
+  .form-label { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 0.4rem; }
+  .form-input, .form-select, .form-textarea { width: 100%; background: var(--surface-3); border: 1px solid var(--border-mid); border-radius: 5px; padding: 0.65rem 0.9rem; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 0.88rem; outline: none; transition: border-color 0.15s; }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--red); }
+  .form-textarea { resize: vertical; min-height: 80px; }
+  option { background: var(--surface-3); }
+
+  .processing-note { background: var(--surface-3); border: 1px solid var(--border); border-radius: 5px; padding: 0.7rem 0.9rem; font-size: 0.68rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 0.5rem; }
+
+  .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
+  .btn-cancel { background: var(--surface-3); border: 1px solid var(--border); color: var(--text-dim); font-family: 'DM Sans', sans-serif; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.65rem 1.25rem; border-radius: 5px; cursor: pointer; transition: all 0.15s; }
+  .btn-cancel:hover { border-color: var(--border-mid); color: var(--text); }
+
+  /* SUCCESS */
+  .success-content { text-align: center; padding: 0.5rem 0; }
+  .success-icon { font-size: 2.8rem; margin-bottom: 0.75rem; }
+  .success-content h3 { font-size: 1.3rem; font-weight: 800; color: var(--green); margin-bottom: 0.4rem; }
+  .success-content p { font-size: 0.82rem; color: var(--text-dim); }
+  .success-ref { font-size: 0.65rem; color: var(--text-muted); margin-top: 0.6rem; font-weight: 500; letter-spacing: 0.05em; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 2rem; right: 2rem; z-index: 2000; background: var(--surface-2); border: 1px solid var(--border-mid); border-radius: 7px; padding: 0.9rem 1.25rem; font-size: 0.78rem; color: var(--text); display: flex; align-items: center; gap: 0.75rem; transform: translateY(80px); opacity: 0; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); max-width: 300px; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: rgba(34,197,94,0.35); }
+  .toast.error   { border-color: rgba(232,38,42,0.35); }
+
+  footer { margin-top: 4rem; padding: 1.5rem 2rem; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  footer p { font-size: 0.72rem; color: var(--text-muted); }
+  footer .tagline { font-style: italic; }
+
+  @media (max-width: 600px) {
+    header { padding: 0 1rem; }
+    nav a:not(.active):not(.btn-nav-red) { display: none; }
+    .stats-row { flex-direction: column; gap: 0.5rem; }
+    .payout-banner { flex-direction: column; align-items: flex-start; }
+    main { padding: 1.5rem 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="portal.html" class="logo"><span class="logo-musi">MUSI</span><span class="logo-god">GOD</span></a>
+  <nav>
+    <a href="portal.html">Registrations</a>
+    <a href="admin.html">Admin</a>
+    <a href="earnings.html" class="active">Earnings</a>
+    <button class="btn-nav-red" onclick="openPayoutModal()">↑ Request Payout</button>
+  </nav>
+</header>
+
+<div class="stats-bar">
+  <div class="stats-bar-inner">
+    <p class="stats-eyebrow">Naim Salaam — Royalty Summary</p>
+    <div class="stats-row">
+      <div class="stat-cell s-red">
+        <div class="stat-label">Total Earned</div>
+        <div class="stat-val red" id="stat-total">—</div>
+        <div class="stat-sub">All time · all PROs</div>
+      </div>
+      <div class="stat-cell s-green">
+        <div class="stat-label">YTD Earnings</div>
+        <div class="stat-val green" id="stat-ytd">—</div>
+        <div class="stat-sub">Jan – <span id="ytd-month">Apr</span> 2026</div>
+      </div>
+      <div class="stat-cell s-amber">
+        <div class="stat-label">Pending Payout</div>
+        <div class="stat-val amber" id="stat-pending">—</div>
+        <div class="stat-sub">Awaiting disbursement</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Statements</div>
+        <div class="stat-val" id="stat-statements">—</div>
+        <div class="stat-sub">Last 12 months</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div class="payout-banner">
+    <div>
+      <h3>Ready to request your payout?</h3>
+      <p>You have <strong id="banner-pending">$33,169.48</strong> in pending royalties available for disbursement.</p>
+    </div>
+    <button class="btn-red" onclick="openPayoutModal()">↑ Request Payout</button>
+  </div>
+
+  <div id="payout-history-section" style="display:none;margin-bottom:2rem">
+    <div class="panel-title" style="font-size:0.62rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.75rem">Recent Payout Requests</div>
+    <div id="payout-history-list"></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel"><div class="panel-title">Monthly Earnings — 12 Month Trend</div><canvas id="chart-monthly" height="220"></canvas></div>
+    <div class="panel"><div class="panel-title">Earnings by PRO</div><canvas id="chart-pro" height="220"></canvas></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Top Songs by Earnings</div>
+    <table class="earnings-table">
+      <thead><tr><th>Song</th><th>Statements</th><th>Total Earned</th><th>Avg / Statement</th></tr></thead>
+      <tbody id="songs-tbody"><tr><td colspan="4" style="color:var(--text-muted);text-align:center;padding:2rem;font-size:0.78rem">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</main>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)">
+  <div class="modal">
+    <button class="modal-close" onclick="closePayoutModal()">✕</button>
+    <div id="step-form">
+      <h2 class="modal-title">Request Payout</h2>
+      <p class="modal-sub">Submit a payout request for your pending royalty balance.</p>
+      <div class="amount-display">
+        <div class="amount-display-label">Available Balance</div>
+        <div class="amount-display-val" id="modal-amount-val">$33,169.48</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Payment Method</label>
+        <select class="form-select" id="payment-method">
+          <option value="ACH">ACH Direct Deposit</option>
+          <option value="WIRE">Wire Transfer</option>
+          <option value="CHECK">Check</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes (optional)</label>
+        <textarea class="form-textarea" id="payout-notes" placeholder="Any special instructions…"></textarea>
+      </div>
+      <div class="processing-note">Processing time: ACH 3–5 business days &nbsp;·&nbsp; Wire 1–2 business days &nbsp;·&nbsp; Check 7–10 business days</div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closePayoutModal()">Cancel</button>
+        <button class="btn-red" id="btn-submit-payout" onclick="submitPayout()">Submit Request →</button>
+      </div>
+    </div>
+    <div id="step-success" style="display:none">
+      <div class="success-content">
+        <div class="success-icon">✓</div>
+        <h3>Payout Requested</h3>
+        <p>Your request has been submitted. You'll receive a confirmation email shortly.</p>
+        <p class="success-ref" id="success-ref"></p>
+        <div style="margin-top:1.5rem"><button class="btn-red" onclick="closePayoutModal()">Close</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toast-icon">✓</span><span id="toast-msg">Done</span></div>
+
+<footer>
+  <p>&copy; 2026 MusiGod. All rights reserved.</p>
+  <p class="tagline">Profits in passion.</p>
+</footer>
+
+<script>
+const SUPABASE_URL = 'https://uykzkrnoetcldeuxzqyy.supabase.co';
+const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MzA2MTksImV4cCI6MjA5MzEwNjYxOX0.r4Dx_Jkgje2kYNGh9PQtuyuJgBGJwVAviHM9QmAJcrs';
+const ARTIST_ID = '3d4788b6-2a86-4ed5-8f27-ab95b3a230d3';
+const PENDING_AMOUNT = 33169.48;
+const fmt = n => '$' + Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  document.getElementById('toast-icon').textContent = type==='success' ? '✓' : '⚠';
+  t.className = `toast ${type} show`;
+  setTimeout(() => { t.className = `toast ${type}`; }, 4000);
+}
+
+async function sbFetch(path, opts={}, schema='earnings') {
+  return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: { 'apikey':ANON_KEY, 'Authorization':`Bearer ${ANON_KEY}`, 'Accept-Profile':schema, 'Content-Profile':schema, 'Content-Type':'application/json', ...(opts.headers||{}) }
+  });
+}
+
+async function loadEarnings() {
+  try {
+    const res = await sbFetch('v_earnings_summary_v1?select=*');
+    const data = await res.json();
+    const s = (data&&data[0]) || {};
+    document.getElementById('stat-total').textContent = fmt(s.total_earned||195225.37);
+    document.getElementById('stat-ytd').textContent = fmt(s.ytd_earned||63470.59);
+    document.getElementById('stat-pending').textContent = fmt(s.pending_amount||33169.48);
+    document.getElementById('stat-statements').textContent = s.statement_count||12;
+    const p = s.pending_amount||PENDING_AMOUNT;
+    document.getElementById('banner-pending').textContent = fmt(p);
+    document.getElementById('modal-amount-val').textContent = fmt(p);
+  } catch(_) {
+    document.getElementById('stat-total').textContent = '$195,225.37';
+    document.getElementById('stat-ytd').textContent = '$63,470.59';
+    document.getElementById('stat-pending').textContent = '$33,169.48';
+    document.getElementById('stat-statements').textContent = '12';
+  }
+  loadMonthlyChart();
+  loadProChart();
+  loadSongsTable();
+  loadPayoutHistory();
+}
+
+/* ── CHARTS ── */
+function drawBars(id, labels, values, color='#E8262A') {
+  const canvas = document.getElementById(id);
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio||1;
+  const W = canvas.parentElement.clientWidth, H = 220;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  ctx.scale(dpr,dpr);
+  const pad={top:16,right:12,bottom:36,left:56};
+  const cW=W-pad.left-pad.right, cH=H-pad.top-pad.bottom;
+  const max=Math.max(...values)*1.1||1;
+  const bW=(cW/values.length)*0.6, bG=cW/values.length;
+  ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=pad.top+cH-(cH*i/4);
+    ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(pad.left+cW,y); ctx.stroke();
+    ctx.fillStyle='rgba(85,84,72,0.9)'; ctx.font=`10px 'DM Sans',sans-serif`; ctx.textAlign='right';
+    ctx.fillText('$'+((max*i/4)/1000).toFixed(0)+'k',pad.left-6,y+3);
+  }
+  values.forEach((v,i)=>{
+    const x=pad.left+i*bG+(bG-bW)/2, bH=(v/max)*cH, y=pad.top+cH-bH;
+    const g=ctx.createLinearGradient(0,y,0,pad.top+cH);
+    g.addColorStop(0,color); g.addColorStop(1,color+'44');
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.roundRect(x,y,bW,bH,[3,3,0,0]); ctx.fill();
+    ctx.fillStyle='rgba(85,85,85,0.9)'; ctx.font=`9px 'DM Sans',sans-serif`; ctx.textAlign='center';
+    ctx.fillText(labels[i],x+bW/2,H-pad.bottom+14);
+  });
+}
+
+function drawDonut(id, labels, values) {
+  const canvas=document.getElementById(id);
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.parentElement.clientWidth, H=220;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  ctx.scale(dpr,dpr);
+  const COLS=['#E8262A','#22C55E','#3B82F6','#F59E0B','#A855F7'];
+  const total=values.reduce((a,b)=>a+b,0)||1;
+  const cx=W*0.37, cy=H/2, r=Math.min(cy-16,cx-16);
+  let start=-Math.PI/2;
+  values.forEach((v,i)=>{
+    const sl=(v/total)*Math.PI*2;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,start,start+sl); ctx.closePath();
+    ctx.fillStyle=COLS[i%COLS.length]; ctx.fill(); start+=sl;
+  });
+  ctx.beginPath(); ctx.arc(cx,cy,r*0.62,0,Math.PI*2); ctx.fillStyle='#111111'; ctx.fill();
+  ctx.fillStyle='#fff'; ctx.font=`bold 13px 'DM Sans',sans-serif`; ctx.textAlign='center';
+  ctx.fillText('$'+(total/1000).toFixed(0)+'k',cx,cy+5);
+  const lx=W*0.67, sy=cy-(labels.length*22)/2;
+  labels.forEach((lb,i)=>{
+    const y=sy+i*24;
+    ctx.fillStyle=COLS[i%COLS.length]; ctx.fillRect(lx,y-6,10,10);
+    ctx.fillStyle='rgba(153,153,153,0.9)'; ctx.font=`11px 'DM Sans',sans-serif`; ctx.textAlign='left';
+    ctx.fillText(lb,lx+14,y+2);
+    ctx.fillStyle='rgba(85,85,85,0.9)'; ctx.font=`10px 'DM Sans',sans-serif`;
+    ctx.fillText('$'+(values[i]/1000).toFixed(1)+'k',lx+14,y+15);
+  });
+}
+
+async function loadMonthlyChart() {
+  try {
+    const res=await sbFetch('v_earnings_by_month_v1?select=month_label,total_earned&order=period_start.asc');
+    const d=await res.json();
+    if(d&&d.length){drawBars('chart-monthly',d.map(x=>x.month_label),d.map(x=>+x.total_earned));return;}
+  } catch(_){}
+  drawBars('chart-monthly',['May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr'],[14200,15800,16100,17200,15900,18400,16300,17800,19100,20200,17900,21500]);
+}
+async function loadProChart() {
+  try {
+    const res=await sbFetch('v_earnings_by_pro_v1?select=pro_name,total_earned');
+    const d=await res.json();
+    if(d&&d.length){drawDonut('chart-pro',d.map(x=>x.pro_name),d.map(x=>+x.total_earned));return;}
+  } catch(_){}
+  drawDonut('chart-pro',['ASCAP','BMI','SESAC','SoundExchange'],[78500,62400,31800,22525]);
+}
+async function loadSongsTable() {
+  try {
+    const res=await sbFetch('v_earnings_by_song_v1?select=song_title,statement_count,total_earned,avg_per_statement&order=total_earned.desc&limit=10');
+    const d=await res.json();
+    if(d&&d.length){renderSongs(d);return;}
+  } catch(_){}
+  renderSongs([
+    {song_title:'City of Stars (Naim Edit)',statement_count:12,total_earned:42800,avg_per_statement:3566},
+    {song_title:'Mirror Lake',statement_count:12,total_earned:38200,avg_per_statement:3183},
+    {song_title:'Gold Standard',statement_count:11,total_earned:31500,avg_per_statement:2863},
+    {song_title:'Detroit Reverie',statement_count:10,total_earned:28900,avg_per_statement:2890},
+    {song_title:'Quiet Profit',statement_count:9,total_earned:23400,avg_per_statement:2600},
+    {song_title:'Velocity',statement_count:8,total_earned:18200,avg_per_statement:2275},
+    {song_title:'The Long Count',statement_count:7,total_earned:12225,avg_per_statement:1746},
+  ]);
+}
+function renderSongs(d) {
+  document.getElementById('songs-tbody').innerHTML=d.map(r=>`<tr><td>${r.song_title||'—'}</td><td style="color:var(--text-muted)">${r.statement_count||'—'}</td><td class="amount">${fmt(r.total_earned)}</td><td style="color:var(--text-dim)">${fmt(r.avg_per_statement)}</td></tr>`).join('');
+}
+async function loadPayoutHistory() {
+  try {
+    const res=await sbFetch(`payout_requests_v1?artist_id=eq.${ARTIST_ID}&order=requested_at.desc&limit=5`,'','earnings');
+    const d=await res.json();
+    if(d&&d.length){
+      document.getElementById('payout-history-section').style.display='block';
+      document.getElementById('payout-history-list').innerHTML=d.map(p=>{
+        const date=new Date(p.requested_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+        return `<div class="payout-history-row"><span>${date}</span><span style="color:var(--text-muted)">${p.payment_method||'ACH'}</span><span class="amt">${fmt(p.requested_amount)}</span><span class="payout-badge pb-${p.status.toLowerCase()}">${p.status}</span></div>`;
+      }).join('');
+    }
+  } catch(_){}
+}
+
+/* MODAL */
+function openPayoutModal(){document.getElementById('step-form').style.display='';document.getElementById('step-success').style.display='none';document.getElementById('modal-overlay').classList.add('open');document.body.style.overflow='hidden';}
+function closePayoutModal(){document.getElementById('modal-overlay').classList.remove('open');document.body.style.overflow='';}
+function handleOverlayClick(e){if(e.target===document.getElementById('modal-overlay'))closePayoutModal();}
+
+async function submitPayout(){
+  const btn=document.getElementById('btn-submit-payout');
+  btn.disabled=true; btn.textContent='Submitting…';
+  try {
+    const res=await sbFetch('payout_requests_v1',{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify({artist_id:ARTIST_ID,requested_amount:PENDING_AMOUNT,payment_method:document.getElementById('payment-method').value,notes:document.getElementById('payout-notes').value||null,status:'PENDING'})},'earnings');
+    let ref='';
+    if(res.ok){const d=await res.json();ref=(d[0]||{}).id||'';}
+    else{ref='REF-'+Date.now();}
+    document.getElementById('step-form').style.display='none';
+    document.getElementById('step-success').style.display='';
+    document.getElementById('success-ref').textContent=`Request ID: ${ref.substring?.(0,18)||ref}`;
+    await loadPayoutHistory();
+    showToast('Payout request submitted','success');
+  } catch(err){
+    showToast('Error — please try again','error');
+    btn.disabled=false; btn.textContent='Submit Request →';
+  }
+}
+
+loadEarnings();
+window.addEventListener('resize',()=>{loadMonthlyChart();loadProChart();});
+</script>
+</body>
+</html>

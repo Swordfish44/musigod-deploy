@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod — Artist Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,300;1,9..40,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #E8262A;
+    --red-dark: #B81E22;
+    --black: #0A0A0A;
+    --surface: #111111;
+    --surface-2: #1A1A1A;
+    --surface-3: #252525;
+    --border: rgba(255,255,255,0.08);
+    --border-mid: rgba(255,255,255,0.14);
+    --text: #FFFFFF;
+    --text-dim: #999999;
+    --text-muted: #555555;
+    --green: #22C55E;
+    --amber: #F59E0B;
+    --blue: #3B82F6;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--black); color: var(--text); font-family: 'DM Sans', sans-serif; font-weight: 400; min-height: 100vh; overflow-x: hidden; }
+
+  /* HEADER */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,10,10,0.96); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 64px;
+  }
+  .logo { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.01em; text-decoration: none; }
+  .logo-musi { color: #fff; }
+  .logo-god  { color: var(--red); }
+  nav { display: flex; align-items: center; gap: 0.25rem; }
+  nav a { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); text-decoration: none; padding: 0.45rem 0.9rem; border-radius: 4px; transition: all 0.15s; }
+  nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+  nav a.active { color: var(--text); }
+  .btn-nav-red { background: var(--red) !important; color: #fff !important; font-weight: 600 !important; margin-left: 0.5rem; transition: background 0.15s, transform 0.15s !important; }
+  .btn-nav-red:hover { background: var(--red-dark) !important; transform: translateY(-1px); }
+
+  /* HERO */
+  .hero { border-bottom: 1px solid var(--border); padding: 3rem 2rem 2.5rem; }
+  .hero-inner { max-width: 1300px; margin: 0 auto; }
+  .hero-eyebrow { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); margin-bottom: 0.6rem; }
+  .hero h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 0.4rem; }
+  .hero-sub { color: var(--text-dim); font-size: 0.88rem; margin-bottom: 1.75rem; }
+
+  /* STATS */
+  .stats-row { display: flex; gap: 1px; background: var(--border); border-radius: 6px; overflow: hidden; margin-bottom: 1.5rem; }
+  .stat-cell { background: var(--surface-2); flex: 1; min-width: 130px; padding: 1rem 1.25rem; }
+  .stat-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.3rem; }
+  .stat-val { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+  .val-white { color: var(--text); }
+  .val-amber { color: var(--amber); }
+  .val-blue  { color: var(--blue); }
+  .val-green { color: var(--green); }
+
+  /* EARNINGS PROMO */
+  .earnings-promo {
+    background: var(--surface-2); border: 1px solid rgba(232,38,42,0.2);
+    border-left: 3px solid var(--red); border-radius: 6px;
+    padding: 1rem 1.5rem; display: flex; align-items: center;
+    justify-content: space-between; gap: 1rem; max-width: 680px; margin-bottom: 2rem;
+  }
+  .earnings-promo h3 { font-size: 0.88rem; font-weight: 600; margin-bottom: 0.2rem; }
+  .earnings-promo p { font-size: 0.76rem; color: var(--text-dim); }
+  .earnings-promo p .g { color: var(--green); font-weight: 600; }
+  .earnings-promo p .a { color: var(--amber); font-weight: 600; }
+  .btn-red {
+    background: var(--red); color: #fff;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    border: none; padding: 0.6rem 1.25rem; border-radius: 4px;
+    cursor: pointer; text-decoration: none; white-space: nowrap; flex-shrink: 0;
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    transition: background 0.15s, transform 0.15s;
+  }
+  .btn-red:hover { background: var(--red-dark); transform: translateY(-1px); }
+
+  /* MAIN */
+  main { max-width: 1300px; margin: 0 auto; padding: 2rem; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+  .section-title { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); }
+  .section-count { font-size: 0.72rem; color: var(--text-muted); }
+
+  /* FILTERS */
+  .filters { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+  .filter-btn { font-size: 0.7rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim); padding: 0.35rem 0.85rem; border-radius: 4px; cursor: pointer; transition: all 0.15s; }
+  .filter-btn:hover { border-color: var(--border-mid); color: var(--text); }
+  .filter-btn.active { background: var(--red); border-color: var(--red); color: #fff; }
+
+  /* GRID */
+  .reg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .reg-card { background: var(--surface); padding: 1.25rem; cursor: pointer; transition: background 0.15s; text-decoration: none; display: block; color: inherit; position: relative; }
+  .reg-card:hover { background: var(--surface-2); }
+  .reg-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.5rem; }
+  .reg-card-type { font-size: 0.92rem; font-weight: 600; line-height: 1.3; }
+  .status-badge { font-size: 0.57rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.22rem 0.55rem; border-radius: 3px; flex-shrink: 0; }
+  .badge-pending    { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .badge-completed  { background: rgba(34,197,94,0.15);  color: var(--green); }
+  .badge-in-progress{ background: rgba(59,130,246,0.15); color: var(--blue);  }
+  .reg-card-meta { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+  .reg-card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); font-size: 0.65rem; color: var(--text-muted); }
+  .reg-card-arrow { transition: transform 0.15s, color 0.15s; }
+  .reg-card:hover .reg-card-arrow { transform: translateX(3px); color: var(--red); }
+
+  /* LOADING */
+  .loading-state, .empty-state { padding: 3rem; text-align: center; color: var(--text-muted); font-size: 0.82rem; }
+  .spinner { width: 28px; height: 28px; border: 2px solid var(--border); border-top-color: var(--red); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* FOOTER */
+  footer { margin-top: 4rem; padding: 1.5rem 2rem; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  footer p { font-size: 0.72rem; color: var(--text-muted); }
+  footer .tagline { font-style: italic; }
+
+  @media (max-width: 600px) {
+    header { padding: 0 1rem; }
+    nav a:not(.active):not(.btn-nav-red) { display: none; }
+    .hero { padding: 2rem 1rem; }
+    main { padding: 1.5rem 1rem; }
+    .reg-grid { grid-template-columns: 1fr; }
+    .earnings-promo { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="portal.html" class="logo"><span class="logo-musi">MUSI</span><span class="logo-god">GOD</span></a>
+  <nav>
+    <a href="portal.html" class="active">Registrations</a>
+    <a href="admin.html">Admin</a>
+    <a href="earnings.html" class="btn-nav-red">View Earnings →</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">Artist Dashboard</p>
+    <h1>Welcome back, Naim Salaam</h1>
+    <p class="hero-sub" id="hero-sub">Loading your registrations&hellip;</p>
+
+    <div class="stats-row" id="stats-row" style="display:none">
+      <div class="stat-cell"><div class="stat-label">Total</div><div class="stat-val val-white" id="stat-total">—</div></div>
+      <div class="stat-cell"><div class="stat-label">Pending</div><div class="stat-val val-amber" id="stat-pending">—</div></div>
+      <div class="stat-cell"><div class="stat-label">In Progress</div><div class="stat-val val-blue" id="stat-inprogress">—</div></div>
+      <div class="stat-cell"><div class="stat-label">Completed</div><div class="stat-val val-green" id="stat-completed">—</div></div>
+    </div>
+
+    <div class="earnings-promo">
+      <div>
+        <h3>Your Royalty Earnings</h3>
+        <p>YTD: <span class="g">$63,470.59</span> &nbsp;·&nbsp; Pending payout: <span class="a">$33,169.48</span></p>
+      </div>
+      <a href="earnings.html" class="btn-red">View Earnings →</a>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div class="section-header">
+    <span class="section-title">Registrations</span>
+    <span class="section-count" id="reg-count"></span>
+  </div>
+  <div class="filters" id="filters" style="display:none">
+    <button class="filter-btn active" onclick="filterRegs('ALL',this)">All</button>
+    <button class="filter-btn" onclick="filterRegs('PENDING',this)">Pending</button>
+    <button class="filter-btn" onclick="filterRegs('IN_PROGRESS',this)">In Progress</button>
+    <button class="filter-btn" onclick="filterRegs('COMPLETED',this)">Completed</button>
+  </div>
+  <div id="reg-container"><div class="loading-state"><div class="spinner"></div>Loading registrations…</div></div>
+</main>
+
+<footer>
+  <p>&copy; 2026 MusiGod. All rights reserved.</p>
+  <p class="tagline">Profits in passion.</p>
+</footer>
+
+<script>
+const SUPABASE_URL = 'https://uykzkrnoetcldeuxzqyy.supabase.co';
+const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MzA2MTksImV4cCI6MjA5MzEwNjYxOX0.r4Dx_Jkgje2kYNGh9PQtuyuJgBGJwVAviHM9QmAJcrs';
+const ARTIST_ID = '3d4788b6-2a86-4ed5-8f27-ab95b3a230d3';
+let allRegs = [], currentFilter = 'ALL';
+
+async function fetchRegistrations() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/registrations_v1?artist_id=eq.${ARTIST_ID}&order=created_at.desc`, {
+      headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}`, 'Accept-Profile': 'registrations' }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    allRegs = await res.json();
+    renderAll();
+  } catch(err) {
+    document.getElementById('reg-container').innerHTML = `<div class="empty-state"><div style="color:var(--red);margin-bottom:0.4rem">Could not load registrations</div><div style="font-size:0.7rem">${err.message}</div></div>`;
+    document.getElementById('hero-sub').textContent = 'Could not connect to server.';
+  }
+}
+
+function renderAll() {
+  const filtered = currentFilter === 'ALL' ? allRegs : allRegs.filter(r => r.status === currentFilter);
+  const counts = { PENDING:0, IN_PROGRESS:0, COMPLETED:0 };
+  allRegs.forEach(r => { if(counts[r.status]!==undefined) counts[r.status]++; });
+  document.getElementById('stat-total').textContent = allRegs.length;
+  document.getElementById('stat-pending').textContent = counts.PENDING;
+  document.getElementById('stat-inprogress').textContent = counts.IN_PROGRESS;
+  document.getElementById('stat-completed').textContent = counts.COMPLETED;
+  document.getElementById('stats-row').style.display = 'flex';
+  document.getElementById('filters').style.display = 'flex';
+  document.getElementById('reg-count').textContent = `${filtered.length} of ${allRegs.length}`;
+  document.getElementById('hero-sub').textContent = `${allRegs.length} registrations on file.`;
+
+  if (!filtered.length) { document.getElementById('reg-container').innerHTML = `<div class="empty-state">No registrations match this filter.</div>`; return; }
+
+  const grid = document.createElement('div');
+  grid.className = 'reg-grid';
+  filtered.forEach(r => {
+    const bc = r.status==='IN_PROGRESS'?'badge-in-progress':r.status==='COMPLETED'?'badge-completed':'badge-pending';
+    const label = `${r.registration_type||''}${r.registration_category?' — '+r.registration_category:''}`;
+    const created = r.created_at ? new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+    const card = document.createElement('a');
+    card.href = `registration-detail.html?id=${r.id}`;
+    card.className = 'reg-card';
+    card.innerHTML = `
+      <div class="reg-card-top">
+        <div class="reg-card-type">${label}</div>
+        <span class="status-badge ${bc}">${r.status.replace('_',' ')}</span>
+      </div>
+      <div class="reg-card-meta">${created}</div>
+      <div class="reg-card-footer"><span>ID: ${r.id.substring(0,8)}…</span><span class="reg-card-arrow">→</span></div>`;
+    grid.appendChild(card);
+  });
+  document.getElementById('reg-container').innerHTML = '';
+  document.getElementById('reg-container').appendChild(grid);
+}
+
+function filterRegs(status, btn) {
+  currentFilter = status;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAll();
+}
+fetchRegistrations();
+</script>
+</body>
+</html>

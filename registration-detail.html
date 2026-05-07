@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod — Registration Detail</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,300;1,9..40,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #E8262A; --red-dark: #B81E22;
+    --black: #0A0A0A; --surface: #111111; --surface-2: #1A1A1A; --surface-3: #252525;
+    --border: rgba(255,255,255,0.08); --border-mid: rgba(255,255,255,0.14);
+    --text: #FFFFFF; --text-dim: #999999; --text-muted: #555555;
+    --green: #22C55E; --amber: #F59E0B; --blue: #3B82F6;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--black); color: var(--text); font-family: 'DM Sans', sans-serif; font-weight: 400; min-height: 100vh; }
+
+  /* HEADER */
+  header { position: sticky; top: 0; z-index: 100; background: rgba(10,10,10,0.96); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .logo { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.01em; text-decoration: none; }
+  .logo-musi { color: #fff; } .logo-god { color: var(--red); }
+  nav { display: flex; gap: 0.25rem; align-items: center; }
+  nav a { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); text-decoration: none; padding: 0.45rem 0.9rem; border-radius: 4px; transition: all 0.15s; }
+  nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+
+  /* BREADCRUMB */
+  .breadcrumb-wrap { border-bottom: 1px solid var(--border); }
+  .breadcrumb { max-width: 1300px; margin: 0 auto; padding: 0.85rem 2rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.72rem; color: var(--text-muted); }
+  .breadcrumb a { color: var(--text-dim); text-decoration: none; transition: color 0.15s; }
+  .breadcrumb a:hover { color: var(--red); }
+
+  /* MAIN */
+  .page-inner { max-width: 1300px; margin: 0 auto; padding: 2rem; }
+
+  /* HERO */
+  .detail-hero { display: grid; grid-template-columns: 1fr auto; gap: 2rem; align-items: start; margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid var(--border); }
+  .hero-eyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); margin-bottom: 0.5rem; }
+  .hero-title { font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 0.5rem; }
+  .hero-id { font-size: 0.7rem; color: var(--text-muted); font-weight: 500; letter-spacing: 0.03em; }
+
+  .status-badge-lg { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.45rem 1rem; border-radius: 4px; display: inline-block; }
+  .badge-pending    { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .badge-completed  { background: rgba(34,197,94,0.15);  color: var(--green); }
+  .badge-in-progress{ background: rgba(59,130,246,0.15); color: var(--blue); }
+  .badge-unknown    { background: rgba(85,85,85,0.2);    color: var(--text-muted); }
+  .status-date { font-size: 0.68rem; color: var(--text-muted); margin-top: 0.4rem; text-align: right; }
+
+  /* LAYOUT */
+  .detail-grid { display: grid; grid-template-columns: 1fr 320px; gap: 1.5rem; align-items: start; }
+  @media (max-width: 900px) { .detail-grid { grid-template-columns: 1fr; } .detail-hero { grid-template-columns: 1fr; } .status-date { text-align: left; } }
+
+  /* PANELS */
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 1.25rem; }
+  .panel-header { padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .panel-title { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); }
+  .panel-body { padding: 1.25rem; }
+
+  /* META GRID */
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; }
+  @media (max-width: 600px) { .meta-grid { grid-template-columns: 1fr; } }
+  .meta-key { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.25rem; }
+  .meta-val { font-size: 0.88rem; color: var(--text); word-break: break-word; }
+  .meta-val.mono { font-family: monospace; font-size: 0.75rem; color: var(--text-dim); }
+
+  /* JSON */
+  .json-block { background: var(--surface-3); border: 1px solid var(--border); border-radius: 5px; padding: 1rem; font-family: monospace; font-size: 0.72rem; line-height: 1.7; color: var(--text-dim); overflow-x: auto; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; }
+  .jk { color: var(--amber); } .js { color: #6EE7B7; } .jn { color: var(--blue); } .jb { color: var(--red); } .jnull { color: var(--text-muted); }
+
+  /* TIMELINE */
+  .timeline { position: relative; padding-left: 1.5rem; }
+  .timeline::before { content: ''; position: absolute; left: 6px; top: 10px; bottom: 10px; width: 1px; background: var(--border); }
+  .timeline-item { position: relative; margin-bottom: 1.5rem; }
+  .timeline-item:last-child { margin-bottom: 0; }
+  .tl-dot { position: absolute; left: -1.5rem; top: 4px; width: 13px; height: 13px; border-radius: 50%; background: var(--surface-3); border: 2px solid var(--border-mid); }
+  .tl-dot.done { background: var(--green); border-color: var(--green); }
+  .tl-dot.current-p { background: var(--amber); border-color: var(--amber); box-shadow: 0 0 0 3px rgba(245,158,11,0.15); }
+  .tl-dot.current-ip { background: var(--blue); border-color: var(--blue); box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+  .tl-dot.current-c { background: var(--green); border-color: var(--green); box-shadow: 0 0 0 3px rgba(34,197,94,0.15); }
+  .tl-when { font-size: 0.62rem; color: var(--text-muted); margin-bottom: 0.2rem; font-weight: 500; }
+  .tl-what { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.15rem; }
+  .tl-detail { font-size: 0.72rem; color: var(--text-muted); }
+
+  /* ACTIONS */
+  .action-btn { width: 100%; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim); font-family: 'DM Sans', sans-serif; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.75rem 1rem; border-radius: 5px; cursor: pointer; text-align: left; display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; transition: all 0.15s; text-decoration: none; }
+  .action-btn:hover { border-color: var(--border-mid); color: var(--text); background: var(--surface-3); }
+  .action-btn.red { background: rgba(232,38,42,0.08); border-color: rgba(232,38,42,0.25); color: var(--red); }
+  .action-btn.red:hover { background: rgba(232,38,42,0.14); }
+
+  /* COPY BTN */
+  .copy-btn { background: none; border: none; cursor: pointer; font-size: 0.6rem; color: var(--text-muted); padding: 0.15rem 0.4rem; border-radius: 3px; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+  .copy-btn:hover { color: var(--red); background: rgba(232,38,42,0.08); }
+
+  /* LOADING / ERROR */
+  .loading-state { padding: 4rem 2rem; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+  .spinner { width: 32px; height: 32px; border: 2px solid var(--border); border-top-color: var(--red); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-state { padding: 3rem 2rem; text-align: center; }
+  .error-state h2 { font-size: 1.3rem; font-weight: 800; color: var(--red); margin-bottom: 0.5rem; }
+  .error-state p { font-size: 0.82rem; color: var(--text-muted); }
+  .empty-msg { font-size: 0.72rem; color: var(--text-muted); text-align: center; padding: 1.5rem; }
+
+  /* WARN BANNER */
+  .warn-banner { background: rgba(232,38,42,0.06); border: 1px solid rgba(232,38,42,0.2); border-radius: 5px; padding: 0.7rem 1rem; font-size: 0.68rem; color: #F87171; margin-bottom: 1.5rem; }
+
+  footer { margin-top: 4rem; padding: 1.5rem 2rem; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  footer p { font-size: 0.72rem; color: var(--text-muted); }
+  footer .tagline { font-style: italic; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="portal.html" class="logo"><span class="logo-musi">MUSI</span><span class="logo-god">GOD</span></a>
+  <nav>
+    <a href="portal.html">← Portal</a>
+    <a href="earnings.html">Earnings</a>
+    <a href="admin.html">Admin</a>
+  </nav>
+</header>
+
+<div class="breadcrumb-wrap">
+  <div class="breadcrumb">
+    <a href="portal.html">Registrations</a>
+    <span>/</span>
+    <span id="breadcrumb-title">Loading…</span>
+  </div>
+</div>
+
+<div class="page-inner" id="page-content">
+  <div class="loading-state"><div class="spinner"></div>Loading registration…</div>
+</div>
+
+<footer>
+  <p>&copy; 2026 MusiGod. All rights reserved.</p>
+  <p class="tagline">Profits in passion.</p>
+</footer>
+
+<script>
+const SUPABASE_URL = 'https://uykzkrnoetcldeuxzqyy.supabase.co';
+const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MzA2MTksImV4cCI6MjA5MzEwNjYxOX0.r4Dx_Jkgje2kYNGh9PQtuyuJgBGJwVAviHM9QmAJcrs';
+
+function getParam(n){return new URLSearchParams(window.location.search).get(n);}
+function fmtDate(dt){if(!dt)return'—';return new Date(dt).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+function fmtShort(dt){if(!dt)return'—';return new Date(dt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function copy(t){navigator.clipboard.writeText(t).catch(()=>{});}
+
+function statusBadge(s){
+  const m={'PENDING':'badge-pending','IN_PROGRESS':'badge-in-progress','COMPLETED':'badge-completed'};
+  return `<span class="status-badge-lg ${m[s]||'badge-unknown'}">${(s||'UNKNOWN').replace('_',' ')}</span>`;
+}
+
+function highlightJson(obj){
+  if(!obj||!Object.keys(obj).length)return'<span style="color:var(--text-muted)">No data</span>';
+  return JSON.stringify(obj,null,2).replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,m=>{
+    let c='jn';
+    if(/^"/.test(m)){c=/:$/.test(m)?'jk':'js';}
+    else if(/true|false/.test(m))c='jb';
+    else if(/null/.test(m))c='jnull';
+    return`<span class="${c}">${m}</span>`;
+  });
+}
+
+function buildTimeline(reg){
+  const steps=[
+    {label:'Submitted',detail:'Registration received and queued.'},
+    {label:'In Progress',detail:'Task dispatcher notified. Processing underway.'},
+    {label:'Completed',detail:'Registration processed successfully.'}
+  ];
+  const order=['PENDING','IN_PROGRESS','COMPLETED'];
+  const ci=order.indexOf(reg.status);
+  return steps.map((s,i)=>{
+    const isDone=i<ci, isCurrent=i===ci;
+    const dotCls=isDone?'done':isCurrent?(reg.status==='PENDING'?'current-p':reg.status==='IN_PROGRESS'?'current-ip':'current-c'):'';
+    const when=i===0?fmtShort(reg.created_at):i===1&&reg.status!=='PENDING'?fmtShort(reg.updated_at):isCurrent?'Now':'Pending';
+    return`<div class="timeline-item"><div class="tl-dot ${dotCls}"></div><div class="tl-when">${when}</div><div class="tl-what">${s.label}</div><div class="tl-detail">${s.detail}</div></div>`;
+  }).join('');
+}
+
+function renderPage(reg, warn){
+  const title=`${reg.registration_type||''}${reg.registration_category?' — '+reg.registration_category:''}`;
+  document.title=`MusiGod — ${title}`;
+  document.getElementById('breadcrumb-title').textContent=title;
+
+  const core=[
+    ['Registration Type', reg.registration_type||'—'],
+    ['Category', reg.registration_category||'—'],
+    ['Status', `<span style="color:var(--${reg.status==='COMPLETED'?'green':reg.status==='IN_PROGRESS'?'blue':'amber'})">${(reg.status||'—').replace('_',' ')}</span>`],
+    ['Created', fmtDate(reg.created_at)],
+    ['Last Updated', fmtDate(reg.updated_at)],
+    ['Reference', `<span style="font-family:monospace;font-size:0.75rem;color:var(--text-dim)">${reg.id.substring(0,8).toUpperCase()}</span> <button class="copy-btn" onclick="copy('${reg.id}')">Copy full ID</button>`],
+  ];
+  if(reg.last_error) core.push(['Last Error',`<span style="color:var(--red);font-size:0.82rem">${reg.last_error}</span>`]);
+
+  // Pull plain-English fields from extras and metadata
+  const extras = reg;
+  const meta = reg.meta || reg.metadata || {};
+  const docs = reg.documents || [];
+
+  // Human-readable fields to surface
+  if(extras.display_name) core.push(['Name', extras.display_name]);
+  if(meta.display_name && !extras.display_name) core.push(['Name', meta.display_name]);
+  if(extras.instructions) {
+    const cleanInstructions = (extras.instructions||'').replace(/\bn8n\b/gi, 'MusiGod');
+    core.push(['Instructions', `<span style="font-size:0.85rem;line-height:1.6;color:var(--text-dim)">${cleanInstructions}</span>`]);
+  }
+  if(meta.territory) core.push(['Territory', meta.territory]);
+  if(meta.is_automated !== undefined) core.push(['Automated', meta.is_automated ? '✓ Yes — no action needed' : 'Manual — action required']);
+  if(meta.requires_human) core.push(['Requires Action', '<span style="color:var(--amber);font-weight:600">Yes — human action needed</span>']);
+  if(meta.estimated_minutes) core.push(['Est. Time', `${meta.estimated_minutes} minutes`]);
+  if(extras.attempts > 0) core.push(['Attempts', extras.attempts]);
+
+  document.getElementById('page-content').innerHTML=`
+    ${warn?`<div class="warn-banner">⚠ ${warn}</div>`:''}
+    <div class="detail-hero">
+      <div>
+        <p class="hero-eyebrow">Registration Detail</p>
+        <h1 class="hero-title">${title}</h1>
+        <p class="hero-id">ID: ${reg.id}</p>
+      </div>
+      <div>
+        ${statusBadge(reg.status)}
+        <div class="status-date">${fmtShort(reg.updated_at||reg.created_at)}</div>
+      </div>
+    </div>
+
+    <div class="detail-grid">
+      <div>
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Registration Fields</span></div>
+          <div class="panel-body">
+            <div class="meta-grid">
+              ${core.map(([k,v])=>`<div><div class="meta-key">${k}</div><div class="meta-val">${v}</div></div>`).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Documents</span></div>
+          <div class="panel-body">
+            ${!docs.length?`<p class="empty-msg">No documents attached.</p>`:docs.map(d=>`
+              <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 0;border-bottom:1px solid var(--border)">
+                <span style="font-size:1.1rem">📄</span>
+                <div style="flex:1"><div style="font-size:0.85rem">${d.name||d.filename||'Document'}</div><div style="font-size:0.68rem;color:var(--text-muted)">${d.type||''}</div></div>
+                ${d.url?`<a href="${d.url}" target="_blank" style="font-size:0.68rem;color:var(--red);text-decoration:none;font-weight:600">View ↗</a>`:''}
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Status Timeline</span></div>
+          <div class="panel-body"><div class="timeline">${buildTimeline(reg)}</div></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Actions</span></div>
+          <div class="panel-body">
+            <a href="portal.html" class="action-btn"><span>← Back to Registrations</span><span>→</span></a>
+            <button class="action-btn" onclick="copy('${reg.id}')"><span>⧉ Copy Registration ID</span><span>→</span></button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function triggerN8n(regId, btn){
+  const orig=btn.innerHTML;
+  btn.innerHTML='<span>Triggering…</span><span>⟳</span>'; btn.disabled=true;
+  try{
+    const res=await fetch('https://musigod.app.n8n.cloud/webhook/registration-task',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({registration_id:regId})});
+    btn.innerHTML=res.ok?'<span>✓ Triggered</span><span></span>':`<span style="color:var(--red)">⚠ HTTP ${res.status}</span><span></span>`;
+  }catch(e){btn.innerHTML=`<span style="color:var(--red)">⚠ ${e.message}</span><span></span>`;}
+  setTimeout(()=>{btn.innerHTML=orig;btn.disabled=false;},3500);
+}
+
+function exportJson(){
+  if(!window._reg)return;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(window._reg,null,2)],{type:'application/json'}));
+  a.download=`registration-${window._reg.id.substring(0,8)}.json`; a.click();
+}
+
+async function loadRegistration(){
+  const id=getParam('id');
+  if(!id){
+    document.getElementById('page-content').innerHTML=`<div class="error-state"><h2>No Registration ID</h2><p>Navigate here from the <a href="portal.html" style="color:var(--red)">Artist Portal</a>.</p></div>`;
+    return;
+  }
+  try{
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/registrations_v1?id=eq.${encodeURIComponent(id)}&limit=1`,{headers:{'apikey':ANON_KEY,'Authorization':`Bearer ${ANON_KEY}`,'Accept-Profile':'registrations'}});
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data=await res.json();
+    if(!data||!data.length){
+      document.getElementById('page-content').innerHTML=`<div class="error-state"><h2>Not Found</h2><p>No registration with ID <code style="color:var(--red)">${id}</code></p><p style="margin-top:1rem"><a href="portal.html" style="color:var(--red)">← Back</a></p></div>`;
+      return;
+    }
+    window._reg=data[0]; renderPage(data[0]);
+  }catch(err){
+    const mock={id,registration_type:'SONG',registration_category:'PERFORMANCE',status:'PENDING',artist_id:'3d4788b6-2a86-4ed5-8f27-ab95b3a230d3',created_at:new Date(Date.now()-86400000*3).toISOString(),updated_at:new Date(Date.now()-86400000).toISOString()};
+    window._reg=mock;
+    renderPage(mock,`Live data unavailable (${err.message}) — showing placeholder.`);
+  }
+}
+
+loadRegistration();
+</script>
+</body>
+</html>
