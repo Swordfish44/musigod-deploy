@@ -819,9 +819,10 @@ function renderReview(){
   }
 }
 
+const SUPABASE_SERVICE = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDYxOSwiZXhwIjoyMDkzMTA2NjE5fQ.jmBLX9VwFvFT4rc3lzqSJS9hFjis2QxRkmWpFizQtKk'
 async function activateOne(id, name){
   if(!confirm("Activate " + name + "?")) return;
-  const res = await fetch(SUPABASE_URL+'/rest/v1/registrations_v1?registration_id=eq.'+id, {method:'PATCH',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON,'Accept-Profile':'registrations','Content-Profile':'registrations'},body:JSON.stringify({status:'ACTIVE'})});
+  const res = await fetch(SUPABASE_URL+'/rest/v1/registrations_v1?id=eq.'+id, {method:'PATCH',headers:{'Content-Type':'application/json','apikey':SUPABASE_SERVICE,'Authorization':'Bearer '+SUPABASE_SERVICE,'Accept-Profile':'registrations','Content-Profile':'registrations'},body:JSON.stringify({status:'ACTIVE'})});
   if(!res.ok){const t=await res.text();showToast('Error: '+t,'err');return;}
   showToast(name+' ACTIVE','ok');setTimeout(()=>loadAll(),800)
 }
