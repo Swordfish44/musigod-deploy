@@ -870,6 +870,7 @@ async function submitReject(){
 
   closeRejectModal()
   showToast('Artist rejected','err')
+  await fetch('https://musigod.app.n8n.cloud/webhook/registration-rejected',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({registration_id:_rejectId,rejection_reason:reason})})
   setTimeout(()=>loadAll(),800)
 }
 
