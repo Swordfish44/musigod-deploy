@@ -822,20 +822,15 @@ function renderReview(){
 
 async function activateOne(id, name){
   if(!confirm("Activate " + name + "?")) return;
-  const res = await fetch(SUPABASE_URL+’/rest/v1/registrations_v1?id=eq.’+id, {
-    method:’PATCH’,
-    headers:{
-      ‘Content-Type’:’application/json’,
-      ‘apikey’:SUPABASE_ANON,
-      ‘Authorization’:’Bearer ‘+SUPABASE_ANON,
-      ‘Accept-Profile’:’registrations’,
-      ‘Content-Profile’:’registrations’
-    },
-    body:JSON.stringify({status:’ACTIVE’})
-  });
-  if(!res.ok){const t=await res.text();showToast(‘Error: ‘+t,’err’);return;}
-  showToast(name+’ → ACTIVE’,’ok’);
-  setTimeout(()=>loadAll(),800);
+  const res = await fetch(SUPABASE_URL+'/rest/v1/registrations_v1?id=eq.'+id, {method:'PATCH',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON,'Accept-Profile':'registrations','Content-Profile':'registrations'},body:JSON.stringify({status:'ACTIVE'})});
+  if(!res.ok){const t=await res.text();showToast('Error: '+t,'err');return;}
+  showToast(name+' ACTIVE','ok');setTimeout(()=>loadAll(),800);return;
+  const {error}=await sb.schema('registrations').rpc('fn_update_registration_status_v1',{
+    p_registration_id:id,p_status:'ACTIVE',
+    p_n8n_execution_id:null,p_external_id:null,p_external_status:null,p_last_error:null
+  })
+  if(error){showToast('Error: '+error.message,'err')}
+  else{showToast(`${name} †’ ACTIVE`,'ok');setTimeout(()=>loadAll(),800)}
 }
 
 let _rejectId = null
