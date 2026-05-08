@@ -828,9 +828,12 @@ async function activateOne(id, name){
 }
 
 let _rejectId = null
+let _rejectArtistId = null
 
 function rejectOne(id, name){
   _rejectId = id
+  const reg = allRegs.find(r=>r.registration_id===id)
+  _rejectArtistId = reg ? reg.artist_id : null
   document.getElementById('reject-modal-name').textContent = name
   document.getElementById('reject-reason').value = ''
   document.getElementById('reject-reason-err').style.display = 'none'
@@ -870,7 +873,7 @@ async function submitReject(){
 
   closeRejectModal()
   showToast('Artist rejected','err')
-  await fetch('https://musigod.app.n8n.cloud/webhook/registration-rejected',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({registration_id:_rejectId,rejection_reason:reason})})
+  await fetch('https://musigod.app.n8n.cloud/webhook/registration-rejected',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({registration_id:_rejectId,rejection_reason:reason,artist_id:_rejectArtistId})})
   setTimeout(()=>loadAll(),800)
 }
 
