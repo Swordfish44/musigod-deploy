@@ -541,45 +541,6 @@
 
   .recovery-note strong { color: var(--white); }
 
-  /* MONEY FLOW */
-  .flow-steps { display: grid; gap: 0; }
-
-  .flow-step {
-    display: grid;
-    grid-template-columns: 80px 1fr;
-    gap: 24px;
-    align-items: start;
-    padding: 28px 0;
-    border-bottom: 0.5px solid var(--border);
-    position: relative;
-  }
-
-  .flow-step:last-child { border-bottom: none; }
-
-  .flow-step-num {
-    font-family: var(--font-display);
-    font-size: 48px;
-    color: var(--red);
-    line-height: 1;
-    text-align: center;
-  }
-
-  .flow-step-content h3 { font-size: 16px; font-weight: 500; margin-bottom: 4px; }
-  .flow-step-content p { font-size: 14px; font-weight: 300; color: var(--gray); line-height: 1.5; }
-
-  .flow-tag {
-    display: inline-block;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    background: rgba(255,255,255,0.06);
-    color: var(--gray);
-    padding: 3px 8px;
-    border-radius: 3px;
-    margin-top: 6px;
-  }
-
   /* WHY MUSIGOD */
   .why-grid {
     display: grid;
@@ -623,31 +584,6 @@
     color: var(--gray);
     line-height: 1.7;
   }
-
-  /* TRUST */
-  .trust-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 24px;
-  }
-
-  .trust-card {
-    padding: 28px;
-    background: var(--card);
-    border: 0.5px solid var(--border);
-    border-radius: 8px;
-  }
-
-  .trust-icon { width: 36px; height: 36px; margin-bottom: 16px; }
-
-  .trust-icon svg {
-    width: 36px; height: 36px;
-    stroke: var(--red); fill: none;
-    stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
-  }
-
-  .trust-title { font-size: 15px; font-weight: 500; margin-bottom: 8px; }
-  .trust-desc { font-size: 13px; font-weight: 300; color: var(--gray); line-height: 1.6; }
 
   /* CTA SECTION */
   .cta-section {
@@ -707,8 +643,6 @@
     .nav-links { display: none; }
     .hero { padding: 100px 1rem 60px; }
     section { padding: 60px 1rem; }
-    .flow-step { grid-template-columns: 48px 1fr; gap: 16px; }
-    .flow-step-num { font-size: 32px; }
     footer { padding: 32px 1rem; }
   }
 </style>
@@ -723,7 +657,7 @@
     <li><a href="#registrations">Registrations</a></li>
     <li><a href="#pricing">Pricing</a></li>
     <li><a href="#contact">Contact</a></li>
-    <li><a href="#pricing" class="nav-cta">Get started</a></li>
+    <li><a href="#contact" class="nav-cta">Get started</a></li>
   </ul>
 </nav>
 
@@ -738,7 +672,7 @@
       The average independent artist collects less than 35% of royalties they're owed. Not because they didn't earn it — because nobody built the infrastructure to collect it. Until now.
     </p>
     <div class="hero-actions">
-      <a href="#pricing" class="btn-primary">
+      <a href="#contact" class="btn-primary">
         Start collecting
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 8h10M9 4l4 4-4 4"/>
@@ -827,7 +761,7 @@
       <p id="mg-amount" style="margin:0 0 4px;font-family:'Bebas Neue',sans-serif;font-size:60px;line-height:1;color:#f0ede8;"></p>
       <p id="mg-range" style="margin:0 0 24px;font-size:13px;color:#666;font-family:'DM Sans',sans-serif;"></p>
       <div id="mg-pills" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:24px;"></div>
-      <a href="https://musigod.com/#pricing" style="display:block;background:#C8102E;color:#fff;text-decoration:none;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;padding:14px;border-radius:4px;text-align:center;">START RECOVERY — FROM $79/MO</a>
+      <a href="#contact" style="display:block;background:#C8102E;color:#fff;text-decoration:none;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;padding:14px;border-radius:4px;text-align:center;">START RECOVERY — FROM $79/MO</a>
       <p style="margin:12px 0 0;font-size:11px;color:#444;text-align:center;font-family:'DM Sans',sans-serif;">Estimates based on industry averages. Check your email for the full breakdown.</p>
     </div>
   </div>
@@ -961,31 +895,30 @@
     <p class="section-label">Pricing</p>
     <h2 class="section-title">How much are you<br>leaving on the table?</h2>
     <p class="section-sub">The average MusiGod artist recovers $2,000–$10,000 in previously uncollected royalties in year one. The platform pays for itself.</p>
-          <!-- FEE TRANSPARENCY DISCLOSURE -->
-      <div style="background:#1a1a1a;border:1px solid #DC2626;border-radius:8px;padding:1.5rem 2rem;margin:2rem auto;max-width:900px;">
-        <div style="display:flex;align-items:flex-start;gap:1rem;">
-          <span style="color:#DC2626;font-size:1.4rem;">&#9888;</span>
-          <div>
-            <p style="color:#fff;font-weight:700;margin:0 0 0.5rem 0;">About Registration Fees</p>
-            <p style="color:#ccc;font-size:0.9rem;margin:0 0 1rem 0;">Your MusiGod subscription covers our service. Some registration bodies charge one-time fees paid <strong style="color:#fff;">directly by you to that organization</strong> — not to MusiGod. Most registrations are free. Fee-bearing registrations total approximately <strong style="color:#fff;">-650</strong> for a fully built-out US and international stack, paid once.</p>
-            <details><summary style="color:#DC2626;font-size:0.85rem;font-weight:600;cursor:pointer;">See full fee schedule</summary>
-              <table style="width:100%;margin-top:1rem;border-collapse:collapse;font-size:0.85rem;">
-                <tr style="border-bottom:1px solid #333;"><th style="text-align:left;padding:0.5rem;color:#999;">Registration</th><th style="text-align:left;padding:0.5rem;color:#999;">Fee</th><th style="text-align:left;padding:0.5rem;color:#999;">Paid To</th></tr>
-                <tr><td style="padding:0.5rem;color:#fff;">ASCAP Writer</td><td style="padding:0.5rem;color:#DC2626;"> one-time</td><td style="padding:0.5rem;color:#aaa;">ASCAP directly</td></tr>
-                <tr><td style="padding:0.5rem;color:#fff;">ASCAP Publisher</td><td style="padding:0.5rem;color:#DC2626;"> one-time</td><td style="padding:0.5rem;color:#aaa;">ASCAP directly</td></tr>
-                <tr><td style="padding:0.5rem;color:#fff;">BMI Publisher</td><td style="padding:0.5rem;color:#DC2626;"> one-time</td><td style="padding:0.5rem;color:#aaa;">BMI directly</td></tr>
-                <tr><td style="padding:0.5rem;color:#fff;">PRS (UK)</td><td style="padding:0.5rem;color:#DC2626;">GBP 100 one-time</td><td style="padding:0.5rem;color:#aaa;">PRS directly</td></tr>
-                <tr><td style="padding:0.5rem;color:#fff;">GEMA (Germany)</td><td style="padding:0.5rem;color:#DC2626;">~EUR 60/year</td><td style="padding:0.5rem;color:#aaa;">GEMA directly</td></tr>
-                <tr><td style="padding:0.5rem;color:#fff;">Trademark (USPTO)</td><td style="padding:0.5rem;color:#DC2626;">-350 one-time</td><td style="padding:0.5rem;color:#aaa;">USPTO directly</td></tr>
-                <tr><td style="padding:0.5rem;color:#fff;">State LLC</td><td style="padding:0.5rem;color:#DC2626;">-500 (varies)</td><td style="padding:0.5rem;color:#aaa;">Your state directly</td></tr>
-                <tr><td style="padding:0.5rem;color:#fff;">All other registrations</td><td style="padding:0.5rem;color:#22c55e;">Free</td><td style="padding:0.5rem;color:#aaa;">N/A</td></tr>
-              </table>
-            </details>
-          </div>
+    <!-- FEE TRANSPARENCY DISCLOSURE -->
+    <div style="background:#1a1a1a;border:1px solid #DC2626;border-radius:8px;padding:1.5rem 2rem;margin:2rem auto;max-width:900px;">
+      <div style="display:flex;align-items:flex-start;gap:1rem;">
+        <span style="color:#DC2626;font-size:1.4rem;">&#9888;</span>
+        <div>
+          <p style="color:#fff;font-weight:700;margin:0 0 0.5rem 0;">About Registration Fees</p>
+          <p style="color:#ccc;font-size:0.9rem;margin:0 0 1rem 0;">Your MusiGod subscription covers our service. Some registration bodies charge one-time fees paid <strong style="color:#fff;">directly by you to that organization</strong> — not to MusiGod. Most registrations are free. Fee-bearing registrations total approximately <strong style="color:#fff;">~$650</strong> for a fully built-out US and international stack, paid once.</p>
+          <details><summary style="color:#DC2626;font-size:0.85rem;font-weight:600;cursor:pointer;">See full fee schedule</summary>
+            <table style="width:100%;margin-top:1rem;border-collapse:collapse;font-size:0.85rem;">
+              <tr style="border-bottom:1px solid #333;"><th style="text-align:left;padding:0.5rem;color:#999;">Registration</th><th style="text-align:left;padding:0.5rem;color:#999;">Fee</th><th style="text-align:left;padding:0.5rem;color:#999;">Paid To</th></tr>
+              <tr><td style="padding:0.5rem;color:#fff;">ASCAP Writer</td><td style="padding:0.5rem;color:#DC2626;">$50 one-time</td><td style="padding:0.5rem;color:#aaa;">ASCAP directly</td></tr>
+              <tr><td style="padding:0.5rem;color:#fff;">ASCAP Publisher</td><td style="padding:0.5rem;color:#DC2626;">$150 one-time</td><td style="padding:0.5rem;color:#aaa;">ASCAP directly</td></tr>
+              <tr><td style="padding:0.5rem;color:#fff;">BMI Publisher</td><td style="padding:0.5rem;color:#DC2626;">$150 one-time</td><td style="padding:0.5rem;color:#aaa;">BMI directly</td></tr>
+              <tr><td style="padding:0.5rem;color:#fff;">PRS (UK)</td><td style="padding:0.5rem;color:#DC2626;">GBP 100 one-time</td><td style="padding:0.5rem;color:#aaa;">PRS directly</td></tr>
+              <tr><td style="padding:0.5rem;color:#fff;">GEMA (Germany)</td><td style="padding:0.5rem;color:#DC2626;">~EUR 60/year</td><td style="padding:0.5rem;color:#aaa;">GEMA directly</td></tr>
+              <tr><td style="padding:0.5rem;color:#fff;">Trademark (USPTO)</td><td style="padding:0.5rem;color:#DC2626;">~$350 one-time</td><td style="padding:0.5rem;color:#aaa;">USPTO directly</td></tr>
+              <tr><td style="padding:0.5rem;color:#fff;">State LLC</td><td style="padding:0.5rem;color:#DC2626;">~$500 (varies)</td><td style="padding:0.5rem;color:#aaa;">Your state directly</td></tr>
+              <tr><td style="padding:0.5rem;color:#fff;">All other registrations</td><td style="padding:0.5rem;color:#22c55e;">Free</td><td style="padding:0.5rem;color:#aaa;">N/A</td></tr>
+            </table>
+          </details>
         </div>
       </div>
-
-      <div class="pricing-grid">
+    </div>
+    <div class="pricing-grid">
       <div class="pricing-card">
         <div class="pricing-tier">Starter</div>
         <div class="pricing-price">$79<span>/mo</span></div>
@@ -1000,7 +933,7 @@
           <li>Copyright.gov eCO filing</li>
           <li>Shazam Artist Portal</li>
         </ul>
-        <a href="https://buy.stripe.com/7sYdR9f2918ncxN7hZ18c00" class="pricing-cta" target="_blank">Get started</a>
+        <a href="#contact" class="pricing-cta">Get started</a>
       </div>
       <div class="pricing-card featured">
         <div class="featured-badge">Most popular</div>
@@ -1017,7 +950,7 @@
           <li>SoundCharts + Chartmetric analytics</li>
           <li>Wise Business setup</li>
         </ul>
-        <a href="https://buy.stripe.com/7sYaEXg6d5oD1T9eKr18c01" class="pricing-cta" target="_blank">Get started</a>
+        <a href="#contact" class="pricing-cta">Get started</a>
       </div>
       <div class="pricing-card">
         <div class="pricing-tier">Pro</div>
@@ -1033,7 +966,7 @@
           <li>Luminate chart tracking</li>
           <li>Quarterly royalty reports</li>
         </ul>
-        <a href="https://buy.stripe.com/8x2eVd2fn2cr41hcCj18c02" class="pricing-cta" target="_blank">Get started</a>
+        <a href="#contact" class="pricing-cta">Get started</a>
       </div>
       <div class="pricing-card">
         <div class="pricing-tier">Label</div>
@@ -1049,7 +982,7 @@
           <li>API access</li>
           <li>Dedicated account support</li>
         </ul>
-        <a href="https://buy.stripe.com/bJedR9dY5eZd41hfOv18c03" class="pricing-cta" target="_blank">Get started</a>
+        <a href="#contact" class="pricing-cta">Get started</a>
       </div>
     </div>
     <div class="recovery-note">
@@ -1114,29 +1047,38 @@
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
       <div>
         <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; font-family: var(--font-mono);">First name</label>
-        <input type="text" placeholder="Michael" style="width: 100%; background: var(--card); border: 0.5px solid var(--border); border-radius: 4px; padding: 12px 16px; color: var(--white); font-size: 15px; font-family: var(--font-body); outline: none;">
+        <input id="contact-first" type="text" placeholder="Michael" style="width: 100%; background: var(--card); border: 0.5px solid var(--border); border-radius: 4px; padding: 12px 16px; color: var(--white); font-size: 15px; font-family: var(--font-body); outline: none;">
       </div>
       <div>
         <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; font-family: var(--font-mono);">Last name</label>
-        <input type="text" placeholder="Jackson" style="width: 100%; background: var(--card); border: 0.5px solid var(--border); border-radius: 4px; padding: 12px 16px; color: var(--white); font-size: 15px; font-family: var(--font-body); outline: none;">
+        <input id="contact-last" type="text" placeholder="Jackson" style="width: 100%; background: var(--card); border: 0.5px solid var(--border); border-radius: 4px; padding: 12px 16px; color: var(--white); font-size: 15px; font-family: var(--font-body); outline: none;">
       </div>
     </div>
     <div>
-      <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; font-family: var(--font-mono);">Email</label>
-      <input type="email" placeholder="you@musigod.com" style="width: 100%; background: var(--card); border: 0.5px solid var(--border); border-radius: 4px; padding: 12px 16px; color: var(--white); font-size: 15px; font-family: var(--font-body); outline: none;">
-    </div>
-    <div>
       <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; font-family: var(--font-mono);">Artist / Stage name</label>
-      <input type="text" placeholder="Your artist name" style="width: 100%; background: var(--card); border: 0.5px solid var(--border); border-radius: 4px; padding: 12px 16px; color: var(--white); font-size: 15px; font-family: var(--font-body); outline: none;">
+      <input id="contact-artist" type="text" placeholder="Your artist name" style="width: 100%; background: var(--card); border: 0.5px solid var(--border); border-radius: 4px; padding: 12px 16px; color: var(--white); font-size: 15px; font-family: var(--font-body); outline: none;">
     </div>
     <div>
-      <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; font-family: var(--font-mono);">Tier interest</label>
-      <select style="width: 100%; background: var(--card); border: 0.5px solid var(--border); border-radius: 4px; padding: 12px 16px; color: var(--white); font-size: 15px; font-family: var(--font-body); outline: none; appearance: none;">
-        <option value="">Select a plan...</option>
-        <option>Starter — $79/month</option>
-        <option>Growth — $129/month</option>
-        <option>Pro — $179/month</option>
-        <option>Label — $699/month</option>
+      <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; font-family: var(--font-mono);">Email</label>
+      <input id="contact-email" type="email" placeholder="you@email.com" style="width: 100%; background: var(--card); border: 0.5px solid var(--border); border-radius: 4px; padding: 12px 16px; color: var(--white); font-size: 15px; font-family: var(--font-body); outline: none;">
+    </div>
+    <div>
+      <label style="font-size: 12px; color: var(--gray); display: block; margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; font-family: var(--font-mono);">Country</label>
+      <select id="contact-country" style="width: 100%; background: var(--card); border: 0.5px solid var(--border); border-radius: 4px; padding: 12px 16px; color: var(--white); font-size: 15px; font-family: var(--font-body); outline: none; appearance: none;">
+        <option value="">Select your country...</option>
+        <option value="US">United States</option>
+        <option value="GB">United Kingdom</option>
+        <option value="CA">Canada</option>
+        <option value="AU">Australia</option>
+        <option value="DE">Germany</option>
+        <option value="FR">France</option>
+        <option value="JP">Japan</option>
+        <option value="NG">Nigeria</option>
+        <option value="GH">Ghana</option>
+        <option value="ZA">South Africa</option>
+        <option value="BR">Brazil</option>
+        <option value="MX">Mexico</option>
+        <option value="OTHER">Other</option>
       </select>
     </div>
     <div style="margin-top:8px;">
@@ -1146,28 +1088,9 @@
       </label>
       <p id="fee-consent-err" style="display:none;color:#C8102E;font-size:12px;margin-top:6px;font-family:var(--font-mono);">Please check this box to continue.</p>
     </div>
+    <p id="contact-err" style="display:none;color:#C8102E;font-size:12px;margin-top:4px;font-family:var(--font-mono);"></p>
     <button type="submit" class="btn-primary" style="border: none; cursor: pointer; justify-content: center; margin-top: 8px;">Request access</button>
   </form>
-<script>
-document.querySelector('.contact-form, form').addEventListener('submit', function(e) {
-  var cb = document.getElementById('fee-consent');
-  var err = document.getElementById('fee-consent-err');
-  if (cb && !cb.checked) {
-    e.preventDefault();
-    err.style.display = 'block';
-    cb.scrollIntoView({behavior:'smooth', block:'center'});
-    return false;
-  }
-  if (err) err.style.display = 'none';
-});
-document.addEventListener('DOMContentLoaded', function() {
-  var cb = document.getElementById('fee-consent');
-  if (cb) cb.addEventListener('change', function() {
-    var err = document.getElementById('fee-consent-err');
-    if (err && cb.checked) err.style.display = 'none';
-  });
-});
-</script>
 </section>
 
 <!-- FOOTER -->
@@ -1185,31 +1108,90 @@ document.addEventListener('DOMContentLoaded', function() {
 </footer>
 
 <script>
-function toggleFeeSchedule(btn) {
-  const table = document.getElementById('fee-schedule-table');
-  const icon = document.getElementById('fee-toggle-icon');
-  const isHidden = table.style.display === 'none';
-  table.style.display = isHidden ? 'block' : 'none';
-  icon.textContent = isHidden ? '▾' : '►';
-}
-function handleSubmit(e) {
+async function handleSubmit(e) {
   e.preventDefault();
+  const first    = document.getElementById('contact-first').value.trim();
+  const last     = document.getElementById('contact-last').value.trim();
+  const artist   = document.getElementById('contact-artist').value.trim();
+  const email    = document.getElementById('contact-email').value.trim();
+  const country  = document.getElementById('contact-country').value;
   const checkbox = document.getElementById('fee-consent');
-  const err = document.getElementById('fee-consent-err');
-  if (!checkbox.checked) {
+  const err      = document.getElementById('contact-err');
+  const feeErr   = document.getElementById('fee-consent-err');
+
+  err.style.display = 'none';
+  feeErr.style.display = 'none';
+
+  if (!first || !last || !artist || !email || !country) {
+    err.textContent = 'Please complete all fields.';
     err.style.display = 'block';
-    checkbox.focus();
     return;
   }
-  err.style.display = 'none';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    err.textContent = 'Please enter a valid email address.';
+    err.style.display = 'block';
+    return;
+  }
+  if (!checkbox.checked) {
+    feeErr.style.display = 'block';
+    checkbox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
   const btn = e.target.querySelector('button[type="submit"]');
-  btn.textContent = 'Request received — we\'ll be in touch.';
-  btn.style.opacity = '0.6';
+  btn.textContent = 'Submitting...';
   btn.disabled = true;
+
+  try {
+    const SUPABASE_URL  = 'https://uykzkrnoetcldeuxzqyy.supabase.co';
+    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MzA2MTksImV4cCI6MjA5MzEwNjYxOX0.r4Dx_Jkgje2kYNGh9PQtuyuJgBGJwVAviHM9QmAJcrs';
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/artists_v1`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON,
+        'Authorization': `Bearer ${SUPABASE_ANON}`,
+        'Content-Profile': 'artists',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({
+        legal_first_name: first,
+        legal_last_name:  last,
+        artist_name:      artist,
+        email:            email,
+        country:          country,
+        plan_status:      'ACTIVE'
+      })
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      console.error('Supabase error response:', body);
+      let msg = 'Submission failed. Please try again or email support@musigod.com';
+      try { const j = JSON.parse(body); msg = j.message || j.error || j.hint || msg; } catch(_) {}
+      throw new Error(msg);
+    }
+
+    btn.textContent = "You're in. We'll be in touch shortly.";
+    btn.style.opacity = '0.6';
+    e.target.querySelectorAll('input, select').forEach(el => el.disabled = true);
+
+  } catch(ex) {
+    btn.textContent = 'Request access';
+    btn.disabled = false;
+    err.textContent = ex.message || 'Something went wrong. Please try again or email support@musigod.com';
+    err.style.display = 'block';
+  }
 }
-document.querySelectorAll('input, select').forEach(el => {
+
+document.querySelectorAll('#contact input, #contact select').forEach(el => {
   el.addEventListener('focus', () => el.style.borderColor = 'rgba(200,16,46,0.6)');
   el.addEventListener('blur',  () => el.style.borderColor = 'rgba(255,255,255,0.08)');
+});
+
+document.getElementById('fee-consent').addEventListener('change', function() {
+  if (this.checked) document.getElementById('fee-consent-err').style.display = 'none';
 });
 </script>
 
