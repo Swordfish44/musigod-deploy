@@ -271,7 +271,7 @@ async function triggerN8n(regId, btn){
   const orig=btn.innerHTML;
   btn.innerHTML='<span>Triggering…</span><span>⟳</span>'; btn.disabled=true;
   try{
-    const res=await fetch('https://musigod.app.n8n.cloud/webhook/registration-task',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({registration_id:regId})});
+    const res=await fetch('https://musigod-n8n.onrender.com/webhook/registration-task',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({registration_id:regId})});
     btn.innerHTML=res.ok?'<span>✓ Triggered</span><span></span>':`<span style="color:var(--red)">⚠ HTTP ${res.status}</span><span></span>`;
   }catch(e){btn.innerHTML=`<span style="color:var(--red)">⚠ ${e.message}</span><span></span>`;}
   setTimeout(()=>{btn.innerHTML=orig;btn.disabled=false;},3500);
