@@ -1155,14 +1155,19 @@ async function handleSubmit(e) {
         'Content-Profile': 'artists',
         'Prefer': 'return=minimal'
       },
-      body: JSON.stringify({
-        legal_first_name: first,
-        legal_last_name:  last,
-        artist_name:      artist,
-        email:            email,
-        country:          country,
-        plan_status:      'ACTIVE'
-      })
+      body: (() => {
+        const _ref = new URLSearchParams(window.location.search).get('ref');
+        const _payload = {
+          legal_first_name: first,
+          legal_last_name:  last,
+          artist_name:      artist,
+          email:            email,
+          country:          country,
+          plan_status:      'ACTIVE'
+        };
+        if (_ref) _payload.ref_code = _ref;
+        return JSON.stringify(_payload);
+      })()
     });
 
     if (!res.ok) {

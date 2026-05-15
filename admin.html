@@ -397,6 +397,7 @@ let selectedAutoIds = new Set()
 let expandedArtist = null
 let expandedInstruction = null
 let currentView = 'queue'
+let artistStripeData = {}
 
 // â€&mdash;â‚¬ HELPERS â€&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;â‚¬
 function esc(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
@@ -444,6 +445,7 @@ async function loadAll(){
   })
   allArtists = Object.values(artistMap)
 
+  await loadStripeData()
   updateMetrics()
   updateSidebarCounts()
   renderQueue()
@@ -452,6 +454,20 @@ async function loadAll(){
   renderActive()
   renderReview()
   renderCats()
+}
+
+async function loadStripeData(){
+  const res = await fetch(SUPABASE_URL+'/rest/v1/registrations_v1?select=artist_id,stripe_customer_id,stripe_subscription_id,plan_type,plan_status', {
+    headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON,'Accept-Profile':'registrations'}
+  })
+  if(!res.ok) return
+  const rows = await res.json()
+  artistStripeData = {}
+  rows.forEach(row=>{
+    if(!artistStripeData[row.artist_id]||(!artistStripeData[row.artist_id].stripe_customer_id&&row.stripe_customer_id)){
+      artistStripeData[row.artist_id]=row
+    }
+  })
 }
 
 // â€&mdash;â‚¬ METRICS â€&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;â‚¬
@@ -511,7 +527,7 @@ function renderQueue(){
       <td>
         <div class="artist-cell">
           <div class="artist-name">${esc(reg.display_name||'NAIM')}</div>
-          <div class="artist-tier">GROWTH</div>
+          <div class="artist-tier">${(artistStripeData[reg.artist_id]?.plan_type||'NO PLAN').toUpperCase()}</div>
         </div>
       </td>
       <td>
@@ -628,8 +644,14 @@ async function markDone(id, name){
     method:'POST', headers:SB_HEADERS3,
     body:JSON.stringify({p_registration_id:id,p_status:'SUBMITTED',p_n8n_execution_id:null,p_external_id:null,p_external_status:null,p_last_error:null})
   })
-  if(!res.ok){const t=await res.text();showToast('Error: '+t,'err')}
-  else{showToast(name+' SUBMITTED','ok');setTimeout(()=>loadAll(),800)}
+  if(!res.ok){const t=await res.text();showToast('Error: '+t,'err');return}
+  showToast(name+' SUBMITTED','ok')
+  await fetch('https://musigod-n8n.onrender.com/webhook/registration-manual-done',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({registration_id:id})
+  }).catch(()=>{})
+  setTimeout(()=>loadAll(),800)
 }
 
 // â€&mdash;â‚¬ ARTISTS VIEW â€&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;â‚¬
@@ -646,6 +668,7 @@ function renderArtists(){
     const initials=(regs[0]?.display_name||'N').charAt(0).toUpperCase()
     const isExpanded=expandedArtist===artist.artist_id
 
+    const sd=artistStripeData[artist.artist_id]||{}
     const card=document.createElement('div')
     card.className='artist-card'+(isExpanded?' expanded':'')
     card.innerHTML=`
@@ -653,7 +676,7 @@ function renderArtists(){
         <div class="artist-avatar">N</div>
         <div class="artist-info">
           <div class="artist-info-name">Naim Salaam</div>
-          <div class="artist-info-sub">GROWTH &middot; ${regs.length} regs &middot; ${needsAction} need action</div>
+          <div class="artist-info-sub">${(sd.plan_type||'NO PLAN').toUpperCase()} &middot; ${regs.length} regs &middot; ${needsAction} need action</div>
         </div>
         <div class="artist-progress">
           <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
@@ -668,6 +691,10 @@ function renderArtists(){
       const autoRegs=regs.filter(r=>r.is_automated&&!r.requires_human&&!['ACTIVE','SUBMITTED'].includes(r.status))
 
       let body=''
+      if(sd.stripe_customer_id||sd.plan_type){
+        const planColor=sd.plan_status==='ACTIVE'?'#22c55e':sd.plan_status==='SUSPENDED'?'#f0a020':'#555'
+        body+=`<div style="padding:10px 18px 10px 64px;display:flex;gap:20px;align-items:center;font-family:'DM Mono',monospace;font-size:10px;border-top:1px solid rgba(255,255,255,0.04)"><span style="color:#555">PLAN</span>&nbsp;<span style="color:#e0e0e0">${(sd.plan_type||'&mdash;').toUpperCase()}</span>&emsp;<span style="color:#555">STATUS</span>&nbsp;<span style="color:${planColor}">${sd.plan_status||'&mdash;'}</span>&emsp;<span style="color:#555">STRIPE ID</span>&nbsp;<span style="color:#444">${sd.stripe_customer_id||'&mdash;'}</span></div>`
+      }
       if(queueRegs.length){
         body+=`<div style="padding:12px 18px 4px 64px;font-family:'DM Mono',monospace;font-size:9px;color:var(--amber);letter-spacing:0.1em">MANUAL TASKS (${queueRegs.length})</div>`
         queueRegs.forEach((r,i)=>{
@@ -824,7 +851,29 @@ async function activateOne(id, name){
   if(!confirm("Activate " + name + "?")) return;
   const res = await fetch(SUPABASE_URL+'/rest/v1/registrations_v1?id=eq.'+id, {method:'PATCH',headers:{'Content-Type':'application/json','apikey':SUPABASE_SERVICE,'Authorization':'Bearer '+SUPABASE_SERVICE,'Accept-Profile':'registrations','Content-Profile':'registrations'},body:JSON.stringify({status:'ACTIVE'})});
   if(!res.ok){const t=await res.text();showToast('Error: '+t,'err');return;}
-  showToast(name+' ACTIVE','ok');setTimeout(()=>loadAll(),800)
+  showToast(name+' ACTIVE','ok');
+  // Commission wiring: look up artist ref_code → call fn_create_commission RPC
+  try {
+    const _reg = allRegs.find(r=>r.registration_id===id);
+    if(_reg?.artist_id){
+      const _artR = await fetch(SUPABASE_URL+'/rest/v1/artists_v1?id=eq.'+_reg.artist_id+'&select=ref_code',{
+        headers:{'apikey':SUPABASE_SERVICE,'Authorization':'Bearer '+SUPABASE_SERVICE,'Accept-Profile':'artists'}
+      });
+      if(_artR.ok){
+        const [_art]=await _artR.json();
+        if(_art?.ref_code){
+          const _commR = await fetch(SUPABASE_URL+'/rest/v1/rpc/fn_create_commission',{
+            method:'POST',
+            headers:{'Content-Type':'application/json','apikey':SUPABASE_SERVICE,'Authorization':'Bearer '+SUPABASE_SERVICE},
+            body:JSON.stringify({p_affiliate_code:_art.ref_code,p_artist_id:_reg.artist_id,p_trigger:'activation'})
+          });
+          const _commJ = await _commR.json().catch(()=>({}));
+          console.log('[commission]',_commJ);
+        }
+      }
+    }
+  } catch(_e){console.warn('[commission error]',_e)}
+  setTimeout(()=>loadAll(),800)
 }
 
 let _rejectId = null
