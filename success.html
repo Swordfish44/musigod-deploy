@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MusiGod &mdash; Payment Confirmed</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{
+      background:#080808;color:#e8e8e8;
+      font-family:'DM Sans',sans-serif;
+      min-height:100vh;display:flex;align-items:center;justify-content:center;
+    }
+    .card{
+      text-align:center;max-width:520px;width:92vw;
+      background:#0c0c0c;border:1px solid rgba(200,16,46,0.2);
+      border-radius:8px;padding:52px 40px;
+    }
+    .logo{
+      font-family:'Bebas Neue',sans-serif;font-size:32px;
+      letter-spacing:0.14em;color:#fff;margin-bottom:32px;
+    }
+    .logo span{color:#C8102E}
+    .check{
+      width:64px;height:64px;border-radius:50%;
+      background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);
+      display:flex;align-items:center;justify-content:center;
+      margin:0 auto 28px;font-size:28px;
+    }
+    .headline{
+      font-family:'Bebas Neue',sans-serif;font-size:28px;
+      letter-spacing:0.1em;color:#fff;margin-bottom:12px;
+    }
+    .sub{
+      font-family:'DM Sans',sans-serif;font-size:15px;
+      color:#888;line-height:1.7;margin-bottom:32px;
+    }
+    .notice{
+      background:rgba(200,16,46,0.06);border:1px solid rgba(200,16,46,0.15);
+      border-radius:5px;padding:16px 20px;
+      font-family:'DM Mono',monospace;font-size:11px;
+      color:#aaa;line-height:1.7;margin-bottom:32px;text-align:left;
+    }
+    .notice strong{color:#C8102E;letter-spacing:0.06em}
+    .btn{
+      display:inline-block;
+      font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.08em;
+      padding:12px 28px;border-radius:4px;cursor:pointer;
+      background:#C8102E;color:#fff;text-decoration:none;
+      transition:background 0.15s;
+    }
+    .btn:hover{background:#a00d25}
+    .footer{
+      margin-top:36px;font-family:'DM Mono',monospace;
+      font-size:10px;color:#333;letter-spacing:0.08em;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">MUSI<span>GOD</span></div>
+    <div class="check">&#10003;</div>
+    <div class="headline">Payment Confirmed</div>
+    <p class="sub">
+      Your subscription is active. Welcome to MusiGod Publishing Administration
+      &mdash; your account is being set up now.
+    </p>
+    <div class="notice">
+      <strong>WHAT HAPPENS NEXT</strong><br/>
+      Our team will begin the registration process for your catalog within 1&ndash;2 business days.
+      You&rsquo;ll receive email updates as each registration is completed.
+      Questions? Reply to your welcome email.
+    </div>
+    <a href="/portal" class="btn">GO TO YOUR PORTAL</a>
+    <div class="footer">MUSIGOD PUBLISHING ADMINISTRATION &mdash; CONFIDENTIAL</div>
+  </div>
+</body>
+</html>
