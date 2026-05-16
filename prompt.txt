@@ -1,31 +1,73 @@
-MusiGod — Artist Fee Transparency Build
-Project context: MusiGod is a royalty registration service. Artists pay a monthly subscription ($79–$699/mo) and MusiGod handles all registrations. However, some registration bodies charge one-time fees that artists pay DIRECTLY to those organizations — MusiGod does not pay these fees on the artist's behalf. This distinction must be made crystal clear at every touchpoint to avoid confusion and chargebacks.
-Stack: Vercel frontend, Supabase backend, n8n workflows, Resend email. All frontend files are in C:\musigod-deploy. Deploy with vercel --prod --force from that directory.
-Supabase details:
+Wire affiliate commission into admin activation + deploy dashboard
+Project: MusiGod, Supabase uykzkrnoetcldeuxzqyy, deployed from C:\musigod-deploy.
+Constraints (always apply):
 
-Project ID: uykzkrnoetcldeuxzqyy
-Anon key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MzA2MTksImV4cCI6MjA5MzEwNjYxOX0.r4Dx_Jkgje2kYNGh9PQtuyuJgBGJwVAviHM9QmAJcrs
-Use raw fetch with schema headers, NOT Supabase JS client
-artists table: artists.artists_v1, status column is plan_status
-registrations table: registrations.registrations_v1
+No Supabase JS client — raw fetch with Accept-Profile / Content-Profile headers only
+Service role key required for all writes
+File patches via Python scripts in PowerShell
+Deploy: cd C:\musigod-deploy && vercel --prod --force
+Schema headers: reads use Accept-Profile, writes use Content-Profile
 
-Fee schedule — hardcode this throughout:
-RegistrationFeePaid ToASCAP Writer$50 one-timeASCAP directlyASCAP Publisher$50 one-timeASCAP directlyBMI Publisher$150 one-timeBMI directlyPRS (UK)GBP 100 one-timePRS directlyGEMA (Germany)~EUR 60/yearGEMA directlyTrademark (USPTO)$250–350 one-timeUSPTO directlyState LLC$50–500 (varies by state)State directlyAll othersFreeN/A
-Build the following — do all of it:
-1. index.html — Pricing section disclosure
-Add a clearly visible fee disclosure block directly above the pricing plan cards. Style it consistently with the existing site (black background, white text, red accents). It should say something like: "Your MusiGod subscription covers our service. Some registration bodies charge one-time fees paid directly by you to that organization — not to MusiGod. Most registrations are free. Fee-bearing registrations total approximately $500–650 for a fully built-out US + international stack." Include a "See full fee schedule" toggle that expands to show the fee table above.
-2. index.html — Contact/intake form
-The contact form at the bottom of index.html has fields for name, email, artist name, and plan selection. Add a required checkbox before the submit button that reads: "I understand that some registration bodies (ASCAP, BMI, USPTO, PRS, GEMA, and others) charge one-time fees paid directly to those organizations — separate from my MusiGod subscription. MusiGod will guide me through each payment." Form must not submit without this checkbox checked. Show a clear validation error if they try.
-3. portal.html — Registration status fee badges
-The portal shows registration status for each of the 18 registration items. For any registration that has a fee, add a yellow badge showing "Fee required — $[amount] due to [org]" when status is pending or in-progress. When status is complete, show a green "Paid & registered" badge instead. The fee amounts are in the table above — hardcode them per registration type.
-4. terms.html — Third-party fees section
-Add a new section called "Third-Party Registration Fees" near the top of the terms, before the general terms. Write it in plain English, not legalese. Key points to cover: (a) MusiGod subscription fees are separate from society registration fees, (b) list each fee-bearing registration with approximate amount, (c) fees are paid directly by the artist to the organization, (d) MusiGod is not responsible for fee changes by third-party organizations, (e) MusiGod will notify artists before any fee-bearing registration is initiated.
-5. n8n — Registration Submitted workflow
-The Registration Submitted workflow fires when a new artist registers. Add a node after the existing welcome email that sends a second email via Resend titled "Your registration fee schedule" — use the Resend node with the existing API credentials already configured in n8n. The email should contain a clean HTML table of all fee-bearing registrations with amounts, a note that all other registrations are free, and a clear statement that these fees are paid directly to each organization, not to MusiGod. The to address comes from the registration record email field. n8n instance: musigod.app.n8n.cloud.
-6. admin.html — VA fee warning indicators
-In the work queue / registration task list in admin.html, for any registration that carries a fee, add a red "⚠ Artist fee required" badge next to the registration name. When a VA clicks "Instructions" for a fee-bearing registration, prepend the instructions with a bold warning: "IMPORTANT: This registration requires the artist to pay [fee amount] directly to [organization]. Confirm the artist has been notified before proceeding. Do not imply MusiGod covers this cost."
-Deployment:
-After completing all file changes, run vercel --prod --force from C:\musigod-deploy and confirm all pages deploy successfully. Commit to git with message "feat: artist fee transparency — disclosure on pricing, intake, portal, terms, admin".
-Do not change anything else about the site design, layout, or functionality. Only add the fee transparency elements described above.
 
-That prompt covers all 6 touchpoints with enough context for Claude Code to execute without asking clarifying questions. Run it from your C:\musigod-deploy directory.
+Task 1 — Wire fn_create_commission into admin.html activation handler
+Open C:\musigod-deploy\admin.html. Find the activateOne() function (or whatever handles the Activate button click). After the existing Supabase PATCH that sets plan_status = 'ACTIVE' succeeds, add this call:
+javascriptasync function triggerAffiliateCommission(artistId) {
+  try {
+    const artist = await fetch(
+      `${SB}/rest/v1/artists_v1?id=eq.${artistId}&select=ref_code`,
+      { headers: { apikey: SVC, Authorization: `Bearer ${SVC}`, 'Accept-Profile': 'artists' } }
+    ).then(r => r.json());
+
+    const refCode = artist[0]?.ref_code;
+    if (!refCode) return; // artist was not referred — skip silently
+
+    const res = await fetch(`${SB}/rest/v1/rpc/fn_create_commission`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SVC,
+        Authorization: `Bearer ${SVC}`
+      },
+      body: JSON.stringify({
+        p_affiliate_code: refCode,
+        p_artist_id: artistId,
+        p_trigger: 'admin_activation'
+      })
+    });
+    const result = await res.json();
+    console.log('[Affiliate] Commission result:', result);
+  } catch (e) {
+    console.warn('[Affiliate] Commission trigger failed (non-blocking):', e);
+  }
+}
+Call await triggerAffiliateCommission(artistId) immediately after your existing activation PATCH succeeds. This must be non-blocking — if it fails, activation still completes.
+Write a Python patch script to inject this, run it, verify the function appears in admin.html, then commit and deploy.
+
+Task 2 — Deploy affiliate-dashboard.html to Vercel
+The file is at C:\musigod-deploy\affiliate-dashboard.html (already in repo from previous session).
+
+Open it and find the line: const ANON_KEY = window.SUPABASE_ANON_KEY || '__SUPABASE_ANON_KEY__';
+Write a Python patch script that replaces __SUPABASE_ANON_KEY__ with the actual anon key value from the existing codebase (find it by scanning other HTML files in C:\musigod-deploy — it will be in a const ANO or const ANON variable)
+Also confirm the dashboard fetch calls use Accept-Profile: affiliates on all requests to affiliates_v1, referrals_v1, commissions_v1, and affiliate_stats_v1
+Commit and deploy
+
+After deploy, verify https://musigod.com/affiliate-dashboard.html returns 200.
+
+Task 3 — Smoke test the full live flow
+After both tasks deploy:
+
+Fetch https://musigod.com/affiliate-dashboard.html and confirm 200
+Fetch https://musigod.com/admin.html and confirm 200
+Do a direct POST to https://uykzkrnoetcldeuxzqyy.supabase.co/rest/v1/rpc/fn_get_commissions with p_artist_id = '3d4788b6-2a86-4ed5-8f27-ab95b3a230d3' using the service role key and confirm the commission row from the e2e test is still there with status = pending and amount = 25.0
+Print a final status table: each check as PASS or FAIL
+
+Do not attempt any Management API calls. Do not ask for a PAT. All Supabase access via service role key already in the codebase.You said: can claude code access everything that it needs?can claude code access everything that it needs?8:47 PMClaude responded: No — it will hit the same MCP wall as yesterday.No — it will hit the same MCP wall as yesterday. The Supabase MCP is authenticated to your Noterminal org, not MusiGod. So apply_migration and execute_sql are dead for this project.
+What Claude Code CAN do without MCP:
+
+Read and patch admin.html directly from disk ✅
+Read and patch affiliate-dashboard.html directly from disk ✅
+Find the anon key by scanning existing files ✅
+Run Python patch scripts via PowerShell ✅
+Commit and deploy via vercel --prod --force ✅
+Smoke test live URLs via HTTP fetch ✅
+POST to Supabase REST API using the service role key already in the codebase ✅

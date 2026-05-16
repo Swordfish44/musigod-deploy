@@ -1,0 +1,362 @@
+-- ============================================================
+-- MusiGod Affiliate Program — Migration 001
+-- Run via: Supabase Dashboard > SQL Editor
+-- Or: supabase db push (if using CLI)
+-- ============================================================
+
+-- Create schema
+CREATE SCHEMA IF NOT EXISTS affiliates;
+
+-- ============================================================
+-- 1. AFFILIATES — one row per affiliate partner
+-- ============================================================
+CREATE TABLE IF NOT EXISTS affiliates.affiliates_v1 (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  -- Identity
+  name                TEXT NOT NULL,
+  email               TEXT NOT NULL UNIQUE,
+  company             TEXT,
+  phone               TEXT,
+
+  -- Unique referral code (e.g. musigod.com/?ref=ABC12345)
+  ref_code            TEXT NOT NULL UNIQUE
+                      DEFAULT upper(substring(replace(gen_random_uuid()::text,'-','') from 1 for 8)),
+
+  -- Lifecycle status
+  status              TEXT NOT NULL DEFAULT 'pending'
+                      CHECK (status IN ('pending','active','suspended','closed')),
+
+  -- Commission model: flat = $X per activation, percent = % of first payment
+  commission_type     TEXT NOT NULL DEFAULT 'flat'
+                      CHECK (commission_type IN ('flat','percent')),
+  commission_flat     NUMERIC(10,2) DEFAULT 25.00,
+  commission_percent  NUMERIC(5,4)  DEFAULT 0.10,    -- 10.00%
+
+  -- Payout config
+  payout_method       TEXT DEFAULT 'stripe'
+                      CHECK (payout_method IN ('stripe','wise','manual')),
+  stripe_account_id   TEXT,
+  wise_account_id     TEXT,
+  payout_threshold    NUMERIC(10,2) DEFAULT 50.00,   -- min balance to auto-pay
+
+  -- Tier for partner management
+  tier                TEXT NOT NULL DEFAULT 'standard'
+                      CHECK (tier IN ('standard','partner','platinum')),
+
+  notes               TEXT
+);
+
+-- ============================================================
+-- 2. REFERRALS — one row per attributed click/signup/conversion
+-- ============================================================
+CREATE TABLE IF NOT EXISTS affiliates.referrals_v1 (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  affiliate_id        UUID NOT NULL REFERENCES affiliates.affiliates_v1(id) ON DELETE RESTRICT,
+  ref_code            TEXT NOT NULL,
+
+  -- Linked artist (NULL until signup completes)
+  artist_id           UUID,           -- maps to artists.artists_v1.id
+  artist_email        TEXT,
+
+  -- Funnel stage
+  stage               TEXT NOT NULL DEFAULT 'click'
+                      CHECK (stage IN ('click','signup','activated','converted')),
+
+  -- Attribution metadata
+  utm_source          TEXT,
+  utm_medium          TEXT,
+  utm_campaign        TEXT,
+  landing_page        TEXT,
+  ip_address          INET,
+  user_agent          TEXT,
+
+  -- Timestamps per stage
+  signed_up_at        TIMESTAMPTZ,
+  activated_at        TIMESTAMPTZ,
+  converted_at        TIMESTAMPTZ,
+  first_payment_at    TIMESTAMPTZ,
+  first_payment_amt   NUMERIC(10,2)
+);
+
+-- ============================================================
+-- 3. COMMISSIONS — one row per earned commission event
+-- ============================================================
+CREATE TABLE IF NOT EXISTS affiliates.commissions_v1 (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  affiliate_id        UUID NOT NULL REFERENCES affiliates.affiliates_v1(id) ON DELETE RESTRICT,
+  referral_id         UUID NOT NULL REFERENCES affiliates.referrals_v1(id) ON DELETE RESTRICT,
+
+  amount              NUMERIC(10,2) NOT NULL,
+  currency            TEXT NOT NULL DEFAULT 'usd',
+  commission_type     TEXT NOT NULL CHECK (commission_type IN ('flat','percent')),
+
+  -- Status lifecycle
+  status              TEXT NOT NULL DEFAULT 'pending'
+                      CHECK (status IN ('pending','approved','paid','voided','disputed')),
+
+  -- Payout linkage
+  batch_id            UUID,           -- set when included in a payout batch
+  payout_id           TEXT,           -- Stripe payout or Wise transfer ID
+  paid_at             TIMESTAMPTZ,
+  payout_method       TEXT,
+
+  -- Audit trail
+  approved_at         TIMESTAMPTZ,
+  approved_by         TEXT,
+  notes               TEXT,
+
+  -- One commission per referral maximum
+  UNIQUE (referral_id)
+);
+
+-- ============================================================
+-- 4. PAYOUT_BATCHES — group commissions into a single transfer
+-- ============================================================
+CREATE TABLE IF NOT EXISTS affiliates.payout_batches_v1 (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  affiliate_id        UUID NOT NULL REFERENCES affiliates.affiliates_v1(id),
+  total_amount        NUMERIC(10,2) NOT NULL,
+  currency            TEXT NOT NULL DEFAULT 'usd',
+  status              TEXT NOT NULL DEFAULT 'pending'
+                      CHECK (status IN ('pending','processing','completed','failed')),
+  payout_method       TEXT,
+  payout_ref          TEXT,           -- Stripe/Wise transfer ID
+  processed_at        TIMESTAMPTZ,
+  notes               TEXT
+);
+
+-- Add batch FK to commissions now that table exists
+ALTER TABLE affiliates.commissions_v1
+  ADD CONSTRAINT fk_commissions_batch
+  FOREIGN KEY (batch_id) REFERENCES affiliates.payout_batches_v1(id);
+
+-- ============================================================
+-- 5. INDEXES
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_aff_ref_code       ON affiliates.affiliates_v1(ref_code);
+CREATE INDEX IF NOT EXISTS idx_aff_status         ON affiliates.affiliates_v1(status);
+
+CREATE INDEX IF NOT EXISTS idx_ref_affiliate      ON affiliates.referrals_v1(affiliate_id);
+CREATE INDEX IF NOT EXISTS idx_ref_artist_id      ON affiliates.referrals_v1(artist_id);
+CREATE INDEX IF NOT EXISTS idx_ref_ref_code       ON affiliates.referrals_v1(ref_code);
+CREATE INDEX IF NOT EXISTS idx_ref_stage          ON affiliates.referrals_v1(stage);
+
+CREATE INDEX IF NOT EXISTS idx_comm_affiliate     ON affiliates.commissions_v1(affiliate_id);
+CREATE INDEX IF NOT EXISTS idx_comm_status        ON affiliates.commissions_v1(status);
+CREATE INDEX IF NOT EXISTS idx_comm_batch         ON affiliates.commissions_v1(batch_id);
+
+-- ============================================================
+-- 6. UPDATED_AT AUTO-TRIGGER
+-- ============================================================
+CREATE OR REPLACE FUNCTION affiliates.set_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_affiliates_updated
+  BEFORE UPDATE ON affiliates.affiliates_v1
+  FOR EACH ROW EXECUTE FUNCTION affiliates.set_updated_at();
+
+CREATE TRIGGER trg_referrals_updated
+  BEFORE UPDATE ON affiliates.referrals_v1
+  FOR EACH ROW EXECUTE FUNCTION affiliates.set_updated_at();
+
+CREATE TRIGGER trg_commissions_updated
+  BEFORE UPDATE ON affiliates.commissions_v1
+  FOR EACH ROW EXECUTE FUNCTION affiliates.set_updated_at();
+
+-- ============================================================
+-- 7. STATS VIEW — powers the affiliate dashboard
+-- ============================================================
+CREATE OR REPLACE VIEW affiliates.affiliate_stats_v1 AS
+SELECT
+  a.id                                            AS affiliate_id,
+  a.name,
+  a.email,
+  a.ref_code,
+  a.status,
+  a.tier,
+  a.commission_type,
+  a.commission_flat,
+  a.commission_percent,
+  a.payout_method,
+  a.payout_threshold,
+
+  -- Funnel
+  COUNT(r.id)                                     AS total_clicks,
+  COUNT(r.id) FILTER (WHERE r.stage IN ('signup','activated','converted'))
+                                                  AS total_signups,
+  COUNT(r.id) FILTER (WHERE r.stage IN ('activated','converted'))
+                                                  AS total_activated,
+  COUNT(r.id) FILTER (WHERE r.stage = 'converted')
+                                                  AS total_converted,
+
+  -- Earnings
+  COALESCE(SUM(c.amount) FILTER (WHERE c.status != 'voided'), 0)
+                                                  AS total_earned,
+  COALESCE(SUM(c.amount) FILTER (WHERE c.status = 'paid'), 0)
+                                                  AS total_paid,
+  COALESCE(SUM(c.amount) FILTER (WHERE c.status = 'approved'), 0)
+                                                  AS approved_balance,
+  COALESCE(SUM(c.amount) FILTER (WHERE c.status = 'pending'), 0)
+                                                  AS pending_balance
+
+FROM affiliates.affiliates_v1 a
+LEFT JOIN affiliates.referrals_v1   r ON r.affiliate_id = a.id
+LEFT JOIN affiliates.commissions_v1 c ON c.affiliate_id = a.id
+GROUP BY a.id;
+
+-- ============================================================
+-- 8. ROW LEVEL SECURITY
+-- Service role key (used by n8n and your backend) bypasses all.
+-- Affiliates can read their own rows via a JWT claim (optional,
+-- implement when you add affiliate login).
+-- ============================================================
+ALTER TABLE affiliates.affiliates_v1     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE affiliates.referrals_v1      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE affiliates.commissions_v1    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE affiliates.payout_batches_v1 ENABLE ROW LEVEL SECURITY;
+
+-- Service role full access
+CREATE POLICY "service_role_all" ON affiliates.affiliates_v1
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service_role_all" ON affiliates.referrals_v1
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service_role_all" ON affiliates.commissions_v1
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service_role_all" ON affiliates.payout_batches_v1
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+-- ============================================================
+-- 9. HELPER RPC FUNCTIONS (callable from frontend via POST /rpc)
+-- ============================================================
+
+-- Resolve a ref_code → affiliate_id (used on signup page)
+CREATE OR REPLACE FUNCTION affiliates.resolve_ref_code(p_code TEXT)
+RETURNS TABLE (affiliate_id UUID, commission_type TEXT, status TEXT)
+LANGUAGE sql SECURITY DEFINER AS $$
+  SELECT id, commission_type, status
+  FROM affiliates.affiliates_v1
+  WHERE ref_code = upper(p_code) AND status = 'active'
+  LIMIT 1;
+$$;
+
+-- Record a click (called from landing page JS)
+CREATE OR REPLACE FUNCTION affiliates.record_click(
+  p_ref_code   TEXT,
+  p_landing    TEXT DEFAULT NULL,
+  p_utm_source TEXT DEFAULT NULL,
+  p_utm_medium TEXT DEFAULT NULL,
+  p_utm_campaign TEXT DEFAULT NULL
+)
+RETURNS UUID
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_aff_id UUID;
+  v_ref_id UUID;
+BEGIN
+  SELECT id INTO v_aff_id
+  FROM affiliates.affiliates_v1
+  WHERE ref_code = upper(p_ref_code) AND status = 'active';
+
+  IF v_aff_id IS NULL THEN RETURN NULL; END IF;
+
+  INSERT INTO affiliates.referrals_v1
+    (affiliate_id, ref_code, stage, landing_page, utm_source, utm_medium, utm_campaign)
+  VALUES
+    (v_aff_id, upper(p_ref_code), 'click', p_landing, p_utm_source, p_utm_medium, p_utm_campaign)
+  RETURNING id INTO v_ref_id;
+
+  RETURN v_ref_id;
+END;
+$$;
+
+-- Attach artist to referral on signup
+CREATE OR REPLACE FUNCTION affiliates.attach_artist_signup(
+  p_referral_id  UUID,
+  p_artist_id    UUID,
+  p_artist_email TEXT
+)
+RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  UPDATE affiliates.referrals_v1
+  SET stage        = 'signup',
+      artist_id    = p_artist_id,
+      artist_email = p_artist_email,
+      signed_up_at = now()
+  WHERE id = p_referral_id AND stage = 'click';
+END;
+$$;
+
+-- Trigger commission on artist activation (called from n8n)
+CREATE OR REPLACE FUNCTION affiliates.trigger_activation_commission(
+  p_artist_id       UUID,
+  p_payment_amount  NUMERIC DEFAULT NULL
+)
+RETURNS UUID
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_ref       affiliates.referrals_v1%ROWTYPE;
+  v_aff       affiliates.affiliates_v1%ROWTYPE;
+  v_amount    NUMERIC(10,2);
+  v_comm_id   UUID;
+BEGIN
+  -- Find the referral for this artist
+  SELECT * INTO v_ref
+  FROM affiliates.referrals_v1
+  WHERE artist_id = p_artist_id
+    AND stage NOT IN ('converted')
+  ORDER BY created_at DESC
+  LIMIT 1;
+
+  IF v_ref.id IS NULL THEN RETURN NULL; END IF;
+
+  -- Check commission not already created
+  IF EXISTS (SELECT 1 FROM affiliates.commissions_v1 WHERE referral_id = v_ref.id) THEN
+    RETURN NULL;
+  END IF;
+
+  -- Get affiliate config
+  SELECT * INTO v_aff FROM affiliates.affiliates_v1 WHERE id = v_ref.affiliate_id;
+
+  -- Calculate commission
+  IF v_aff.commission_type = 'flat' THEN
+    v_amount := v_aff.commission_flat;
+  ELSIF v_aff.commission_type = 'percent' AND p_payment_amount IS NOT NULL THEN
+    v_amount := round(p_payment_amount * v_aff.commission_percent, 2);
+  ELSE
+    v_amount := v_aff.commission_flat; -- fallback
+  END IF;
+
+  -- Update referral stage
+  UPDATE affiliates.referrals_v1
+  SET stage        = 'activated',
+      activated_at = now(),
+      first_payment_amt = p_payment_amount,
+      first_payment_at  = CASE WHEN p_payment_amount IS NOT NULL THEN now() END
+  WHERE id = v_ref.id;
+
+  -- Create commission record
+  INSERT INTO affiliates.commissions_v1
+    (affiliate_id, referral_id, amount, currency, commission_type, status)
+  VALUES
+    (v_aff.id, v_ref.id, v_amount, 'usd', v_aff.commission_type, 'pending')
+  RETURNING id INTO v_comm_id;
+
+  RETURN v_comm_id;
+END;
+$$;

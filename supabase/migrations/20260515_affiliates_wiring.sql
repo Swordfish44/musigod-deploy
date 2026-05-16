@@ -21,27 +21,29 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_affiliate_id  UUID;
-  v_commission_id UUID;
+  v_affiliate_id     UUID;
+  v_commission_flat  NUMERIC;
+  v_commission_id    UUID;
 BEGIN
   IF p_affiliate_code IS NULL OR p_affiliate_code = '' THEN
     RETURN json_build_object('ok', false, 'reason', 'no_ref_code');
   END IF;
 
-  SELECT id INTO v_affiliate_id
+  SELECT id, commission_flat
+  INTO v_affiliate_id, v_commission_flat
   FROM affiliates.affiliates_v1
-  WHERE code = p_affiliate_code
+  WHERE ref_code = p_affiliate_code
   LIMIT 1;
 
   IF v_affiliate_id IS NULL THEN
     RETURN json_build_object('ok', false, 'reason', 'affiliate_not_found', 'code', p_affiliate_code);
   END IF;
 
-  INSERT INTO affiliates.commissions_v1 (affiliate_id, artist_id, triggered_by, status)
-  VALUES (v_affiliate_id, p_artist_id, p_trigger, 'PENDING')
+  INSERT INTO affiliates.commissions_v1 (affiliate_id, artist_id, triggered_by, status, amount)
+  VALUES (v_affiliate_id, p_artist_id, p_trigger, 'pending', v_commission_flat)
   RETURNING id INTO v_commission_id;
 
-  RETURN json_build_object('ok', true, 'commission_id', v_commission_id);
+  RETURN json_build_object('ok', true, 'commission_id', v_commission_id, 'amount', v_commission_flat);
 END;
 $$;
 

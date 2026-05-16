@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MusiGod &mdash; Affiliates</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --red:#C8102E;--bg:#080808;--bg2:#0c0c0c;--bg3:#0e0e0e;--bg4:#111;
+      --text:#e8e8e8;--muted:#555;--dim:#333;
+      --green:#22c55e;--blue:#3090f0;--amber:#f0a020;--purple:#a855f7;
+    }
+    html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+
+    .hdr{background:var(--bg2);border-bottom:1px solid rgba(200,16,46,0.2);padding:0 28px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+    .hdr-logo{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:0.12em;color:#fff}
+    .hdr-logo span{color:var(--red)}
+    .hdr-right{display:flex;align-items:center;gap:16px}
+    .hdr-badge{font-family:'DM Mono',monospace;font-size:10px;color:var(--amber);letter-spacing:0.1em;background:rgba(240,160,32,0.08);border:1px solid rgba(240,160,32,0.2);padding:4px 10px;border-radius:3px}
+    .hdr-link{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);text-decoration:none;letter-spacing:0.06em}
+    .hdr-link:hover{color:#aaa}
+
+    .main{padding:28px;max-width:1400px;margin:0 auto}
+
+    .metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px}
+    .metric{background:var(--bg3);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:16px 18px}
+    .metric-num{font-family:'Bebas Neue',sans-serif;font-size:30px;line-height:1;color:#fff}
+    .metric-num.green{color:var(--green)}
+    .metric-num.amber{color:var(--amber)}
+    .metric-num.blue{color:var(--blue)}
+    .metric-num.red{color:var(--red)}
+    .metric-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.1em;color:var(--muted);margin-top:4px}
+
+    .section{margin-bottom:32px}
+    .section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .section-title{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:0.1em;color:#fff}
+    .section-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
+
+    .card{background:var(--bg3);border:1px solid rgba(255,255,255,0.06);border-radius:6px;overflow:hidden}
+
+    .tbl{width:100%;border-collapse:collapse;font-family:'DM Mono',monospace;font-size:11px}
+    .tbl th{text-align:left;padding:8px 14px;color:var(--dim);font-size:9px;letter-spacing:0.12em;border-bottom:1px solid rgba(255,255,255,0.05);font-weight:400}
+    .tbl td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:middle}
+    .tbl tr:last-child td{border-bottom:none}
+    .tbl tr:hover td{background:rgba(255,255,255,0.02)}
+
+    .badge{display:inline-flex;align-items:center;gap:5px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.08em;padding:3px 8px;border-radius:3px}
+    .badge-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+    .badge-active{background:rgba(34,197,94,0.1);color:var(--green)}
+    .badge-active .badge-dot{background:var(--green)}
+    .badge-pending{background:rgba(240,160,32,0.1);color:var(--amber)}
+    .badge-pending .badge-dot{background:var(--amber)}
+    .badge-suspended{background:rgba(200,16,46,0.1);color:var(--red)}
+    .badge-suspended .badge-dot{background:var(--red)}
+    .badge-closed{background:rgba(85,85,85,0.2);color:var(--muted)}
+    .badge-closed .badge-dot{background:var(--muted)}
+    .badge-approved{background:rgba(48,144,240,0.1);color:var(--blue)}
+    .badge-approved .badge-dot{background:var(--blue)}
+    .badge-paid{background:rgba(34,197,94,0.1);color:var(--green)}
+    .badge-paid .badge-dot{background:var(--green)}
+    .badge-voided{background:rgba(85,85,85,0.15);color:var(--muted)}
+    .badge-voided .badge-dot{background:var(--muted)}
+
+    .loading{padding:48px;text-align:center;font-family:'DM Mono',monospace;font-size:11px;color:var(--dim);letter-spacing:0.1em}
+    .loading-bar{width:160px;height:2px;background:rgba(200,16,46,0.1);margin:14px auto 0;border-radius:2px;overflow:hidden;position:relative}
+    .loading-bar::after{content:'';position:absolute;left:-60%;width:60%;height:100%;background:var(--red);animation:slide 1.1s ease-in-out infinite}
+    @keyframes slide{0%{left:-60%}100%{left:110%}}
+
+    .empty{padding:40px;text-align:center;font-family:'DM Mono',monospace;font-size:11px;color:var(--dim);letter-spacing:0.08em}
+
+    .err-bar{background:rgba(200,16,46,0.08);border:1px solid rgba(200,16,46,0.25);border-radius:5px;padding:12px 16px;margin-bottom:20px;font-family:'DM Mono',monospace;font-size:11px;color:var(--red);line-height:1.6;display:none}
+
+    .mono{font-family:'DM Mono',monospace}
+    .muted{color:var(--muted)}
+    .ref-code{font-family:'DM Mono',monospace;font-size:10px;color:var(--blue);letter-spacing:0.08em}
+    .amount{font-family:'Bebas Neue',sans-serif;font-size:14px}
+  </style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-logo">MUSI<span>GOD</span> &mdash; AFFILIATES</div>
+  <div class="hdr-right">
+    <span class="hdr-badge">INTERNAL</span>
+    <a href="/admin.html" class="hdr-link">ADMIN</a>
+    <a href="/" class="hdr-link">SITE</a>
+  </div>
+</header>
+
+<main class="main">
+
+  <div class="err-bar" id="err-bar"></div>
+
+  <!-- Metrics row -->
+  <div class="metrics" id="metrics">
+    <div class="metric"><div class="metric-num" id="m-total">—</div><div class="metric-label">TOTAL AFFILIATES</div></div>
+    <div class="metric"><div class="metric-num green" id="m-active">—</div><div class="metric-label">ACTIVE</div></div>
+    <div class="metric"><div class="metric-num amber" id="m-pending-aff">—</div><div class="metric-label">PENDING APPROVAL</div></div>
+    <div class="metric"><div class="metric-num blue" id="m-commissions">—</div><div class="metric-label">TOTAL COMMISSIONS</div></div>
+    <div class="metric"><div class="metric-num green" id="m-earned">—</div><div class="metric-label">TOTAL EARNED ($)</div></div>
+  </div>
+
+  <!-- Affiliates table -->
+  <div class="section">
+    <div class="section-hdr">
+      <span class="section-title">AFFILIATES</span>
+      <span class="section-sub" id="aff-sub"></span>
+    </div>
+    <div class="card">
+      <div class="loading" id="aff-loading">LOADING AFFILIATES<div class="loading-bar"></div></div>
+      <table class="tbl" id="aff-table" style="display:none">
+        <thead>
+          <tr>
+            <th>AFFILIATE</th>
+            <th>REF CODE</th>
+            <th>STATUS</th>
+            <th>TIER</th>
+            <th>COMMISSION</th>
+            <th>COMMISSIONS</th>
+            <th>EARNED</th>
+            <th>PENDING</th>
+            <th>CREATED</th>
+          </tr>
+        </thead>
+        <tbody id="aff-tbody"></tbody>
+      </table>
+      <div class="empty" id="aff-empty" style="display:none">NO AFFILIATES YET</div>
+    </div>
+  </div>
+
+  <!-- Commissions feed -->
+  <div class="section">
+    <div class="section-hdr">
+      <span class="section-title">RECENT COMMISSIONS</span>
+      <span class="section-sub" id="comm-sub"></span>
+    </div>
+    <div class="card">
+      <div class="loading" id="comm-loading">LOADING COMMISSIONS<div class="loading-bar"></div></div>
+      <table class="tbl" id="comm-table" style="display:none">
+        <thead>
+          <tr>
+            <th>DATE</th>
+            <th>AFFILIATE</th>
+            <th>ARTIST</th>
+            <th>AMOUNT</th>
+            <th>TYPE</th>
+            <th>STATUS</th>
+            <th>TRIGGER</th>
+          </tr>
+        </thead>
+        <tbody id="comm-tbody"></tbody>
+      </table>
+      <div class="empty" id="comm-empty" style="display:none">NO COMMISSIONS YET</div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const SB  = 'https://uykzkrnoetcldeuxzqyy.supabase.co'
+const SVC = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDYxOSwiZXhwIjoyMDkzMTA2NjE5fQ.jmBLX9VwFvFT4rc3lzqSJS9hFjis2QxRkmWpFizQtKk'
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+
+function fmtDate(ts){
+  if(!ts) return '—'
+  const d = new Date(ts)
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'})
+}
+
+function fmtAmt(v){
+  if(v==null||v===undefined) return '—'
+  return '$'+parseFloat(v).toFixed(2)
+}
+
+function statusBadge(status){
+  const s = (status||'').toLowerCase()
+  const cls = {active:'active',pending:'pending',suspended:'suspended',closed:'closed',
+                approved:'approved',paid:'paid',voided:'voided'}[s] || 'pending'
+  return `<span class="badge badge-${cls}"><span class="badge-dot"></span>${esc(status||'—')}</span>`
+}
+
+function showErr(msg){
+  const el = document.getElementById('err-bar')
+  el.style.display = 'block'
+  el.innerHTML = msg
+}
+
+async function rpc(fn, body={}){
+  const r = await fetch(`${SB}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SVC,
+      'Authorization': `Bearer ${SVC}`
+    },
+    body: JSON.stringify(body)
+  })
+  if(!r.ok){
+    const t = await r.text()
+    throw new Error(`${fn} ${r.status}: ${t}`)
+  }
+  const raw = await r.json()
+  // fn returns JSON string or already parsed array
+  if(typeof raw === 'string') try{ return JSON.parse(raw) }catch{ return [] }
+  if(Array.isArray(raw)) return raw
+  if(raw && typeof raw === 'object') return [raw]
+  return []
+}
+
+// ── Affiliates ─────────────────────────────────────────────────────────────
+async function loadAffiliates(){
+  let affiliates = []
+  try {
+    affiliates = await rpc('fn_list_affiliates')
+  } catch(e) {
+    document.getElementById('aff-loading').style.display = 'none'
+    document.getElementById('aff-empty').style.display = 'block'
+    document.getElementById('aff-empty').textContent = 'fn_list_affiliates not found — apply dashboard_rpcs migration first'
+    showErr(`<b>fn_list_affiliates not available.</b><br>Apply <code>supabase/migrations/20260515_affiliate_dashboard_rpcs.sql</code> in the Supabase SQL editor, then reload.`)
+    return []
+  }
+
+  document.getElementById('aff-loading').style.display = 'none'
+
+  const total   = affiliates.length
+  const active  = affiliates.filter(a=>(a.status||'').toLowerCase()==='active').length
+  const pending = affiliates.filter(a=>(a.status||'').toLowerCase()==='pending').length
+
+  document.getElementById('m-total').textContent = total
+  document.getElementById('m-active').textContent = active
+  document.getElementById('m-pending-aff').textContent = pending
+  document.getElementById('aff-sub').textContent = `${total} partner${total!==1?'s':''}`
+
+  if(!total){
+    document.getElementById('aff-empty').style.display = 'block'
+    return affiliates
+  }
+
+  document.getElementById('aff-table').style.display = 'table'
+  const tbody = document.getElementById('aff-tbody')
+  tbody.innerHTML = affiliates.map(a => {
+    // handle column name variations
+    const name    = a.name || a.affiliate_name || '—'
+    const email   = a.email || '—'
+    const ref     = a.ref_code || a.code || '—'
+    const status  = a.status || 'pending'
+    const tier    = a.tier || 'standard'
+    const ctype   = a.commission_type || 'flat'
+    const cflat   = a.commission_flat != null ? fmtAmt(a.commission_flat) : '—'
+    const cpct    = a.commission_percent != null ? (parseFloat(a.commission_percent)*100).toFixed(1)+'%' : null
+    const comm    = ctype === 'percent' ? (cpct || '—') : cflat
+    const total_e = a.total_earned != null ? fmtAmt(a.total_earned) : '—'
+    const pend_b  = a.pending_balance != null ? fmtAmt(a.pending_balance) : '—'
+    const total_c = a.total_commissions ?? a.commission_count ?? '—'
+    const created = fmtDate(a.created_at)
+    return `<tr>
+      <td>
+        <div style="color:#e0e0e0;font-size:12px">${esc(name)}</div>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">${esc(email)}</div>
+      </td>
+      <td><span class="ref-code">${esc(ref)}</span></td>
+      <td>${statusBadge(status)}</td>
+      <td style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.06em">${esc(tier)}</td>
+      <td style="color:#ccc">${esc(comm)} <span style="color:var(--muted);font-size:9px">${esc(ctype)}</span></td>
+      <td style="color:#ccc">${esc(total_c)}</td>
+      <td style="color:var(--green)">${total_e}</td>
+      <td style="color:var(--amber)">${pend_b}</td>
+      <td style="color:var(--muted);font-size:10px">${created}</td>
+    </tr>`
+  }).join('')
+
+  return affiliates
+}
+
+// ── Commissions ────────────────────────────────────────────────────────────
+async function loadCommissions(affiliates){
+  // build lookup: affiliate_id → name
+  const affMap = {}
+  if(Array.isArray(affiliates)){
+    affiliates.forEach(a => {
+      const id = a.id || a.affiliate_id
+      if(id) affMap[id] = a.name || a.affiliate_name || a.ref_code || id.slice(0,8)
+    })
+  }
+
+  let commissions = []
+  try {
+    commissions = await rpc('fn_list_commissions', {p_limit: 100})
+  } catch(e) {
+    document.getElementById('comm-loading').style.display = 'none'
+    document.getElementById('comm-empty').style.display = 'block'
+    document.getElementById('comm-empty').textContent = 'fn_list_commissions not found — apply dashboard_rpcs migration first'
+    return
+  }
+
+  document.getElementById('comm-loading').style.display = 'none'
+
+  // Update commission count metric
+  document.getElementById('m-commissions').textContent = commissions.length
+
+  // Compute total earned
+  const totalEarned = commissions
+    .filter(c => (c.status||'').toLowerCase() !== 'voided')
+    .reduce((s,c) => s + parseFloat(c.amount||c.commission_amount||0), 0)
+  document.getElementById('m-earned').textContent = totalEarned.toFixed(2)
+
+  document.getElementById('comm-sub').textContent = `${commissions.length} commission${commissions.length!==1?'s':''}`
+
+  if(!commissions.length){
+    document.getElementById('comm-empty').style.display = 'block'
+    return
+  }
+
+  document.getElementById('comm-table').style.display = 'table'
+  const tbody = document.getElementById('comm-tbody')
+  tbody.innerHTML = commissions.map(c => {
+    // handle column name variations between schema versions
+    const affId   = c.affiliate_id
+    const affName = (affId && affMap[affId]) || c.affiliate_code || c.affiliate_name || (affId ? affId.slice(0,8) : '—')
+    const artId   = c.artist_id
+    const artDisp = artId ? artId.slice(0,8)+'...' : (c.artist_email || '—')
+    const amt     = c.amount || c.commission_amount
+    const ctype   = c.commission_type || '—'
+    const status  = c.status || 'pending'
+    const trigger = c.triggered_by || c.trigger || '—'
+    const created = fmtDate(c.created_at)
+    return `<tr>
+      <td style="color:var(--muted);font-size:10px;white-space:nowrap">${created}</td>
+      <td style="color:#ccc">${esc(affName)}</td>
+      <td style="color:var(--muted);font-size:10px">${esc(artDisp)}</td>
+      <td><span class="amount" style="color:var(--green)">${fmtAmt(amt)}</span></td>
+      <td style="color:var(--muted);font-size:10px">${esc(ctype)}</td>
+      <td>${statusBadge(status)}</td>
+      <td style="color:var(--muted);font-size:10px">${esc(trigger)}</td>
+    </tr>`
+  }).join('')
+}
+
+async function init(){
+  const affiliates = await loadAffiliates()
+  await loadCommissions(affiliates)
+}
+
+init()
+</script>
+</body>
+</html>
