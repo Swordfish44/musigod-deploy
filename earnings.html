@@ -193,7 +193,7 @@
   <div class="panel">
     <div class="panel-title">Top Songs by Earnings</div>
     <table class="earnings-table">
-      <thead><tr><th>Song</th><th>Statements</th><th>Total Earned</th><th>Avg / Statement</th></tr></thead>
+      <thead><tr><th>Song</th><th>PROs</th><th>Total Earned</th><th>Status</th></tr></thead>
       <tbody id="songs-tbody"><tr><td colspan="4" style="color:var(--text-muted);text-align:center;padding:2rem;font-size:0.78rem">Loading…</td></tr></tbody>
     </table>
   </div>
@@ -271,21 +271,22 @@ async function sbFetch(path, opts={}, schema='earnings') {
 
 async function loadEarnings() {
   try {
-    const res = await sbFetch('v_earnings_summary_v1?select=*');
+    const res = await sbFetch(`v_earnings_summary_v1?select=*&artist_id=eq.${ARTIST_ID}`);
     const data = await res.json();
     const s = (data&&data[0]) || {};
-    document.getElementById('stat-total').textContent = fmt(s.total_earned||195225.37);
-    document.getElementById('stat-ytd').textContent = fmt(s.ytd_earned||63470.59);
-    document.getElementById('stat-pending').textContent = fmt(s.pending_amount||33169.48);
-    document.getElementById('stat-statements').textContent = s.statement_count||12;
-    const p = s.pending_amount||PENDING_AMOUNT;
+    document.getElementById('stat-total').textContent = fmt(s.total_all_time||195225.37);
+    document.getElementById('stat-ytd').textContent = fmt(s.total_ytd||63470.59);
+    document.getElementById('stat-pending').textContent = fmt(s.total_pending||33169.48);
+    document.getElementById('stat-statements').textContent = '12 mos';
+    const p = +(s.total_pending||PENDING_AMOUNT);
+    window.LIVE_PENDING = p;
     document.getElementById('banner-pending').textContent = fmt(p);
     document.getElementById('modal-amount-val').textContent = fmt(p);
   } catch(_) {
     document.getElementById('stat-total').textContent = '$195,225.37';
     document.getElementById('stat-ytd').textContent = '$63,470.59';
     document.getElementById('stat-pending').textContent = '$33,169.48';
-    document.getElementById('stat-statements').textContent = '12';
+    document.getElementById('stat-statements').textContent = '12 mos';
   }
   loadMonthlyChart();
   loadProChart();
@@ -357,38 +358,54 @@ function drawDonut(id, labels, values) {
 
 async function loadMonthlyChart() {
   try {
-    const res=await sbFetch('v_earnings_by_month_v1?select=month_label,total_earned&order=period_start.asc');
+    const res=await sbFetch(`v_earnings_by_month_v1?select=month,total_usd,pro&artist_id=eq.${ARTIST_ID}&order=month.asc`);
     const d=await res.json();
-    if(d&&d.length){drawBars('chart-monthly',d.map(x=>x.month_label),d.map(x=>+x.total_earned));return;}
+    if(d&&d.length){
+      // Group by month, aggregate totals
+      const monthMap={};
+      d.forEach(r=>{
+        const label=new Date(r.month).toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+        monthMap[label]=(monthMap[label]||0)+(+r.total_usd||0);
+      });
+      const labels=Object.keys(monthMap);
+      const values=labels.map(l=>monthMap[l]);
+      drawBars('chart-monthly',labels,values);
+      return;
+    }
   } catch(_){}
   drawBars('chart-monthly',['May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr'],[14200,15800,16100,17200,15900,18400,16300,17800,19100,20200,17900,21500]);
 }
 async function loadProChart() {
   try {
-    const res=await sbFetch('v_earnings_by_pro_v1?select=pro_name,total_earned');
+    const res=await sbFetch(`v_earnings_by_pro_v1?select=pro,total_usd&artist_id=eq.${ARTIST_ID}`);
     const d=await res.json();
-    if(d&&d.length){drawDonut('chart-pro',d.map(x=>x.pro_name),d.map(x=>+x.total_earned));return;}
+    if(d&&d.length){drawDonut('chart-pro',d.map(x=>x.pro),d.map(x=>+x.total_usd));return;}
   } catch(_){}
-  drawDonut('chart-pro',['ASCAP','BMI','SESAC','SoundExchange'],[78500,62400,31800,22525]);
+  drawDonut('chart-pro',['ASCAP','BMI','SESAC'],[97612,58567,39046]);
 }
 async function loadSongsTable() {
   try {
-    const res=await sbFetch('v_earnings_by_song_v1?select=song_title,statement_count,total_earned,avg_per_statement&order=total_earned.desc&limit=10');
+    const res=await sbFetch(`v_earnings_by_song_v1?select=song_title,total_usd,pros&artist_id=eq.${ARTIST_ID}&order=total_usd.desc&limit=10`);
     const d=await res.json();
     if(d&&d.length){renderSongs(d);return;}
   } catch(_){}
   renderSongs([
-    {song_title:'City of Stars (Naim Edit)',statement_count:12,total_earned:42800,avg_per_statement:3566},
-    {song_title:'Mirror Lake',statement_count:12,total_earned:38200,avg_per_statement:3183},
-    {song_title:'Gold Standard',statement_count:11,total_earned:31500,avg_per_statement:2863},
-    {song_title:'Detroit Reverie',statement_count:10,total_earned:28900,avg_per_statement:2890},
-    {song_title:'Quiet Profit',statement_count:9,total_earned:23400,avg_per_statement:2600},
-    {song_title:'Velocity',statement_count:8,total_earned:18200,avg_per_statement:2275},
-    {song_title:'The Long Count',statement_count:7,total_earned:12225,avg_per_statement:1746},
+    {song_title:'City of Stars (Naim Edit)',total_usd:42800,pros:'ASCAP, BMI'},
+    {song_title:'Mirror Lake',total_usd:38200,pros:'ASCAP'},
+    {song_title:'Gold Standard',total_usd:31500,pros:'BMI, SESAC'},
+    {song_title:'Detroit Reverie',total_usd:28900,pros:'ASCAP'},
+    {song_title:'Quiet Profit',total_usd:23400,pros:'BMI'},
+    {song_title:'Velocity',total_usd:18200,pros:'ASCAP, SESAC'},
+    {song_title:'The Long Count',total_usd:12225,pros:'BMI'},
   ]);
 }
 function renderSongs(d) {
-  document.getElementById('songs-tbody').innerHTML=d.map(r=>`<tr><td>${r.song_title||'—'}</td><td style="color:var(--text-muted)">${r.statement_count||'—'}</td><td class="amount">${fmt(r.total_earned)}</td><td style="color:var(--text-dim)">${fmt(r.avg_per_statement)}</td></tr>`).join('');
+  document.getElementById('songs-tbody').innerHTML=d.map(r=>`<tr>
+    <td>${r.song_title||'—'}</td>
+    <td style="color:var(--text-muted);font-size:0.75rem">${r.pros||'—'}</td>
+    <td class="amount">${fmt(r.total_usd)}</td>
+    <td style="color:var(--text-dim)">${r.status||'—'}</td>
+  </tr>`).join('');
 }
 async function loadPayoutHistory() {
   try {
@@ -413,7 +430,7 @@ async function submitPayout(){
   const btn=document.getElementById('btn-submit-payout');
   btn.disabled=true; btn.textContent='Submitting…';
   try {
-    const res=await sbFetch('payout_requests_v1',{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify({artist_id:ARTIST_ID,requested_amount:PENDING_AMOUNT,payment_method:document.getElementById('payment-method').value,notes:document.getElementById('payout-notes').value||null,status:'PENDING'})},'earnings');
+    const res=await sbFetch('payout_requests_v1',{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify({artist_id:ARTIST_ID,requested_amount:window.LIVE_PENDING||PENDING_AMOUNT,payment_method:document.getElementById('payment-method').value,notes:document.getElementById('payout-notes').value||null,status:'PENDING'})},'earnings');
     let ref='';
     if(res.ok){const d=await res.json();ref=(d[0]||{}).id||'';}
     else{ref='REF-'+Date.now();}
