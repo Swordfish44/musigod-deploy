@@ -35,6 +35,8 @@ Deno.serve(async () => {
 
     const artistIds = [...new Set(data.map((r: any) => r.artist_id).filter(Boolean))];
     const artistMap = await loadArtists(artistIds);
+    await mergeWriterProfiles(artistMap, artistIds);
+    await mergePublisherProfiles(artistMap, artistIds);
 
     const payload = {
       event: "registration.batch_ready",
@@ -102,6 +104,40 @@ async function loadArtists(artistIds: string[]) {
 
   artists.forEach((artist: any) => map.set(artist.id, artist));
   return map;
+}
+
+async function mergeWriterProfiles(artistMap: Map<string, any>, artistIds: string[]) {
+  if (!artistIds.length) return;
+  const writers = await supabaseGet(
+    "writer_profiles_v1",
+    new URLSearchParams({
+      select: "artist_id,pro_affiliation",
+      artist_id: `in.(${artistIds.join(",")})`,
+    }),
+    "artists",
+  ).catch(() => []);
+
+  writers.forEach((writer: any) => {
+    const artist = artistMap.get(writer.artist_id);
+    if (artist) artist.pro_affiliation = writer.pro_affiliation ?? null;
+  });
+}
+
+async function mergePublisherProfiles(artistMap: Map<string, any>, artistIds: string[]) {
+  if (!artistIds.length) return;
+  const publishers = await supabaseGet(
+    "publisher_profiles_v1",
+    new URLSearchParams({
+      select: "artist_id,publisher_name",
+      artist_id: `in.(${artistIds.join(",")})`,
+    }),
+    "artists",
+  ).catch(() => []);
+
+  publishers.forEach((publisher: any) => {
+    const artist = artistMap.get(publisher.artist_id);
+    if (artist) artist.publisher_name = publisher.publisher_name ?? null;
+  });
 }
 
 async function supabaseGet(table: string, params: URLSearchParams, schema: string) {

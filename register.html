@@ -937,6 +937,13 @@ if (urlRef) {
   const refInput = document.getElementById('ref_code');
   if (refInput) refInput.value = urlRef.toUpperCase();
 }
+
+const params = new URLSearchParams(window.location.search);
+const cancelledArtistId = params.get('artist_id');
+if (cancelledArtistId) localStorage.setItem('musigod_artist_id', cancelledArtistId);
+if (params.get('checkout') === 'cancelled') {
+  setTimeout(() => toast('Checkout was cancelled. Choose your plan and submit again when ready.', true), 300);
+}
 </script>
 </body>
 </html>
