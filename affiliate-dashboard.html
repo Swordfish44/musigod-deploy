@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -95,11 +95,11 @@
 
   <!-- Metrics row -->
   <div class="metrics" id="metrics">
-    <div class="metric"><div class="metric-num" id="m-total">—</div><div class="metric-label">TOTAL AFFILIATES</div></div>
-    <div class="metric"><div class="metric-num green" id="m-active">—</div><div class="metric-label">ACTIVE</div></div>
-    <div class="metric"><div class="metric-num amber" id="m-pending-aff">—</div><div class="metric-label">PENDING APPROVAL</div></div>
-    <div class="metric"><div class="metric-num blue" id="m-commissions">—</div><div class="metric-label">TOTAL COMMISSIONS</div></div>
-    <div class="metric"><div class="metric-num green" id="m-earned">—</div><div class="metric-label">TOTAL EARNED ($)</div></div>
+    <div class="metric"><div class="metric-num" id="m-total">â€”</div><div class="metric-label">TOTAL AFFILIATES</div></div>
+    <div class="metric"><div class="metric-num green" id="m-active">â€”</div><div class="metric-label">ACTIVE</div></div>
+    <div class="metric"><div class="metric-num amber" id="m-pending-aff">â€”</div><div class="metric-label">PENDING APPROVAL</div></div>
+    <div class="metric"><div class="metric-num blue" id="m-commissions">â€”</div><div class="metric-label">TOTAL COMMISSIONS</div></div>
+    <div class="metric"><div class="metric-num green" id="m-earned">â€”</div><div class="metric-label">TOTAL EARNED ($)</div></div>
   </div>
 
   <!-- Affiliates table -->
@@ -160,18 +160,18 @@
 
 <script>
 const SB  = 'https://uykzkrnoetcldeuxzqyy.supabase.co'
-const SVC = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDYxOSwiZXhwIjoyMDkzMTA2NjE5fQ.jmBLX9VwFvFT4rc3lzqSJS9hFjis2QxRkmWpFizQtKk'
+const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MzA2MTksImV4cCI6MjA5MzEwNjYxOX0.r4Dx_Jkgje2kYNGh9PQtuyuJgBGJwVAviHM9QmAJcrs'
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
 
 function fmtDate(ts){
-  if(!ts) return '—'
+  if(!ts) return 'â€”'
   const d = new Date(ts)
   return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'})
 }
 
 function fmtAmt(v){
-  if(v==null||v===undefined) return '—'
+  if(v==null||v===undefined) return 'â€”'
   return '$'+parseFloat(v).toFixed(2)
 }
 
@@ -179,7 +179,7 @@ function statusBadge(status){
   const s = (status||'').toLowerCase()
   const cls = {active:'active',pending:'pending',suspended:'suspended',closed:'closed',
                 approved:'approved',paid:'paid',voided:'voided'}[s] || 'pending'
-  return `<span class="badge badge-${cls}"><span class="badge-dot"></span>${esc(status||'—')}</span>`
+  return `<span class="badge badge-${cls}"><span class="badge-dot"></span>${esc(status||'â€”')}</span>`
 }
 
 function showErr(msg){
@@ -193,8 +193,10 @@ async function rpc(fn, body={}){
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'apikey': SVC,
-      'Authorization': `Bearer ${SVC}`
+      'apikey': ANON,
+      'Authorization': `Bearer ${ANON}`,
+      'Accept-Profile': 'public',
+      'Content-Profile': 'public'
     },
     body: JSON.stringify(body)
   })
@@ -210,7 +212,7 @@ async function rpc(fn, body={}){
   return []
 }
 
-// ── Affiliates ─────────────────────────────────────────────────────────────
+// â”€â”€ Affiliates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function loadAffiliates(){
   let affiliates = []
   try {
@@ -218,7 +220,7 @@ async function loadAffiliates(){
   } catch(e) {
     document.getElementById('aff-loading').style.display = 'none'
     document.getElementById('aff-empty').style.display = 'block'
-    document.getElementById('aff-empty').textContent = 'fn_list_affiliates not found — apply dashboard_rpcs migration first'
+    document.getElementById('aff-empty').textContent = 'fn_list_affiliates not found â€” apply dashboard_rpcs migration first'
     showErr(`<b>fn_list_affiliates not available.</b><br>Apply <code>supabase/migrations/20260515_affiliate_dashboard_rpcs.sql</code> in the Supabase SQL editor, then reload.`)
     return []
   }
@@ -243,18 +245,18 @@ async function loadAffiliates(){
   const tbody = document.getElementById('aff-tbody')
   tbody.innerHTML = affiliates.map(a => {
     // handle column name variations
-    const name    = a.name || a.affiliate_name || '—'
-    const email   = a.email || '—'
-    const ref     = a.ref_code || a.code || '—'
+    const name    = a.name || a.affiliate_name || 'â€”'
+    const email   = a.email || 'â€”'
+    const ref     = a.ref_code || a.code || 'â€”'
     const status  = a.status || 'pending'
     const tier    = a.tier || 'standard'
     const ctype   = a.commission_type || 'flat'
-    const cflat   = a.commission_flat != null ? fmtAmt(a.commission_flat) : '—'
+    const cflat   = a.commission_flat != null ? fmtAmt(a.commission_flat) : 'â€”'
     const cpct    = a.commission_percent != null ? (parseFloat(a.commission_percent)*100).toFixed(1)+'%' : null
-    const comm    = ctype === 'percent' ? (cpct || '—') : cflat
-    const total_e = a.total_earned != null ? fmtAmt(a.total_earned) : '—'
-    const pend_b  = a.pending_balance != null ? fmtAmt(a.pending_balance) : '—'
-    const total_c = a.total_commissions ?? a.commission_count ?? '—'
+    const comm    = ctype === 'percent' ? (cpct || 'â€”') : cflat
+    const total_e = a.total_earned != null ? fmtAmt(a.total_earned) : 'â€”'
+    const pend_b  = a.pending_balance != null ? fmtAmt(a.pending_balance) : 'â€”'
+    const total_c = a.total_commissions ?? a.commission_count ?? 'â€”'
     const created = fmtDate(a.created_at)
     return `<tr>
       <td>
@@ -275,9 +277,9 @@ async function loadAffiliates(){
   return affiliates
 }
 
-// ── Commissions ────────────────────────────────────────────────────────────
+// â”€â”€ Commissions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function loadCommissions(affiliates){
-  // build lookup: affiliate_id → name
+  // build lookup: affiliate_id â†’ name
   const affMap = {}
   if(Array.isArray(affiliates)){
     affiliates.forEach(a => {
@@ -292,7 +294,7 @@ async function loadCommissions(affiliates){
   } catch(e) {
     document.getElementById('comm-loading').style.display = 'none'
     document.getElementById('comm-empty').style.display = 'block'
-    document.getElementById('comm-empty').textContent = 'fn_list_commissions not found — apply dashboard_rpcs migration first'
+    document.getElementById('comm-empty').textContent = 'fn_list_commissions not found â€” apply dashboard_rpcs migration first'
     return
   }
 
@@ -319,13 +321,13 @@ async function loadCommissions(affiliates){
   tbody.innerHTML = commissions.map(c => {
     // handle column name variations between schema versions
     const affId   = c.affiliate_id
-    const affName = (affId && affMap[affId]) || c.affiliate_code || c.affiliate_name || (affId ? affId.slice(0,8) : '—')
-    const artId   = c.artist_id
-    const artDisp = artId ? artId.slice(0,8)+'...' : (c.artist_email || '—')
+    const affName = (affId && affMap[affId]) || c.affiliate_code || c.affiliate_name || (affId ? affId.slice(0,8) : 'â€”')
+    const artId   = c.referral_id
+    const artDisp = artId ? artId.slice(0,8)+'...' : (c.artist_email || 'â€”')
     const amt     = c.amount || c.commission_amount
-    const ctype   = c.commission_type || '—'
+    const ctype   = c.commission_type || 'â€”'
     const status  = c.status || 'pending'
-    const trigger = c.triggered_by || c.trigger || '—'
+    const trigger = c.triggered_by || c.trigger || 'â€”'
     const created = fmtDate(c.created_at)
     return `<tr>
       <td style="color:var(--muted);font-size:10px;white-space:nowrap">${created}</td>

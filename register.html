@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod — Artist Registration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,300;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #E8262A; --red-dark: #B81E22; --red-glow: rgba(232,38,42,0.15);
+    --black: #0A0A0A; --surface: #111111; --surface-2: #1A1A1A; --surface-3: #252525;
+    --border: rgba(255,255,255,0.08); --border-mid: rgba(255,255,255,0.14); --border-focus: rgba(232,38,42,0.5);
+    --text: #FFFFFF; --text-dim: #999999; --text-muted: #444444;
+    --green: #22C55E; --amber: #F59E0B;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--black); color: var(--text);
+    font-family: 'DM Sans', sans-serif; font-weight: 400;
+    min-height: 100vh; overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,10,10,0.95); backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem; height: 60px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.01em; text-decoration: none; }
+  .logo-musi { color: #fff; } .logo-god { color: var(--red); }
+  .hdr-right { display: flex; align-items: center; gap: 1rem; }
+  .hdr-link { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); text-decoration: none; transition: color 0.15s; }
+  .hdr-link:hover { color: var(--text); }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 5rem 2rem 4rem;
+    text-align: center;
+    position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(232,38,42,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    font-family: 'DM Mono', monospace; font-size: 0.65rem; font-weight: 500;
+    letter-spacing: 0.2em; text-transform: uppercase; color: var(--red);
+    background: rgba(232,38,42,0.08); border: 1px solid rgba(232,38,42,0.2);
+    padding: 0.35rem 0.9rem; border-radius: 20px; margin-bottom: 1.5rem;
+  }
+  .hero h1 {
+    font-size: clamp(2.2rem, 5vw, 3.5rem); font-weight: 800;
+    letter-spacing: -0.03em; line-height: 1.05; margin-bottom: 1rem;
+  }
+  .hero h1 em { color: var(--red); font-style: normal; }
+  .hero-sub {
+    font-size: 1rem; color: var(--text-dim); max-width: 520px;
+    margin: 0 auto 2.5rem; line-height: 1.65;
+  }
+  .hero-pills {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    justify-content: center; margin-bottom: 0;
+  }
+  .pill {
+    font-size: 0.7rem; font-weight: 500; letter-spacing: 0.03em;
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text-dim); padding: 0.35rem 0.9rem; border-radius: 20px;
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  .pill-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+
+  /* ── PROGRESS ── */
+  .progress-wrap { max-width: 640px; margin: 0 auto; padding: 0 2rem; }
+  .progress-steps {
+    display: flex; align-items: center; gap: 0; margin-bottom: 3rem;
+    padding: 1.5rem 0 0;
+  }
+  .step-item { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; }
+  .step-item:not(:last-child)::after {
+    content: ''; position: absolute; top: 14px; left: 50%; right: -50%;
+    height: 1px; background: var(--border); z-index: 0;
+    transition: background 0.4s;
+  }
+  .step-item.done:not(:last-child)::after { background: var(--red); }
+  .step-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--surface-2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'DM Mono', monospace; font-size: 0.65rem; font-weight: 500;
+    color: var(--text-muted); z-index: 1; position: relative;
+    transition: all 0.3s;
+  }
+  .step-item.active .step-num { background: var(--red); border-color: var(--red); color: #fff; box-shadow: 0 0 0 4px rgba(232,38,42,0.15); }
+  .step-item.done .step-num { background: var(--red); border-color: var(--red); color: #fff; }
+  .step-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); margin-top: 0.5rem; transition: color 0.3s; }
+  .step-item.active .step-label { color: var(--text-dim); }
+  .step-item.done .step-label { color: var(--red); }
+
+  /* ── FORM CONTAINER ── */
+  .form-wrap { max-width: 640px; margin: 0 auto; padding: 0 2rem 6rem; }
+
+  .form-section { display: none; }
+  .form-section.active { display: block; animation: fadeUp 0.35s ease; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+  .section-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; margin-bottom: 1.5rem;
+  }
+  .section-card-header {
+    padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 0.75rem;
+  }
+  .section-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--red-glow); border: 1px solid rgba(232,38,42,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.9rem; flex-shrink: 0;
+  }
+  .section-card-title { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text); }
+  .section-card-sub { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.15rem; }
+  .section-card-body { padding: 1.5rem; }
+
+  /* ── FORM FIELDS ── */
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  .field-row.single { grid-template-columns: 1fr; }
+  .field-row.triple { grid-template-columns: 1fr 1fr 1fr; }
+  @media (max-width: 600px) { .field-row, .field-row.triple { grid-template-columns: 1fr; } }
+
+  .field { display: flex; flex-direction: column; gap: 0.35rem; }
+  .field-label {
+    font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem;
+  }
+  .req { color: var(--red); }
+  .field-input, .field-select, .field-textarea {
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 0.7rem 0.9rem;
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 0.88rem;
+    outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
+  }
+  .field-input:focus, .field-select:focus, .field-textarea:focus {
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 3px rgba(232,38,42,0.08);
+  }
+  .field-input::placeholder { color: var(--text-muted); }
+  .field-input.err, .field-select.err { border-color: var(--red); }
+  .field-hint { font-size: 0.65rem; color: var(--text-muted); margin-top: 0.2rem; }
+  .field-err { font-size: 0.65rem; color: var(--red); margin-top: 0.2rem; display: none; }
+  .field-err.show { display: block; }
+  option { background: #1a1a1a; }
+
+  /* ── RADIO CARDS ── */
+  .radio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .radio-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+  @media (max-width: 500px) { .radio-grid, .radio-grid.three { grid-template-columns: 1fr; } }
+  .radio-card { position: relative; }
+  .radio-card input[type=radio] { position: absolute; opacity: 0; width: 0; height: 0; }
+  .radio-label {
+    display: flex; flex-direction: column; gap: 0.2rem;
+    padding: 1rem 1.1rem; border-radius: 8px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .radio-label:hover { border-color: var(--border-mid); }
+  .radio-card input:checked + .radio-label {
+    border-color: var(--red); background: rgba(232,38,42,0.06);
+    box-shadow: 0 0 0 3px rgba(232,38,42,0.08);
+  }
+  .radio-title { font-size: 0.82rem; font-weight: 600; }
+  .radio-sub { font-size: 0.68rem; color: var(--text-muted); }
+  .radio-price { font-size: 1rem; font-weight: 700; color: var(--red); margin-top: 0.3rem; }
+
+  /* ── PLAN CARDS ── */
+  .plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 500px) { .plan-grid { grid-template-columns: 1fr; } }
+  .plan-card { position: relative; }
+  .plan-card input[type=radio] { position: absolute; opacity: 0; width: 0; height: 0; }
+  .plan-label {
+    display: flex; flex-direction: column; gap: 0.5rem;
+    padding: 1.25rem; border-radius: 10px;
+    background: var(--surface-2); border: 2px solid var(--border);
+    cursor: pointer; transition: all 0.2s; height: 100%;
+  }
+  .plan-label:hover { border-color: var(--border-mid); }
+  .plan-card input:checked + .plan-label {
+    border-color: var(--red); background: rgba(232,38,42,0.05);
+    box-shadow: 0 0 0 4px rgba(232,38,42,0.1);
+  }
+  .plan-name { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+  .plan-price { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.02em; }
+  .plan-price span { font-size: 0.78rem; font-weight: 400; color: var(--text-muted); }
+  .plan-features { list-style: none; display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.25rem; }
+  .plan-features li { font-size: 0.72rem; color: var(--text-dim); display: flex; align-items: flex-start; gap: 0.4rem; }
+  .plan-features li::before { content: '✓'; color: var(--green); font-size: 0.65rem; margin-top: 0.1rem; flex-shrink: 0; }
+  .plan-badge { display: inline-block; font-size: 0.55rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; background: rgba(232,38,42,0.15); color: var(--red); border: 1px solid rgba(232,38,42,0.25); padding: 0.15rem 0.5rem; border-radius: 3px; margin-left: 0.4rem; }
+
+  /* ── NAV BUTTONS ── */
+  .form-nav { display: flex; gap: 0.75rem; justify-content: space-between; align-items: center; margin-top: 1.5rem; }
+  .btn-back {
+    background: none; border: 1px solid var(--border); color: var(--text-dim);
+    font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 600;
+    letter-spacing: 0.04em; text-transform: uppercase; padding: 0.7rem 1.25rem;
+    border-radius: 6px; cursor: pointer; transition: all 0.15s;
+  }
+  .btn-back:hover { border-color: var(--border-mid); color: var(--text); }
+  .btn-next {
+    background: var(--red); color: #fff;
+    font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 700;
+    letter-spacing: 0.04em; text-transform: uppercase; padding: 0.75rem 1.75rem;
+    border-radius: 6px; border: none; cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .btn-next:hover { background: var(--red-dark); transform: translateY(-1px); }
+  .btn-next:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* ── AGREEMENT ── */
+  .agreement-box {
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.25rem; margin-bottom: 1.25rem;
+    max-height: 180px; overflow-y: auto;
+    font-size: 0.72rem; color: var(--text-muted); line-height: 1.7;
+  }
+  .agreement-box h4 { font-size: 0.75rem; font-weight: 700; color: var(--text-dim); margin-bottom: 0.75rem; }
+  .agreement-box p { margin-bottom: 0.5rem; }
+  .checkbox-row { display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; }
+  .checkbox-row input[type=checkbox] { margin-top: 3px; accent-color: var(--red); flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; }
+  .checkbox-text { font-size: 0.78rem; color: var(--text-dim); line-height: 1.5; }
+  .checkbox-text strong { color: var(--text); }
+
+  /* ── SUCCESS ── */
+  .success-screen { display: none; text-align: center; padding: 5rem 2rem; }
+  .success-screen.show { display: block; animation: fadeUp 0.5s ease; }
+  .success-icon { width: 72px; height: 72px; border-radius: 50%; background: rgba(34,197,94,0.1); border: 2px solid rgba(34,197,94,0.25); display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1.5rem; }
+  .success-screen h2 { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 0.5rem; }
+  .success-screen p { font-size: 0.88rem; color: var(--text-dim); max-width: 420px; margin: 0 auto 2rem; line-height: 1.6; }
+  .success-id { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--text-muted); background: var(--surface-2); border: 1px solid var(--border); padding: 0.5rem 1rem; border-radius: 4px; display: inline-block; margin-bottom: 2.5rem; }
+  .success-next { display: flex; flex-direction: column; gap: 0.75rem; max-width: 360px; margin: 0 auto; }
+  .success-step { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; display: flex; align-items: flex-start; gap: 1rem; text-align: left; }
+  .success-step-num { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--red); background: rgba(232,38,42,0.1); border: 1px solid rgba(232,38,42,0.2); border-radius: 3px; padding: 0.2rem 0.5rem; flex-shrink: 0; margin-top: 2px; }
+  .success-step p { font-size: 0.78rem; color: var(--text-dim); line-height: 1.5; }
+  .success-step strong { color: var(--text); }
+
+  /* ── TOAST ── */
+  .toast { position: fixed; bottom: 2rem; right: 2rem; z-index: 2000; background: var(--surface-2); border: 1px solid var(--border-mid); border-radius: 8px; padding: 0.9rem 1.25rem; font-size: 0.78rem; display: flex; align-items: center; gap: 0.75rem; transform: translateY(80px); opacity: 0; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); max-width: 320px; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.err { border-color: rgba(232,38,42,0.4); }
+
+  footer { margin-top: 0; padding: 1.5rem 2rem; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  footer p { font-size: 0.7rem; color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="logo"><span class="logo-musi">MUSI</span><span class="logo-god">GOD</span></a>
+  <div class="hdr-right">
+    <a href="portal.html" class="hdr-link">Artist Login</a>
+  </div>
+</header>
+
+<!-- ── HERO ── -->
+<div class="hero">
+  <div class="hero-eyebrow">Artist Registration</div>
+  <h1>Your music.<br><em>Your rights.</em> Your money.</h1>
+  <p class="hero-sub">MusiGod handles your publishing administration end-to-end — PRO registration, royalty recovery, and rights management. You keep 100% ownership.</p>
+  <div class="hero-pills">
+    <div class="pill"><span class="pill-dot"></span>Artists retain all rights</div>
+    <div class="pill"><span class="pill-dot"></span>15% recovery fee only</div>
+    <div class="pill"><span class="pill-dot"></span>Limited time artists get LLC at cost</div>
+    <div class="pill"><span class="pill-dot"></span>No long-term contracts</div>
+  </div>
+</div>
+
+<!-- ── PROGRESS STEPS ── -->
+<div class="progress-wrap">
+  <div class="progress-steps">
+    <div class="step-item active" id="step-ind-1">
+      <div class="step-num">1</div>
+      <div class="step-label">Identity</div>
+    </div>
+    <div class="step-item" id="step-ind-2">
+      <div class="step-num">2</div>
+      <div class="step-label">Catalog</div>
+    </div>
+    <div class="step-item" id="step-ind-3">
+      <div class="step-num">3</div>
+      <div class="step-label">Plan</div>
+    </div>
+    <div class="step-item" id="step-ind-4">
+      <div class="step-num">4</div>
+      <div class="step-label">Review</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── FORM ── -->
+<div class="form-wrap">
+
+  <!-- STEP 1: Identity -->
+  <div class="form-section active" id="section-1">
+    <div class="section-card">
+      <div class="section-card-header">
+        <div class="section-icon">👤</div>
+        <div>
+          <div class="section-card-title">Your Identity</div>
+          <div class="section-card-sub">Legal name as it appears on your government ID</div>
+        </div>
+      </div>
+      <div class="section-card-body">
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label">First Name <span class="req">*</span></label>
+            <input class="field-input" type="text" id="legal_first_name" placeholder="Legal first name" autocomplete="given-name">
+            <div class="field-err" id="err-legal_first_name">Required</div>
+          </div>
+          <div class="field">
+            <label class="field-label">Last Name <span class="req">*</span></label>
+            <input class="field-input" type="text" id="legal_last_name" placeholder="Legal last name" autocomplete="family-name">
+            <div class="field-err" id="err-legal_last_name">Required</div>
+          </div>
+        </div>
+        <div class="field-row single">
+          <div class="field">
+            <label class="field-label">Artist / Stage Name</label>
+            <input class="field-input" type="text" id="artist_name" placeholder="How the world knows you">
+            <div class="field-hint">Leave blank if same as legal name</div>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label">Email <span class="req">*</span></label>
+            <input class="field-input" type="email" id="email" placeholder="your@email.com" autocomplete="email">
+            <div class="field-err" id="err-email">Valid email required</div>
+          </div>
+          <div class="field">
+            <label class="field-label">Phone</label>
+            <input class="field-input" type="tel" id="phone" placeholder="+1 (555) 000-0000" autocomplete="tel">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label">City</label>
+            <input class="field-input" type="text" id="city" placeholder="Detroit" autocomplete="address-level2">
+          </div>
+          <div class="field">
+            <label class="field-label">State</label>
+            <select class="field-input field-select" id="state" autocomplete="address-level1">
+              <option value="">— Select —</option>
+              <option>AL</option><option>AK</option><option>AZ</option><option>AR</option>
+              <option>CA</option><option>CO</option><option>CT</option><option>DE</option>
+              <option>FL</option><option>GA</option><option>HI</option><option>ID</option>
+              <option>IL</option><option>IN</option><option>IA</option><option>KS</option>
+              <option>KY</option><option>LA</option><option>ME</option><option>MD</option>
+              <option>MA</option><option>MI</option><option>MN</option><option>MS</option>
+              <option>MO</option><option>MT</option><option>NE</option><option>NV</option>
+              <option>NH</option><option>NJ</option><option>NM</option><option>NY</option>
+              <option>NC</option><option>ND</option><option>OH</option><option>OK</option>
+              <option>OR</option><option>PA</option><option>RI</option><option>SC</option>
+              <option>SD</option><option>TN</option><option>TX</option><option>UT</option>
+              <option>VT</option><option>VA</option><option>WA</option><option>WV</option>
+              <option>WI</option><option>WY</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row single" style="margin-bottom:0">
+          <div class="field">
+            <label class="field-label">Referral Code</label>
+            <input class="field-input" type="text" id="ref_code" placeholder="e.g. AE329F07" style="font-family:'DM Mono',monospace;letter-spacing:0.08em;text-transform:uppercase">
+            <div class="field-hint">Leave blank if you weren't referred by a partner</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-nav">
+      <div></div>
+      <button class="btn-next" onclick="goStep(2)">Continue <span>→</span></button>
+    </div>
+  </div>
+
+  <!-- STEP 2: Catalog -->
+  <div class="form-section" id="section-2">
+    <div class="section-card">
+      <div class="section-card-header">
+        <div class="section-icon">🎵</div>
+        <div>
+          <div class="section-card-title">Your Catalog</div>
+          <div class="section-card-sub">Tell us about your music so we can maximize your recovery</div>
+        </div>
+      </div>
+      <div class="section-card-body">
+        <div class="field-row single" style="margin-bottom:1.25rem">
+          <div class="field">
+            <label class="field-label">Current PRO Affiliation <span class="req">*</span></label>
+            <div class="radio-grid three" style="margin-top:0.5rem">
+              <div class="radio-card">
+                <input type="radio" name="pro" id="pro-ascap" value="ASCAP">
+                <label class="radio-label" for="pro-ascap">
+                  <div class="radio-title">ASCAP</div>
+                </label>
+              </div>
+              <div class="radio-card">
+                <input type="radio" name="pro" id="pro-bmi" value="BMI">
+                <label class="radio-label" for="pro-bmi">
+                  <div class="radio-title">BMI</div>
+                </label>
+              </div>
+              <div class="radio-card">
+                <input type="radio" name="pro" id="pro-sesac" value="SESAC">
+                <label class="radio-label" for="pro-sesac">
+                  <div class="radio-title">SESAC</div>
+                </label>
+              </div>
+              <div class="radio-card">
+                <input type="radio" name="pro" id="pro-socan" value="SOCAN">
+                <label class="radio-label" for="pro-socan">
+                  <div class="radio-title">SOCAN</div>
+                  <div class="radio-sub">Canada</div>
+                </label>
+              </div>
+              <div class="radio-card">
+                <input type="radio" name="pro" id="pro-none" value="NONE">
+                <label class="radio-label" for="pro-none">
+                  <div class="radio-title">None</div>
+                  <div class="radio-sub">Not registered</div>
+                </label>
+              </div>
+              <div class="radio-card">
+                <input type="radio" name="pro" id="pro-unsure" value="UNSURE">
+                <label class="radio-label" for="pro-unsure">
+                  <div class="radio-title">Not sure</div>
+                </label>
+              </div>
+            </div>
+            <div class="field-err" id="err-pro">Please select your PRO affiliation</div>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label">Songs in Catalog <span class="req">*</span></label>
+            <select class="field-input field-select" id="catalog_size">
+              <option value="">— Select range —</option>
+              <option value="1-10">1–10 songs</option>
+              <option value="11-25">11–25 songs</option>
+              <option value="26-50">26–50 songs</option>
+              <option value="51-100">51–100 songs</option>
+              <option value="100+">100+ songs</option>
+            </select>
+            <div class="field-err" id="err-catalog_size">Required</div>
+          </div>
+          <div class="field">
+            <label class="field-label">Works Registered?</label>
+            <select class="field-input field-select" id="works_registered">
+              <option value="">— Select —</option>
+              <option value="YES">Yes — all registered</option>
+              <option value="SOME">Some registered</option>
+              <option value="NO">No — none registered</option>
+              <option value="UNSURE">Not sure</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label">Primary Genre</label>
+            <select class="field-input field-select" id="genre">
+              <option value="">— Select —</option>
+              <option>Hip-Hop / Rap</option>
+              <option>R&B / Soul</option>
+              <option>Pop</option>
+              <option>Rock</option>
+              <option>Electronic / EDM</option>
+              <option>Jazz</option>
+              <option>Gospel / Christian</option>
+              <option>Country</option>
+              <option>Latin</option>
+              <option>Classical</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">How Did You Hear About Us?</label>
+            <select class="field-input field-select" id="referral_source">
+              <option value="">— Select —</option>
+              <option>Referral / Partner</option>
+              <option>Instagram</option>
+              <option>Twitter / X</option>
+              <option>YouTube</option>
+              <option>TikTok</option>
+              <option>Google Search</option>
+              <option>Podcast</option>
+              <option>Word of mouth</option>
+              <option>Other</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-nav">
+      <button class="btn-back" onclick="goStep(1)">← Back</button>
+      <button class="btn-next" onclick="goStep(3)">Continue <span>→</span></button>
+    </div>
+  </div>
+
+  <!-- STEP 3: Plan -->
+  <div class="form-section" id="section-3">
+    <div class="section-card">
+      <div class="section-card-header">
+        <div class="section-icon">⚡</div>
+        <div>
+          <div class="section-card-title">Choose Your Plan</div>
+          <div class="section-card-sub">Both plans include full publishing administration</div>
+        </div>
+      </div>
+      <div class="section-card-body">
+        <div class="plan-grid">
+          <div class="plan-card">
+            <input type="radio" name="plan" id="plan-starter" value="starter" checked>
+            <label class="plan-label" for="plan-starter">
+              <div class="plan-name">Starter</div>
+              <div class="plan-price">$79<span>/mo</span></div>
+              <ul class="plan-features">
+                <li>EIN, LLC, FinCEN BOI guidance</li>
+                <li>All identifier codes (ISRC, ISWC, UPC)</li>
+                <li>ASCAP + BMI registration</li>
+                <li>SoundExchange + MLC enrollment</li>
+                <li>Spotify, Apple, Amazon claiming</li>
+                <li>Copyright.gov eCO filing</li>
+              </ul>
+            </label>
+          </div>
+          <div class="plan-card">
+            <input type="radio" name="plan" id="plan-growth" value="growth">
+            <label class="plan-label" for="plan-growth">
+              <div class="plan-name">Growth <span class="plan-badge">Popular</span></div>
+              <div class="plan-price">$129<span>/mo</span></div>
+              <ul class="plan-features">
+                <li>Everything in Starter</li>
+                <li>YouTube Content ID</li>
+                <li>TikTok + Meta sound registration</li>
+                <li>13 international PROs</li>
+                <li>Neighboring rights — 40+ territories</li>
+                <li>SoundCharts + Chartmetric analytics</li>
+              </ul>
+            </label>
+          </div>
+        </div>
+        <p style="font-size:0.7rem;color:var(--text-muted);margin-top:1.25rem;text-align:center">
+          + 15% of royalties we recover that you weren't previously collecting. If we don't find you new money, we don't take a cut.
+        </p>
+      </div>
+    </div>
+
+    <div class="form-nav">
+      <button class="btn-back" onclick="goStep(2)">← Back</button>
+      <button class="btn-next" onclick="goStep(4)">Review Registration <span>→</span></button>
+    </div>
+  </div>
+
+  <!-- STEP 4: Review & Submit -->
+  <div class="form-section" id="section-4">
+    <div class="section-card">
+      <div class="section-card-header">
+        <div class="section-icon">📋</div>
+        <div>
+          <div class="section-card-title">Review & Sign</div>
+          <div class="section-card-sub">Confirm your details and agree to the publishing admin agreement</div>
+        </div>
+      </div>
+      <div class="section-card-body">
+        <!-- Summary -->
+        <div id="review-summary" style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:1.25rem;margin-bottom:1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:0.75rem 1.5rem;font-size:0.8rem"></div>
+
+        <!-- Agreement -->
+        <div class="agreement-box">
+          <h4>Publishing Administration Agreement — Summary</h4>
+          <p>MusiGod Publishing Administration ("MusiGod") will act as your non-exclusive publishing administrator. You retain 100% ownership of all copyrights in your musical compositions.</p>
+          <p>MusiGod will register your works with applicable Performing Rights Organizations (PROs), collect royalties on your behalf, and remit collected royalties minus the agreed service fee.</p>
+          <p><strong>Service Fee:</strong> Monthly subscription as selected + 15% of retroactively recovered royalties only. No fee on prospective royalties collected during the subscription period.</p>
+          <p><strong>Term:</strong> Month-to-month. Cancel anytime. MusiGod will continue administering already-registered works through the current billing period.</p>
+          <p><strong>Rights:</strong> Artist retains all copyrights. MusiGod receives no ownership interest in any compositions. This is an administrative services agreement only.</p>
+          <p>Full agreement will be sent via DocuSign for electronic signature within 1 business day of activation.</p>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:0.75rem;margin-bottom:0">
+          <label class="checkbox-row" id="agree-row-1">
+            <input type="checkbox" id="agree-terms">
+            <span class="checkbox-text">I agree to the <strong>Publishing Administration Agreement</strong> and authorize MusiGod to register my works with applicable PROs on my behalf.</span>
+          </label>
+          <label class="checkbox-row" id="agree-row-2">
+            <input type="checkbox" id="agree-age">
+            <span class="checkbox-text">I confirm I am <strong>18 years of age or older</strong> and have the authority to enter this agreement.</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-nav">
+      <button class="btn-back" onclick="goStep(3)">← Back</button>
+      <button class="btn-next" id="btn-submit" onclick="submitForm()">
+        <span id="submit-label">Submit Registration</span> <span>→</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- SUCCESS -->
+  <div class="success-screen" id="success-screen">
+    <div class="success-icon">✓</div>
+    <h2>Registration received.</h2>
+    <p>Redirecting you to secure checkout. Your onboarding starts as soon as payment is confirmed.</p>
+    <div class="success-id" id="success-artist-id">—</div>
+    <div class="success-next">
+      <div class="success-step">
+        <div class="success-step-num">01</div>
+        <p><strong>Check your email</strong> — confirmation with your next steps is on the way to the address you provided.</p>
+      </div>
+      <div class="success-step">
+        <div class="success-step-num">02</div>
+        <p><strong>DocuSign agreement</strong> arrives within 1 business day — sign electronically to complete onboarding.</p>
+      </div>
+      <div class="success-step">
+        <div class="success-step-num">03</div>
+        <p><strong>VA begins your setup</strong> — PRO registrations, rights infrastructure, and retroactive recovery kick off.</p>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /form-wrap -->
+
+<div class="toast" id="toast"><span id="toast-icon">⚠</span><span id="toast-msg">Error</span></div>
+
+<footer>
+  <p>© 2026 MusiGod Publishing Administration</p>
+  <p>Questions? <a href="mailto:support@musigod.com" style="color:var(--red);text-decoration:none">support@musigod.com</a></p>
+</footer>
+
+<script>
+let currentStep = 1;
+
+// ── STEP NAV ──────────────────────────────────────────────────
+function goStep(n) {
+  if (n > currentStep && !validateStep(currentStep)) return;
+  if (n === 4) buildReview();
+
+  document.getElementById(`section-${currentStep}`).classList.remove('active');
+  document.getElementById(`section-${n}`).classList.add('active');
+
+  // Update indicators
+  for (let i = 1; i <= 4; i++) {
+    const el = document.getElementById(`step-ind-${i}`);
+    el.classList.remove('active', 'done');
+    if (i < n) el.classList.add('done');
+    if (i === n) el.classList.add('active');
+    // Show checkmark for done steps
+    el.querySelector('.step-num').textContent = i < n ? '✓' : i;
+  }
+
+  currentStep = n;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── VALIDATION ────────────────────────────────────────────────
+function validateStep(step) {
+  let ok = true;
+  function require(id, msg) {
+    const el = document.getElementById(id);
+    const errEl = document.getElementById(`err-${id}`);
+    const val = el ? el.value.trim() : '';
+    if (!val) {
+      if (el) el.classList.add('err');
+      if (errEl) { errEl.textContent = msg || 'Required'; errEl.classList.add('show'); }
+      ok = false;
+    } else {
+      if (el) el.classList.remove('err');
+      if (errEl) errEl.classList.remove('show');
+    }
+  }
+
+  if (step === 1) {
+    require('legal_first_name', 'First name required');
+    require('legal_last_name', 'Last name required');
+    const email = document.getElementById('email').value.trim();
+    const emailErr = document.getElementById('err-email');
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      document.getElementById('email').classList.add('err');
+      emailErr.classList.add('show');
+      ok = false;
+    } else {
+      document.getElementById('email').classList.remove('err');
+      emailErr.classList.remove('show');
+    }
+  }
+
+  if (step === 2) {
+    const pro = document.querySelector('input[name=pro]:checked');
+    const proErr = document.getElementById('err-pro');
+    if (!pro) { proErr.classList.add('show'); ok = false; }
+    else proErr.classList.remove('show');
+    require('catalog_size', 'Please select your catalog size');
+  }
+
+  if (step === 4) {
+    if (!document.getElementById('agree-terms').checked || !document.getElementById('agree-age').checked) {
+      toast('Please check both agreement boxes to continue', true);
+      ok = false;
+    }
+  }
+
+  return ok;
+}
+
+// ── REVIEW SUMMARY ────────────────────────────────────────────
+function buildReview() {
+  const pro = document.querySelector('input[name=pro]:checked')?.value || '—';
+  const plan = document.querySelector('input[name=plan]:checked')?.value || 'starter';
+  const rows = [
+    ['Legal Name', `${v('legal_first_name')} ${v('legal_last_name')}`],
+    ['Artist Name', v('artist_name') || '(same as legal)'],
+    ['Email', v('email')],
+    ['Phone', v('phone') || '—'],
+    ['Location', [v('city'), v('state')].filter(Boolean).join(', ') || '—'],
+    ['PRO', pro],
+    ['Catalog Size', v('catalog_size') || '—'],
+    ['Works Registered', v('works_registered') || '—'],
+    ['Genre', v('genre') || '—'],
+    ['Plan', plan === 'growth' ? 'Growth - $129/mo' : 'Starter - $79/mo'],
+    ['Ref Code', v('ref_code') || '—'],
+  ];
+  document.getElementById('review-summary').innerHTML = rows.map(([k, val]) =>
+    `<div><div style="font-size:0.58rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.2rem">${k}</div><div style="font-size:0.82rem;color:var(--text)">${val}</div></div>`
+  ).join('');
+}
+
+function v(id) { return (document.getElementById(id)?.value || '').trim(); }
+
+// ── SUBMIT ────────────────────────────────────────────────────
+async function submitForm() {
+  if (!validateStep(4)) return;
+
+  const btn = document.getElementById('btn-submit');
+  const label = document.getElementById('submit-label');
+  btn.disabled = true;
+  label.textContent = 'Submitting...';
+
+  const plan = document.querySelector('input[name=plan]:checked')?.value || 'starter';
+  const pro = document.querySelector('input[name=pro]:checked')?.value || 'UNSURE';
+  const payload = {
+    legal_first_name: v('legal_first_name'),
+    legal_last_name: v('legal_last_name'),
+    artist_name: v('artist_name') || null,
+    email: v('email'),
+    phone: v('phone') || null,
+    city: v('city') || null,
+    state: v('state') || null,
+    plan,
+    pro,
+    catalog_size: v('catalog_size') || null,
+    works_registered: v('works_registered') || null,
+    genre: v('genre') || null,
+    referral_source: v('referral_source') || null,
+    ref_code: v('ref_code').toUpperCase() || null,
+  };
+
+  try {
+    const regRes = await fetch('/api/register-artist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const regBody = await regRes.json().catch(() => ({}));
+    if (!regRes.ok) throw new Error(regBody.error || `Registration failed (${regRes.status})`);
+
+    const artistId = regBody.artist_id;
+    localStorage.setItem('musigod_artist_id', artistId);
+    localStorage.setItem('musigod_plan', plan);
+
+    document.getElementById('section-4').classList.remove('active');
+    document.querySelectorAll('.progress-steps, .section-card').forEach(el => el.style.opacity = '0.3');
+    document.getElementById('success-screen').classList.add('show');
+    document.getElementById('success-artist-id').textContent = `Artist ID: ${artistId}`;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    label.textContent = 'Opening checkout...';
+    const checkoutRes = await fetch('/api/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ artist_id: artistId, plan }),
+    });
+    const checkoutBody = await checkoutRes.json().catch(() => ({}));
+    if (!checkoutRes.ok || !checkoutBody.url) throw new Error(checkoutBody.error || `Checkout failed (${checkoutRes.status})`);
+
+    window.location.href = checkoutBody.url;
+  } catch (err) {
+    console.error(err);
+    toast(`Error: ${err.message}`, true);
+    btn.disabled = false;
+    label.textContent = 'Submit Registration';
+  }
+}
+
+async function legacySubmitForm() {
+  if (!validateStep(4)) return;
+
+  const btn = document.getElementById('btn-submit');
+  const label = document.getElementById('submit-label');
+  btn.disabled = true; label.textContent = 'Submitting…';
+
+  const plan = document.querySelector('input[name=plan]:checked')?.value || 'starter';
+  const pro  = document.querySelector('input[name=pro]:checked')?.value || 'UNSURE';
+
+  const artistPayload = {
+    legal_first_name: v('legal_first_name'),
+    legal_last_name:  v('legal_last_name'),
+    artist_name:      v('artist_name') || null,
+    email:            v('email'),
+    phone:            v('phone') || null,
+    city:             v('city') || null,
+    state:            v('state') || null,
+    country:          'US',
+    plan_tier:        plan.toUpperCase(),
+    plan_status:      'PENDING',
+    ref_code:         v('ref_code').toUpperCase() || null,
+    meta: {
+      pro_affiliation:  pro,
+      catalog_size:     v('catalog_size') || null,
+      works_registered: v('works_registered') || null,
+      genre:            v('genre') || null,
+      referral_source:  v('referral_source') || null,
+      registered_at:    new Date().toISOString(),
+      agreement_ip:     null,
+    }
+  };
+
+  try {
+    // 1. Insert artist
+    const artRes = await fetch(`${SUPABASE_URL}/rest/v1/artists_v1`, {
+      method: 'POST',
+      headers: {
+        'apikey': '', 'Authorization': 'Bearer ',
+        'Content-Type': 'application/json',
+        'Accept-Profile': 'artists', 'Content-Profile': 'artists',
+        'Prefer': 'return=representation',
+      },
+      body: JSON.stringify(artistPayload),
+    });
+
+    if (!artRes.ok) {
+      const err = await artRes.text();
+      throw new Error(`Artist insert failed: ${err}`);
+    }
+
+    const [artist] = await artRes.json();
+    const artistId = artist.id;
+
+    // 2. Seed initial registration row (admin review)
+    const regPayload = {
+      artist_id:             artistId,
+      registration_type:     'ONBOARDING',
+      registration_category: 'BUSINESS',
+      status:                'PENDING',
+      instructions:          `New artist registration — ${v('legal_first_name')} ${v('legal_last_name')} (${v('email')}). Plan: ${plan.toUpperCase()}. PRO: ${pro}. Catalog: ${v('catalog_size') || 'unknown'}.`,
+      meta: {
+        plan,
+        pro,
+        catalog_size:     v('catalog_size'),
+        works_registered: v('works_registered'),
+        genre:            v('genre'),
+      }
+    };
+
+    await fetch(`${SUPABASE_URL}/rest/v1/registrations_v1`, {
+      method: 'POST',
+      headers: {
+        'apikey': '', 'Authorization': 'Bearer ',
+        'Content-Type': 'application/json',
+        'Accept-Profile': 'registrations', 'Content-Profile': 'registrations',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify(regPayload),
+    });
+
+    // 3. Fire n8n webhook (non-blocking)
+    fetch('https://musigod-n8n.onrender.com/webhook/artist-registered', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        artist_id: artistId,
+        name: `${v('legal_first_name')} ${v('legal_last_name')}`,
+        artist_name: v('artist_name') || null,
+        email: v('email'),
+        plan,
+        pro,
+        ref_code: v('ref_code') || null,
+      }),
+    }).catch(() => {}); // fire-and-forget
+
+    // 4. Show success
+    document.getElementById(`section-4`).classList.remove('active');
+    document.querySelectorAll('.progress-steps, .section-card').forEach(el => el.style.opacity = '0.3');
+    const success = document.getElementById('success-screen');
+    success.classList.add('show');
+    document.getElementById('success-artist-id').textContent = `Artist ID: ${artistId}`;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  } catch (err) {
+    console.error(err);
+    toast(`Error: ${err.message}`, true);
+    btn.disabled = false; label.textContent = 'Submit Registration';
+  }
+}
+
+// ── TOAST ─────────────────────────────────────────────────────
+function toast(msg, isErr = false) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  document.getElementById('toast-icon').textContent = isErr ? '⚠' : '✓';
+  t.className = `toast ${isErr ? 'err' : ''} show`;
+  setTimeout(() => { t.className = `toast ${isErr ? 'err' : ''}`; }, 4500);
+}
+
+// ── PRE-FILL REF CODE FROM URL ────────────────────────────────
+const urlRef = new URLSearchParams(window.location.search).get('ref');
+if (urlRef) {
+  const refInput = document.getElementById('ref_code');
+  if (refInput) refInput.value = urlRef.toUpperCase();
+}
+</script>
+</body>
+</html>

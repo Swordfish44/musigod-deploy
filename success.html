@@ -72,8 +72,15 @@
       You&rsquo;ll receive email updates as each registration is completed.
       Questions? Reply to your welcome email.
     </div>
-    <a href="/portal" class="btn">GO TO YOUR PORTAL</a>
+    <a href="/portal" class="btn" id="portal-link">GO TO YOUR PORTAL</a>
     <div class="footer">MUSIGOD PUBLISHING ADMINISTRATION &mdash; CONFIDENTIAL</div>
   </div>
+  <script>
+    const artistId = new URLSearchParams(window.location.search).get('artist_id');
+    if (artistId) {
+      localStorage.setItem('musigod_artist_id', artistId);
+      document.getElementById('portal-link').href = `/portal?artist_id=${encodeURIComponent(artistId)}`;
+    }
+  </script>
 </body>
 </html>

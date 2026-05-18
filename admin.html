@@ -846,33 +846,23 @@ function renderReview(){
   }
 }
 
-const SUPABASE_SERVICE = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDYxOSwiZXhwIjoyMDkzMTA2NjE5fQ.jmBLX9VwFvFT4rc3lzqSJS9hFjis2QxRkmWpFizQtKk'
+async function adminAction(payload){
+  const key = sessionStorage.getItem('musigod_admin_key') || prompt('Admin key (leave blank if not configured)') || ''
+  if(key) sessionStorage.setItem('musigod_admin_key', key)
+  const res = await fetch('/api/admin-registration-action', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Admin-Key':key},
+    body:JSON.stringify(payload)
+  })
+  const body = await res.json().catch(()=>({}))
+  return res.ok ? {ok:true,body} : {ok:false,error:body.error || `HTTP ${res.status}`}
+}
+
 async function activateOne(id, name){
   if(!confirm("Activate " + name + "?")) return;
-  const res = await fetch(SUPABASE_URL+'/rest/v1/registrations_v1?id=eq.'+id, {method:'PATCH',headers:{'Content-Type':'application/json','apikey':SUPABASE_SERVICE,'Authorization':'Bearer '+SUPABASE_SERVICE,'Accept-Profile':'registrations','Content-Profile':'registrations'},body:JSON.stringify({status:'ACTIVE'})});
-  if(!res.ok){const t=await res.text();showToast('Error: '+t,'err');return;}
-  showToast(name+' ACTIVE','ok'); await triggerAffiliateCommission(reg.id);
-  // Commission wiring: look up artist ref_code → call fn_create_commission RPC
-  try {
-    const _reg = allRegs.find(r=>r.registration_id===id);
-    if(_reg?.artist_id){
-      const _artR = await fetch(SUPABASE_URL+'/rest/v1/artists_v1?id=eq.'+_reg.artist_id+'&select=ref_code',{
-        headers:{'apikey':SUPABASE_SERVICE,'Authorization':'Bearer '+SUPABASE_SERVICE,'Accept-Profile':'artists'}
-      });
-      if(_artR.ok){
-        const [_art]=await _artR.json();
-        if(_art?.ref_code){
-          const _commR = await fetch(SUPABASE_URL+'/rest/v1/rpc/fn_create_commission',{
-            method:'POST',
-            headers:{'Content-Type':'application/json','apikey':SUPABASE_SERVICE,'Authorization':'Bearer '+SUPABASE_SERVICE},
-            body:JSON.stringify({p_affiliate_code:_art.ref_code,p_artist_id:_reg.artist_id,p_trigger:'activation'})
-          });
-          const _commJ = await _commR.json().catch(()=>({}));
-          console.log('[commission]',_commJ);
-        }
-      }
-    }
-  } catch(_e){console.warn('[commission error]',_e)}
+  const res = await adminAction({action:'activate',registration_id:id});
+  if(!res.ok){showToast('Error: '+res.error,'err');return;}
+  showToast(name+' ACTIVE','ok');
   setTimeout(()=>loadAll(),800)
 }
 
@@ -907,22 +897,11 @@ async function submitReject(){
   btn.disabled = true
   btn.textContent = 'Rejecting...'
 
-  const regRes = await fetch(SUPABASE_URL+'/rest/v1/registrations_v1?id=eq.'+_rejectId, {
-    method:'PATCH',
-    headers:{
-      'Content-Type':'application/json',
-      'apikey':SUPABASE_SERVICE,
-      'Authorization':'Bearer '+SUPABASE_SERVICE,
-      'Accept-Profile':'registrations',
-      'Content-Profile':'registrations'
-    },
-    body:JSON.stringify({status:'REJECTED',rejection_reason:reason})
-  })
-  if(!regRes.ok){const t=await regRes.text();showToast('Reg error: '+t,'err');btn.disabled=false;btn.textContent='Confirm Reject';return}
+  const regRes = await adminAction({action:'reject',registration_id:_rejectId,reason})
+  if(!regRes.ok){showToast('Reg error: '+regRes.error,'err');btn.disabled=false;btn.textContent='Confirm Reject';return}
 
   closeRejectModal()
   showToast('Artist rejected','err')
-  await fetch('https://musigod-n8n.onrender.com/webhook/registration-rejected',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({registration_id:_rejectId,rejection_reason:reason,artist_id:_rejectArtistId})})
   setTimeout(()=>loadAll(),800)
 }
 

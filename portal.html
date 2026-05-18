@@ -185,10 +185,22 @@
 <script>
 const SUPABASE_URL = 'https://uykzkrnoetcldeuxzqyy.supabase.co';
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MzA2MTksImV4cCI6MjA5MzEwNjYxOX0.r4Dx_Jkgje2kYNGh9PQtuyuJgBGJwVAviHM9QmAJcrs';
-const ARTIST_ID = '3d4788b6-2a86-4ed5-8f27-ab95b3a230d3';
+const ARTIST_ID = getArtistId();
 let allRegs = [], currentFilter = 'ALL';
 
+function getArtistId() {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('artist_id') || localStorage.getItem('musigod_artist_id');
+  if (id) localStorage.setItem('musigod_artist_id', id);
+  return id;
+}
+
 async function fetchRegistrations() {
+  if (!ARTIST_ID) {
+    document.getElementById('reg-container').innerHTML = `<div class="empty-state"><div style="margin-bottom:0.4rem">No artist session found</div><div style="font-size:0.7rem">Register first, then return to your portal from the payment confirmation page.</div><div style="margin-top:1rem"><a class="btn-red" href="register.html">Register</a></div></div>`;
+    document.getElementById('hero-sub').textContent = 'Register to create your artist portal.';
+    return;
+  }
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/registrations_v1?artist_id=eq.${ARTIST_ID}&order=created_at.desc`, {
       headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}`, 'Accept-Profile': 'registrations' }

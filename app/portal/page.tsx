@@ -1,12 +1,9 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 type RegistrationRow = {
   registration_id: string
@@ -79,8 +76,14 @@ export default function ArtistPortal() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [activeCategory, setActiveCategory] = useState<string>('ALL')
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
+  const [artistId, setArtistId] = useState<string | null>(null)
 
-  const ARTIST_ID = '3d4788b6-2a86-4ed5-8f27-ab95b3a230d3'
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const id = params.get('artist_id') || window.localStorage.getItem('musigod_artist_id')
+    if (id) window.localStorage.setItem('musigod_artist_id', id)
+    setArtistId(id)
+  }, [])
 
   const showToast = (msg: string, ok: boolean) => {
     setToast({ msg, ok })
@@ -88,29 +91,65 @@ export default function ArtistPortal() {
   }
 
   const load = useCallback(async () => {
+    if (!artistId) {
+      setRows([])
+      setLoading(false)
+      setError('No artist session found')
+      return
+    }
     setLoading(true)
-    const { data, error: err } = await supabase
-      .from('v_artist_dashboard')
-      .select('*')
-      .eq('artist_id', ARTIST_ID)
-      .order('portal_sort_order', { ascending: true, nullsFirst: false })
-    if (err) { setError(err.message); setLoading(false); return }
-    setRows((data as RegistrationRow[]) ?? [])
-    setLoading(false)
-  }, [])
+    setError(null)
+    try {
+      const params = new URLSearchParams({
+        select: '*',
+        artist_id: `eq.${artistId}`,
+        order: 'portal_sort_order.asc.nullslast',
+      })
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/v_artist_dashboard?${params.toString()}`, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          'Accept-Profile': 'registrations',
+        },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`)
+      setRows((data as RegistrationRow[]) ?? [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLoading(false)
+    }
+  }, [artistId])
 
   useEffect(() => { load() }, [load])
 
   const markComplete = async (reg: RegistrationRow) => {
     setUpdating(reg.registration_id)
-    const { error: err } = await supabase.rpc('fn_update_registration_status_v1', {
-      p_registration_id: reg.registration_id,
-      p_status: 'SUBMITTED',
-      p_n8n_execution_id: null,
-      p_external_id: null,
-      p_external_status: null,
-      p_last_error: null,
-    })
+    let err: Error | null = null
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/fn_update_registration_status_v1`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Accept-Profile': 'registrations',
+          'Content-Profile': 'registrations',
+        },
+        body: JSON.stringify({
+          p_registration_id: reg.registration_id,
+          p_status: 'SUBMITTED',
+          p_n8n_execution_id: null,
+          p_external_id: null,
+          p_external_status: null,
+          p_last_error: null,
+        }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+    } catch (e) {
+      err = e instanceof Error ? e : new Error(String(e))
+    }
     setUpdating(null)
     if (err) { showToast(`Error: ${err.message}`, false) }
     else { showToast(`${reg.display_name} marked complete.`, true); load() }

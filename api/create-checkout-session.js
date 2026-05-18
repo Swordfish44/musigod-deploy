@@ -4,12 +4,13 @@ const PRICE_IDS = {
 }
 
 module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', 'https://musigod.com')
+  setCors(req, res)
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+  if (!process.env.STRIPE_SECRET_KEY) return res.status(500).json({ error: 'Stripe secret key is not configured' })
 
   let body
   try {
@@ -21,7 +22,7 @@ module.exports = async function handler(req, res) {
 
   const { artist_id, plan } = body
   if (!artist_id || !PRICE_IDS[plan]) {
-    return res.status(400).json({ error: 'artist_id and plan (starter|growth) required' })
+    return res.status(400).json({ error: 'artist_id and configured plan (starter|growth) required' })
   }
 
   const params = new URLSearchParams()
@@ -30,9 +31,11 @@ module.exports = async function handler(req, res) {
   params.append('line_items[0][quantity]', '1')
   params.append('metadata[artist_id]', artist_id)
   params.append('metadata[plan]', plan)
+  params.append('subscription_data[metadata][artist_id]', artist_id)
+  params.append('subscription_data[metadata][plan]', plan)
   params.append('customer_creation', 'always')
-  params.append('success_url', 'https://musigod.com/success.html')
-  params.append('cancel_url', 'https://musigod.com/portal')
+  params.append('success_url', `https://musigod.com/success.html?artist_id=${encodeURIComponent(artist_id)}&session_id={CHECKOUT_SESSION_ID}`)
+  params.append('cancel_url', `https://musigod.com/register.html?artist_id=${encodeURIComponent(artist_id)}&checkout=cancelled`)
 
   const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
     method: 'POST',
@@ -50,6 +53,13 @@ module.exports = async function handler(req, res) {
   }
 
   res.status(200).json({ url: session.url })
+}
+
+function setCors(req, res) {
+  const origin = req.headers.origin || ''
+  const allowed = new Set(['https://musigod.com', 'https://www.musigod.com'])
+  res.setHeader('Access-Control-Allow-Origin', allowed.has(origin) ? origin : 'https://musigod.com')
+  res.setHeader('Vary', 'Origin')
 }
 
 function getRawBody(req) {

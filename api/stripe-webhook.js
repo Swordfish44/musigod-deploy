@@ -26,6 +26,8 @@ module.exports = async function handler(req, res) {
       await handleCheckoutComplete(event.data.object)
     } else if (event.type === 'customer.subscription.created') {
       await handleSubscriptionCreated(event.data.object)
+    } else if (event.type === 'customer.subscription.updated') {
+      await handleSubscriptionUpdated(event.data.object)
     } else if (event.type === 'customer.subscription.deleted') {
       await handleSubscriptionDeleted(event.data.object)
     }
@@ -51,16 +53,27 @@ async function handleCheckoutComplete(session) {
 }
 
 async function handleSubscriptionCreated(subscription) {
-  const artistId = await artistIdByCustomer(subscription.customer)
+  const artistId = subscription.metadata?.artist_id || await artistIdByCustomer(subscription.customer)
   if (!artistId) return
   await sbPatch(`registrations_v1?artist_id=eq.${artistId}`, {
     stripe_subscription_id: subscription.id,
-    plan_status: 'ACTIVE',
+    plan_status: normalizeSubscriptionStatus(subscription.status),
+    plan_type: subscription.metadata?.plan || undefined,
+  })
+}
+
+async function handleSubscriptionUpdated(subscription) {
+  const artistId = subscription.metadata?.artist_id || await artistIdByCustomer(subscription.customer)
+  if (!artistId) return
+  await sbPatch(`registrations_v1?artist_id=eq.${artistId}`, {
+    stripe_subscription_id: subscription.id,
+    plan_status: normalizeSubscriptionStatus(subscription.status),
+    plan_type: subscription.metadata?.plan || undefined,
   })
 }
 
 async function handleSubscriptionDeleted(subscription) {
-  const artistId = await artistIdByCustomer(subscription.customer)
+  const artistId = subscription.metadata?.artist_id || await artistIdByCustomer(subscription.customer)
   if (!artistId) return
   await sbPatch(`registrations_v1?artist_id=eq.${artistId}`, {
     plan_status: 'SUSPENDED',
@@ -92,6 +105,7 @@ async function sbPatch(path, data) {
   if (!res.ok) {
     const text = await res.text()
     console.error('Supabase PATCH error:', res.status, text)
+    throw new Error(`Supabase PATCH failed: ${res.status}`)
   }
 }
 
@@ -122,6 +136,13 @@ function verifySignature(payload, header, secret) {
   const b = Buffer.from(expected, 'hex')
   if (a.length !== b.length) return false
   return crypto.timingSafeEqual(a, b)
+}
+
+function normalizeSubscriptionStatus(status) {
+  if (status === 'active' || status === 'trialing') return 'ACTIVE'
+  if (status === 'past_due' || status === 'unpaid') return 'PAST_DUE'
+  if (status === 'canceled' || status === 'incomplete_expired') return 'SUSPENDED'
+  return String(status || 'PENDING').toUpperCase()
 }
 
 function getRawBody(req) {
