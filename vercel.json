@@ -16,6 +16,7 @@
     { "source": "/earnings", "destination": "/earnings.html" },
     { "source": "/registration/:path*", "destination": "/registration-detail.html" },
     { "source": "/success", "destination": "/success.html" },
+    { "source": "/rights-audit", "destination": "/rights-audit.html" },
     { "source": "/affiliates", "destination": "/affiliate-dashboard.html" }
   ]
 }

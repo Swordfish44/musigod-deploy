@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod - Rights Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--red:#C8102E;--red2:#E8262A;--black:#080808;--bg:#0c0c0c;--bg2:#111;--bg3:#1a1a1a;--line:rgba(255,255,255,0.08);--text:#e8e8e8;--muted:#888;--dim:#555;--green:#22c55e;--amber:#f0a020}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--black);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+  header{height:64px;background:rgba(12,12,12,0.96);border-bottom:1px solid rgba(200,16,46,0.2);display:flex;align-items:center;justify-content:space-between;padding:0 32px;position:sticky;top:0;z-index:20}
+  .logo{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:0.14em;color:#fff;text-decoration:none}.logo span{color:var(--red)}
+  .hdr-link{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:0.08em;text-decoration:none}.hdr-link:hover{color:#fff}
+  .hero{border-bottom:1px solid var(--line);padding:56px 32px 34px;background:linear-gradient(180deg,#0d0d0d 0%,#080808 100%)}
+  .hero-inner,.wrap{max-width:1040px;margin:0 auto}
+  .eyebrow{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.18em;color:var(--red);margin-bottom:14px}
+  h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(44px,7vw,78px);letter-spacing:0.04em;line-height:0.95;color:#fff;margin-bottom:16px}
+  .sub{max-width:720px;color:#aaa;font-size:16px;line-height:1.7}
+  .wrap{padding:34px 32px 70px;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:start}
+  .panel{background:var(--bg);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .panel-h{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:16px;align-items:center}
+  .panel-title{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.16em;color:#fff}.panel-sub{font-size:12px;color:var(--dim);margin-top:4px}
+  .panel-b{padding:22px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.grid.one{grid-template-columns:1fr}
+  label{display:block;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.12em;color:var(--dim);margin-bottom:7px}
+  input,select,textarea{width:100%;background:var(--bg3);border:1px solid rgba(255,255,255,0.1);border-radius:5px;color:#fff;font-family:'DM Sans',sans-serif;font-size:14px;padding:11px 12px;outline:none}
+  input:focus,select:focus,textarea:focus{border-color:rgba(200,16,46,0.55);box-shadow:0 0 0 3px rgba(200,16,46,0.08)}
+  textarea{min-height:112px;resize:vertical}.field{margin-bottom:14px}.req{color:var(--red)}
+  .checks{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .check{display:flex;gap:9px;align-items:flex-start;background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:10px;font-size:13px;color:#bbb;line-height:1.35}
+  .check input{width:auto;margin-top:2px;accent-color:var(--red)}
+  .btn{border:0;border-radius:5px;padding:12px 18px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.1em;cursor:pointer;text-transform:uppercase}
+  .btn-red{background:var(--red);color:#fff}.btn-red:hover{background:#a00d25}.btn-red:disabled{opacity:0.55;cursor:not-allowed}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--muted)}
+  .actions{display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:18px}
+  .notice{background:rgba(200,16,46,0.06);border:1px solid rgba(200,16,46,0.18);border-left:3px solid var(--red);border-radius:6px;padding:16px 18px;color:#aaa;font-size:13px;line-height:1.65;margin-bottom:16px}
+  .side-list{list-style:none;display:flex;flex-direction:column;gap:12px}.side-list li{display:flex;gap:10px;color:#aaa;font-size:13px;line-height:1.5}.num{font-family:'DM Mono',monospace;color:var(--red);font-size:11px;margin-top:2px}
+  .result{display:none;margin-top:16px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:6px;padding:16px;color:#bdeacb;font-size:13px;line-height:1.6}
+  .result.show{display:block}.error{display:none;margin-top:16px;background:rgba(200,16,46,0.08);border:1px solid rgba(200,16,46,0.28);border-radius:6px;padding:14px;color:#ff9ba8;font-size:13px}.error.show{display:block}
+  .mono{font-family:'DM Mono',monospace}.status-box{background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:12px;font-size:12px;color:#aaa;line-height:1.6;min-height:52px}
+  footer{border-top:1px solid var(--line);padding:24px 32px;color:#444;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;text-align:center}
+  @media(max-width:850px){header{padding:0 18px}.wrap{grid-template-columns:1fr;padding:24px 18px 52px}.hero{padding:42px 18px 28px}.grid,.checks{grid-template-columns:1fr}.actions{flex-direction:column}.btn{width:100%}}
+</style>
+</head>
+<body>
+<header>
+  <a class="logo" href="/"><span>MUSI</span>GOD</a>
+  <a class="hdr-link" href="/register.html">START ONBOARDING</a>
+</header>
+
+<section class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow">RIGHTS AUDIT</div>
+    <h1>Find the royalty leaks.</h1>
+    <p class="sub">MusiGod reviews your registrations, publishing setup, master rights, platform claims, and collection gaps so you know what is missing before money disappears.</p>
+  </div>
+</section>
+
+<main class="wrap">
+  <section class="panel">
+    <div class="panel-h">
+      <div><div class="panel-title">REQUEST AUDIT</div><div class="panel-sub">Complete every required field for a usable review.</div></div>
+    </div>
+    <div class="panel-b">
+      <div class="notice">This is not legal advice. The audit identifies operational gaps in registrations, claims, royalty collection, and account setup so MusiGod can prioritize recovery and administration work.</div>
+      <form id="audit-form">
+        <div class="grid">
+          <div class="field"><label>Artist / Stage Name <span class="req">*</span></label><input id="artist_name" autocomplete="organization" required></div>
+          <div class="field"><label>Legal Name</label><input id="legal_name" autocomplete="name"></div>
+        </div>
+        <div class="grid">
+          <div class="field"><label>Email <span class="req">*</span></label><input id="email" type="email" autocomplete="email" required></div>
+          <div class="field"><label>Phone</label><input id="phone" type="tel" autocomplete="tel"></div>
+        </div>
+        <div class="grid">
+          <div class="field"><label>PRO Affiliation</label><select id="pro_affiliation"><option value="">Unknown / not registered</option><option>ASCAP</option><option>BMI</option><option>SESAC</option><option>GMR</option><option>PRS</option><option>Other</option></select></div>
+          <div class="field"><label>Publisher Name</label><input id="publisher_name" placeholder="Leave blank if none"></div>
+        </div>
+        <div class="grid">
+          <div class="field"><label>Catalog Size <span class="req">*</span></label><select id="catalog_size" required><option value="">Select</option><option>1-5 songs</option><option>6-20 songs</option><option>21-50 songs</option><option>51-100 songs</option><option>100+ songs</option></select></div>
+          <div class="field"><label>Released Music <span class="req">*</span></label><select id="released_music" required><option value="">Select</option><option>Already released</option><option>Releasing within 30 days</option><option>Unreleased catalog</option><option>Mixed released and unreleased</option></select></div>
+        </div>
+
+        <div class="field">
+          <label>Platforms With Music Live</label>
+          <div class="checks" id="platforms">
+            <label class="check"><input type="checkbox" value="Spotify">Spotify</label>
+            <label class="check"><input type="checkbox" value="Apple Music">Apple Music</label>
+            <label class="check"><input type="checkbox" value="YouTube">YouTube</label>
+            <label class="check"><input type="checkbox" value="TikTok">TikTok</label>
+            <label class="check"><input type="checkbox" value="SoundCloud">SoundCloud</label>
+            <label class="check"><input type="checkbox" value="Bandcamp">Bandcamp</label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Rights Concerns <span class="req">*</span></label>
+          <div class="checks" id="rights_concerns">
+            <label class="check"><input type="checkbox" value="Publishing not registered">Publishing not registered</label>
+            <label class="check"><input type="checkbox" value="Missing songwriter royalties">Missing songwriter royalties</label>
+            <label class="check"><input type="checkbox" value="No SoundExchange or neighboring rights">No SoundExchange / neighboring rights</label>
+            <label class="check"><input type="checkbox" value="YouTube Content ID missing">YouTube Content ID missing</label>
+            <label class="check"><input type="checkbox" value="Unclaimed DSP artist profiles">Unclaimed DSP profiles</label>
+            <label class="check"><input type="checkbox" value="Old catalog needs royalty recovery">Old catalog recovery</label>
+          </div>
+        </div>
+
+        <div class="field"><label>Notes</label><textarea id="notes" placeholder="List distributors, release dates, alternate artist names, label names, or known registration problems."></textarea></div>
+        <div class="actions"><button type="button" class="btn btn-ghost" onclick="resetForm()">CLEAR</button><button class="btn btn-red" id="submit-btn" type="submit">START RIGHTS AUDIT</button></div>
+      </form>
+      <div class="result" id="result"></div>
+      <div class="error" id="error"></div>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="panel-h"><div><div class="panel-title">WHAT WE CHECK</div><div class="panel-sub">Operational rights coverage.</div></div></div>
+    <div class="panel-b">
+      <ul class="side-list">
+        <li><span class="num">01</span><span>Songwriter and publisher registrations across PROs and publishing administration records.</span></li>
+        <li><span class="num">02</span><span>Master recording collection setup including SoundExchange and neighboring rights paths.</span></li>
+        <li><span class="num">03</span><span>DSP profile claims, YouTube Content ID, metadata consistency, and catalog identifiers.</span></li>
+        <li><span class="num">04</span><span>Recovery opportunities where released catalog may be collecting in the wrong place or not collecting at all.</span></li>
+      </ul>
+      <div style="height:18px"></div>
+      <div class="panel-title" style="margin-bottom:10px">CHECK STATUS</div>
+      <div class="field"><label>Audit ID</label><input id="lookup_id"></div>
+      <div class="field"><label>Email</label><input id="lookup_email" type="email"></div>
+      <button class="btn btn-ghost" style="width:100%" onclick="lookupAudit()">LOOK UP AUDIT</button>
+      <div class="status-box" id="status-box" style="margin-top:12px">Enter your audit ID and email to check status.</div>
+    </div>
+  </aside>
+</main>
+
+<footer>MUSIGOD PUBLISHING ADMINISTRATION - RIGHTS AUDIT INTAKE</footer>
+
+<script>
+function val(id){return (document.getElementById(id)?.value || '').trim()}
+function checked(id){return [...document.querySelectorAll(`#${id} input:checked`)].map(el=>el.value)}
+function showError(msg){const el=document.getElementById('error');el.textContent=msg;el.classList.add('show')}
+function clearError(){const el=document.getElementById('error');el.textContent='';el.classList.remove('show')}
+function resetForm(){document.getElementById('audit-form').reset();clearError();document.getElementById('result').classList.remove('show')}
+
+document.getElementById('audit-form').addEventListener('submit', async (event) => {
+  event.preventDefault()
+  clearError()
+  const btn = document.getElementById('submit-btn')
+  btn.disabled = true
+  btn.textContent = 'SUBMITTING...'
+  try {
+    const res = await fetch('/api/start-rights-audit', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        artist_name: val('artist_name'),
+        legal_name: val('legal_name'),
+        email: val('email'),
+        phone: val('phone'),
+        pro_affiliation: val('pro_affiliation'),
+        publisher_name: val('publisher_name'),
+        catalog_size: val('catalog_size'),
+        released_music: val('released_music'),
+        platforms: checked('platforms'),
+        rights_concerns: checked('rights_concerns'),
+        notes: val('notes'),
+        source: 'rights-audit.html'
+      })
+    })
+    const body = await res.json().catch(()=>({}))
+    if(!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+    localStorage.setItem('musigod_rights_audit_id', body.audit_id)
+    localStorage.setItem('musigod_rights_audit_email', val('email'))
+    document.getElementById('lookup_id').value = body.audit_id
+    document.getElementById('lookup_email').value = val('email')
+    const result = document.getElementById('result')
+    result.innerHTML = `Audit started.<br><span class="mono">Audit ID: ${body.audit_id}</span><br>Status: ${body.status}. Check your email for confirmation.`
+    result.classList.add('show')
+  } catch(err) {
+    showError(err.message)
+  } finally {
+    btn.disabled = false
+    btn.textContent = 'START RIGHTS AUDIT'
+  }
+})
+
+async function lookupAudit(){
+  const auditId = val('lookup_id') || localStorage.getItem('musigod_rights_audit_id') || ''
+  const email = val('lookup_email') || localStorage.getItem('musigod_rights_audit_email') || ''
+  const box = document.getElementById('status-box')
+  if(!auditId || !email){box.textContent='Audit ID and email are required.';return}
+  box.textContent='Loading audit status...'
+  try{
+    const res = await fetch(`/api/get-rights-audit?audit_id=${encodeURIComponent(auditId)}&email=${encodeURIComponent(email)}`)
+    const body = await res.json().catch(()=>({}))
+    if(!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+    const a = body.audit
+    box.innerHTML = `<span class="mono">${a.audit_id}</span><br>Status: ${a.status}<br>Artist: ${a.artist_name}<br>Submitted: ${new Date(a.created_at).toLocaleDateString()}`
+  }catch(err){box.textContent=err.message}
+}
+
+const savedId = localStorage.getItem('musigod_rights_audit_id')
+const savedEmail = localStorage.getItem('musigod_rights_audit_email')
+if(savedId) document.getElementById('lookup_id').value = savedId
+if(savedEmail) document.getElementById('lookup_email').value = savedEmail
+</script>
+</body>
+</html>

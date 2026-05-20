@@ -184,6 +184,10 @@
         AUTOMATION
         <span class="sidebar-count amber" id="sc-auto">&mdash;</span>
       </div>
+      <div class="sidebar-item" data-view="rights-audits" onclick="switchView('rights-audits',this)">
+        RIGHTS AUDITS
+        <span class="sidebar-count red" id="sc-rights-audits">0</span>
+      </div>
       <div class="sidebar-item" data-view="active" onclick="switchView('active',this)">
       </div><div class="sidebar-item" data-view="review" onclick="switchView('review',this)">REVIEW <span class="sidebar-count red" id="sc-review">0</span>
         ACTIVE
@@ -323,6 +327,22 @@
       </table>
     </div>
 
+    <!-- RIGHTS AUDITS VIEW -->
+    <div class="view" id="view-rights-audits">
+      <div class="section-hdr">
+        <div>
+          <div class="section-title">RIGHTS AUDITS</div>
+          <div class="section-sub">Public audit requests awaiting review</div>
+        </div>
+        <button class="btn btn-ghost" onclick="loadRightsAudits()">&#8635; Refresh</button>
+      </div>
+      <div id="rights-audits-loading" class="loading">LOADING RIGHTS AUDITS<div class="loading-bar"></div></div>
+      <table class="tbl hidden" id="rights-audits-table">
+        <thead><tr><th>ARTIST</th><th>EMAIL</th><th>CATALOG</th><th>CONCERNS</th><th>STATUS</th><th>SUBMITTED</th></tr></thead>
+        <tbody id="rights-audits-tbody"></tbody>
+      </table>
+    </div>
+
     <!-- CATEGORY VIEWS (dynamically filled) -->
     <div class="view" id="view-cat-BUSINESS">
       <div class="section-hdr"><div><div class="section-title">BUSINESS</div><div class="section-sub">Entity, tax, legal identity</div></div></div>
@@ -398,6 +418,7 @@ let expandedArtist = null
 let expandedInstruction = null
 let currentView = 'queue'
 let artistStripeData = {}
+let rightsAudits = []
 
 // â€&mdash;â‚¬ HELPERS â€&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;â‚¬
 function esc(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
@@ -411,6 +432,12 @@ function showToast(msg,type='ok'){
   t.textContent=msg
   document.body.appendChild(t)
   setTimeout(()=>t.remove(),3000)
+}
+
+function getAdminKey(){
+  const key = sessionStorage.getItem('musigod_admin_key') || prompt('Admin key') || ''
+  if(key) sessionStorage.setItem('musigod_admin_key', key)
+  return key
 }
 
 function badgeHTML(status){
@@ -446,6 +473,7 @@ async function loadAll(){
   allArtists = Object.values(artistMap)
 
   await loadStripeData()
+  await loadRightsAudits()
   updateMetrics()
   updateSidebarCounts()
   renderQueue()
@@ -453,6 +481,7 @@ async function loadAll(){
   renderAuto()
   renderActive()
   renderReview()
+  renderRightsAudits()
   renderCats()
 }
 
@@ -468,6 +497,23 @@ async function loadStripeData(){
       artistStripeData[row.artist_id]=row
     }
   })
+}
+
+async function loadRightsAudits(){
+  const loading = document.getElementById('rights-audits-loading')
+  if(loading) loading.classList.remove('hidden')
+  try{
+    const res = await fetch('/api/get-rights-audit?admin=1&limit=100', {
+      headers:{'X-Admin-Key':getAdminKey()}
+    })
+    const body = await res.json().catch(()=>({}))
+    if(!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+    rightsAudits = Array.isArray(body.audits) ? body.audits : []
+  }catch(e){
+    rightsAudits = []
+    showToast('Rights audit load error: '+e.message,'err')
+  }
+  renderRightsAudits()
 }
 
 // â€&mdash;â‚¬ METRICS â€&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;â‚¬
@@ -490,6 +536,7 @@ function updateSidebarCounts(){
   document.getElementById('sc-artists').textContent = allArtists.length
   document.getElementById('sc-auto').textContent = pendingAuto.length
   document.getElementById('sc-active').textContent = active.length
+  document.getElementById('sc-rights-audits').textContent = rightsAudits.filter(a=>!['CLOSED','READY_FOR_ONBOARDING'].includes(a.status)).length
   const review = allRegs.filter(r=>r.status==='SUBMITTED')
   document.getElementById('sc-review').textContent = review.length
 }
@@ -846,9 +893,32 @@ function renderReview(){
   }
 }
 
+function renderRightsAudits(){
+  const loading = document.getElementById('rights-audits-loading')
+  const table = document.getElementById('rights-audits-table')
+  const tbody = document.getElementById('rights-audits-tbody')
+  if(!tbody) return
+  if(loading) loading.classList.add('hidden')
+  if(table) table.classList.remove('hidden')
+  tbody.innerHTML = ''
+  rightsAudits.forEach(a=>{
+    const concerns = Array.isArray(a.rights_concerns) ? a.rights_concerns.join(', ') : ''
+    tbody.innerHTML += `<tr>
+      <td><div class="artist-name">${esc(a.artist_name)}</div><div class="reg-cat">${esc(a.audit_id)}</div></td>
+      <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">${esc(a.email)}</td>
+      <td><div class="reg-name-cell">${esc(a.catalog_size)}</div><div class="reg-cat">${esc(a.released_music)}</div></td>
+      <td style="max-width:340px;color:#aaa;font-size:12px;line-height:1.5">${esc(concerns)}</td>
+      <td>${badgeHTML(a.status || 'NEW')}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">${fmtDate(a.created_at)}</td>
+    </tr>`
+  })
+  if(rightsAudits.length===0){
+    tbody.innerHTML=`<tr><td colspan="6" style="padding:32px;text-align:center;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px">NO RIGHTS AUDITS SUBMITTED</td></tr>`
+  }
+}
+
 async function adminAction(payload){
-  const key = sessionStorage.getItem('musigod_admin_key') || prompt('Admin key (leave blank if not configured)') || ''
-  if(key) sessionStorage.setItem('musigod_admin_key', key)
+  const key = getAdminKey()
   const res = await fetch('/api/admin-registration-action', {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Admin-Key':key},
