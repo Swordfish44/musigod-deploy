@@ -13,7 +13,7 @@
   body{background:var(--black);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
   header{height:64px;background:rgba(12,12,12,0.96);border-bottom:1px solid rgba(200,16,46,0.2);display:flex;align-items:center;justify-content:space-between;padding:0 32px;position:sticky;top:0;z-index:20}
   .logo{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:0.14em;color:#fff;text-decoration:none}.logo span{color:var(--red)}
-  .hdr-link{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:0.08em;text-decoration:none}.hdr-link:hover{color:#fff}
+  .hdr-actions{display:flex;align-items:center;gap:14px}.hdr-link{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:0.08em;text-decoration:none}.hdr-link:hover{color:#fff}.hdr-cta{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.08em;text-decoration:none;background:var(--red);color:#fff;padding:9px 13px;border-radius:4px}.hdr-cta:hover{background:#a00d25}
   .hero{border-bottom:1px solid var(--line);padding:56px 32px 34px;background:linear-gradient(180deg,#0d0d0d 0%,#080808 100%)}
   .hero-inner,.wrap{max-width:1040px;margin:0 auto}
   .eyebrow{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.18em;color:var(--red);margin-bottom:14px}
@@ -39,16 +39,20 @@
   .notice{background:rgba(200,16,46,0.06);border:1px solid rgba(200,16,46,0.18);border-left:3px solid var(--red);border-radius:6px;padding:16px 18px;color:#aaa;font-size:13px;line-height:1.65;margin-bottom:16px}
   .side-list{list-style:none;display:flex;flex-direction:column;gap:12px}.side-list li{display:flex;gap:10px;color:#aaa;font-size:13px;line-height:1.5}.num{font-family:'DM Mono',monospace;color:var(--red);font-size:11px;margin-top:2px}
   .result{display:none;margin-top:16px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:6px;padding:16px;color:#bdeacb;font-size:13px;line-height:1.6}
+  .unlock-card{display:none;margin-top:16px;background:rgba(200,16,46,0.08);border:1px solid rgba(200,16,46,0.28);border-left:4px solid var(--red);border-radius:6px;padding:18px;color:#ddd;line-height:1.65}.unlock-card.show{display:block}.unlock-card h3{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:0.08em;color:#fff;margin-bottom:8px}.unlock-card p{font-size:14px;color:#bbb;margin-bottom:16px}.unlock-card .btn{width:100%;font-size:12px;padding:14px 18px}
   .result.show{display:block}.error{display:none;margin-top:16px;background:rgba(200,16,46,0.08);border:1px solid rgba(200,16,46,0.28);border-radius:6px;padding:14px;color:#ff9ba8;font-size:13px}.error.show{display:block}
   .mono{font-family:'DM Mono',monospace}.status-box{background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:12px;font-size:12px;color:#aaa;line-height:1.6;min-height:52px}
   footer{border-top:1px solid var(--line);padding:24px 32px;color:#444;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;text-align:center}
-  @media(max-width:850px){header{padding:0 18px}.wrap{grid-template-columns:1fr;padding:24px 18px 52px}.hero{padding:42px 18px 28px}.grid,.checks{grid-template-columns:1fr}.actions{flex-direction:column}.btn{width:100%}}
+  @media(max-width:850px){header{padding:0 18px}.hdr-actions{gap:8px}.hdr-link{display:none}.wrap{grid-template-columns:1fr;padding:24px 18px 52px}.hero{padding:42px 18px 28px}.grid,.checks{grid-template-columns:1fr}.actions{flex-direction:column}.btn{width:100%}}
 </style>
 </head>
 <body>
 <header>
   <a class="logo" href="/"><span>MUSI</span>GOD</a>
-  <a class="hdr-link" href="/register.html">START ONBOARDING</a>
+  <div class="hdr-actions">
+    <a class="hdr-link" href="/register.html">START ONBOARDING</a>
+    <a class="hdr-cta" href="#unlock" onclick="scrollUnlock(event)">GET FULL AUDIT</a>
+  </div>
 </header>
 
 <section class="hero">
@@ -112,6 +116,11 @@
         <div class="actions"><button type="button" class="btn btn-ghost" onclick="resetForm()">CLEAR</button><button class="btn btn-red" id="submit-btn" type="submit">START RIGHTS AUDIT</button></div>
       </form>
       <div class="result" id="result"></div>
+      <div class="unlock-card" id="unlock">
+        <h3>Potential royalty leaks detected.</h3>
+        <p>Potential royalty leaks detected. Unlock the full MusiGod Rights Audit to view missing registrations, DSP claim issues, publishing gaps, neighboring rights problems, recovery opportunities, and your action plan.</p>
+        <button class="btn btn-red" id="unlock-btn" onclick="unlockFullAudit()" disabled>UNLOCK FULL AUDIT</button>
+      </div>
       <div class="error" id="error"></div>
     </div>
   </section>
@@ -142,7 +151,7 @@ function val(id){return (document.getElementById(id)?.value || '').trim()}
 function checked(id){return [...document.querySelectorAll(`#${id} input:checked`)].map(el=>el.value)}
 function showError(msg){const el=document.getElementById('error');el.textContent=msg;el.classList.add('show')}
 function clearError(){const el=document.getElementById('error');el.textContent='';el.classList.remove('show')}
-function resetForm(){document.getElementById('audit-form').reset();clearError();document.getElementById('result').classList.remove('show')}
+function resetForm(){document.getElementById('audit-form').reset();clearError();document.getElementById('result').classList.remove('show');document.getElementById('unlock').classList.remove('show');document.getElementById('unlock-btn').disabled=true}
 
 document.getElementById('audit-form').addEventListener('submit', async (event) => {
   event.preventDefault()
@@ -178,6 +187,9 @@ document.getElementById('audit-form').addEventListener('submit', async (event) =
     const result = document.getElementById('result')
     result.innerHTML = `Audit started.<br><span class="mono">Audit ID: ${body.audit_id}</span><br>Status: ${body.status}. Check your email for confirmation.`
     result.classList.add('show')
+    document.getElementById('unlock').classList.add('show')
+    document.getElementById('unlock-btn').disabled = false
+    document.getElementById('unlock').scrollIntoView({behavior:'smooth',block:'center'})
   } catch(err) {
     showError(err.message)
   } finally {
@@ -199,6 +211,41 @@ async function lookupAudit(){
     const a = body.audit
     box.innerHTML = `<span class="mono">${a.audit_id}</span><br>Status: ${a.status}<br>Artist: ${a.artist_name}<br>Submitted: ${new Date(a.created_at).toLocaleDateString()}`
   }catch(err){box.textContent=err.message}
+}
+
+function scrollUnlock(event){
+  const card = document.getElementById('unlock')
+  if(card.classList.contains('show')) return
+  event.preventDefault()
+  document.getElementById('audit-form').scrollIntoView({behavior:'smooth',block:'start'})
+}
+
+async function unlockFullAudit(){
+  clearError()
+  const btn = document.getElementById('unlock-btn')
+  const auditId = localStorage.getItem('musigod_rights_audit_id') || val('lookup_id')
+  const email = localStorage.getItem('musigod_rights_audit_email') || val('lookup_email') || val('email')
+  if(!auditId || !email){showError('Submit the audit form first so checkout can attach your audit ID.');return}
+  btn.disabled = true
+  btn.textContent = 'OPENING CHECKOUT...'
+  try{
+    const res = await fetch('/api/create-checkout-session', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        plan:'rights_audit_unlock',
+        audit_id:auditId,
+        email
+      })
+    })
+    const body = await res.json().catch(()=>({}))
+    if(!res.ok || !body.url) throw new Error(body.error || `Checkout failed (${res.status})`)
+    window.location.href = body.url
+  }catch(err){
+    showError(err.message)
+    btn.disabled = false
+    btn.textContent = 'UNLOCK FULL AUDIT'
+  }
 }
 
 const savedId = localStorage.getItem('musigod_rights_audit_id')
