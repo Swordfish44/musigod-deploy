@@ -1,10 +1,12 @@
+const { captureException, withSentry } = require('./_sentry')
+
 const PRICE_IDS = {
   starter: process.env.STRIPE_STARTER_PRICE_ID,
   growth:  process.env.STRIPE_GROWTH_PRICE_ID,
   rights_audit_unlock: process.env.STRIPE_RIGHTS_AUDIT_UNLOCK_PRICE_ID,
 }
 
-module.exports = async function handler(req, res) {
+module.exports = withSentry(async function handler(req, res) {
   setCors(req, res)
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
@@ -25,6 +27,9 @@ module.exports = async function handler(req, res) {
   if (!artist_id && plan !== 'rights_audit_unlock') {
     return res.status(400).json({ error: 'artist_id required' })
   }
+  if (plan === 'rights_audit_unlock' && (!audit_id || !email)) {
+    return res.status(400).json({ error: 'audit_id and email required' })
+  }
   if (!PRICE_IDS[plan]) {
     return res.status(400).json({ error: 'configured plan required' })
   }
@@ -35,7 +40,9 @@ module.exports = async function handler(req, res) {
   params.append('line_items[0][quantity]', '1')
   if (artist_id) params.append('metadata[artist_id]', artist_id)
   params.append('metadata[plan]', plan)
+  params.append('metadata[product_type]', plan)
   if (audit_id) params.append('metadata[audit_id]', audit_id)
+  if (email) params.append('metadata[email]', email)
   if (email) params.append('customer_email', email)
   if (plan !== 'rights_audit_unlock') {
     params.append('subscription_data[metadata][artist_id]', artist_id)
@@ -60,11 +67,19 @@ module.exports = async function handler(req, res) {
   const session = await stripeRes.json()
   if (!stripeRes.ok) {
     console.error('Stripe error:', session.error)
+    captureException(new Error(session.error?.message || 'Stripe checkout session failed'), {
+      route: 'create-checkout-session',
+      method: req.method,
+      path: req.url,
+      statusCode: 500,
+      stripeStatus: stripeRes.status,
+      plan,
+    })
     return res.status(500).json({ error: session.error?.message || 'Stripe error' })
   }
 
   res.status(200).json({ url: session.url })
-}
+}, 'create-checkout-session')
 
 function setCors(req, res) {
   const origin = req.headers.origin || ''

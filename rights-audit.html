@@ -39,12 +39,26 @@
   .notice{background:rgba(200,16,46,0.06);border:1px solid rgba(200,16,46,0.18);border-left:3px solid var(--red);border-radius:6px;padding:16px 18px;color:#aaa;font-size:13px;line-height:1.65;margin-bottom:16px}
   .side-list{list-style:none;display:flex;flex-direction:column;gap:12px}.side-list li{display:flex;gap:10px;color:#aaa;font-size:13px;line-height:1.5}.num{font-family:'DM Mono',monospace;color:var(--red);font-size:11px;margin-top:2px}
   .result{display:none;margin-top:16px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:6px;padding:16px;color:#bdeacb;font-size:13px;line-height:1.6}
+  .success{display:none;margin-bottom:16px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-left:4px solid var(--green);border-radius:6px;padding:16px 18px;color:#d8ffe3;font-size:14px;line-height:1.6}.success.show{display:block}
   .unlock-card{display:none;margin-top:16px;background:rgba(200,16,46,0.08);border:1px solid rgba(200,16,46,0.28);border-left:4px solid var(--red);border-radius:6px;padding:18px;color:#ddd;line-height:1.65}.unlock-card.show{display:block}.unlock-card h3{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:0.08em;color:#fff;margin-bottom:8px}.unlock-card p{font-size:14px;color:#bbb;margin-bottom:16px}.unlock-card .btn{width:100%;font-size:12px;padding:14px 18px}
   .result.show{display:block}.error{display:none;margin-top:16px;background:rgba(200,16,46,0.08);border:1px solid rgba(200,16,46,0.28);border-radius:6px;padding:14px;color:#ff9ba8;font-size:13px}.error.show{display:block}
   .mono{font-family:'DM Mono',monospace}.status-box{background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:12px;font-size:12px;color:#aaa;line-height:1.6;min-height:52px}
   footer{border-top:1px solid var(--line);padding:24px 32px;color:#444;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;text-align:center}
   @media(max-width:850px){header{padding:0 18px}.hdr-actions{gap:8px}.hdr-link{display:none}.wrap{grid-template-columns:1fr;padding:24px 18px 52px}.hero{padding:42px 18px 28px}.grid,.checks{grid-template-columns:1fr}.actions{flex-direction:column}.btn{width:100%}}
 </style>
+  <script>
+    window.MUSIGOD_PUBLIC_CONFIG_READY = fetch('/api/public-config', { credentials: 'same-origin' })
+      .then(function (response) { return response.ok ? response.json() : {}; })
+      .then(function (config) {
+        window.MUSIGOD_SENTRY_DSN = config.sentryDsn || '';
+        window.MUSIGOD_ENVIRONMENT = config.environment || 'production';
+      })
+      .catch(function () {
+        window.MUSIGOD_SENTRY_DSN = '';
+        window.MUSIGOD_ENVIRONMENT = 'production';
+      });
+  </script>
+  <script src="/sentry-browser.js"></script>
 </head>
 <body>
 <header>
@@ -69,6 +83,7 @@
       <div><div class="panel-title">REQUEST AUDIT</div><div class="panel-sub">Complete every required field for a usable review.</div></div>
     </div>
     <div class="panel-b">
+      <div class="success" id="unlock-success">Your full MusiGod Rights Audit has been unlocked. Check your email for next steps.</div>
       <div class="notice">This is not legal advice. The audit identifies operational gaps in registrations, claims, royalty collection, and account setup so MusiGod can prioritize recovery and administration work.</div>
       <form id="audit-form">
         <div class="grid">
@@ -209,7 +224,8 @@ async function lookupAudit(){
     const body = await res.json().catch(()=>({}))
     if(!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
     const a = body.audit
-    box.innerHTML = `<span class="mono">${a.audit_id}</span><br>Status: ${a.status}<br>Artist: ${a.artist_name}<br>Submitted: ${new Date(a.created_at).toLocaleDateString()}`
+    const paid = a.paid_status === 'PAID'
+    box.innerHTML = `<span class="mono">${a.audit_id}</span><br>Status: ${a.status}<br>Payment: ${paid ? 'PAID' : 'UNPAID'}${paid && a.paid_at ? '<br>Unlocked: '+new Date(a.paid_at).toLocaleDateString() : ''}<br>Artist: ${a.artist_name}<br>Submitted: ${new Date(a.created_at).toLocaleDateString()}`
   }catch(err){box.textContent=err.message}
 }
 
@@ -252,6 +268,16 @@ const savedId = localStorage.getItem('musigod_rights_audit_id')
 const savedEmail = localStorage.getItem('musigod_rights_audit_email')
 if(savedId) document.getElementById('lookup_id').value = savedId
 if(savedEmail) document.getElementById('lookup_email').value = savedEmail
+const unlockParams = new URLSearchParams(window.location.search)
+if(unlockParams.get('unlock') === 'success'){
+  const auditId = unlockParams.get('audit_id') || savedId || ''
+  if(auditId) localStorage.setItem('musigod_rights_audit_id', auditId)
+  if(auditId) document.getElementById('lookup_id').value = auditId
+  document.getElementById('unlock-success').classList.add('show')
+  document.getElementById('unlock-success').scrollIntoView({behavior:'smooth',block:'center'})
+}else if(unlockParams.get('unlock') === 'cancelled'){
+  showError('Checkout was cancelled. You can unlock the full audit when you are ready.')
+}
 </script>
 </body>
 </html>

@@ -156,6 +156,19 @@
       .metrics{grid-template-columns:repeat(3,1fr)}
     }
   </style>
+  <script>
+    window.MUSIGOD_PUBLIC_CONFIG_READY = fetch('/api/public-config', { credentials: 'same-origin' })
+      .then(function (response) { return response.ok ? response.json() : {}; })
+      .then(function (config) {
+        window.MUSIGOD_SENTRY_DSN = config.sentryDsn || '';
+        window.MUSIGOD_ENVIRONMENT = config.environment || 'production';
+      })
+      .catch(function () {
+        window.MUSIGOD_SENTRY_DSN = '';
+        window.MUSIGOD_ENVIRONMENT = 'production';
+      });
+  </script>
+  <script src="/sentry-browser.js"></script>
 </head>
 <body>
 
@@ -338,7 +351,7 @@
       </div>
       <div id="rights-audits-loading" class="loading">LOADING RIGHTS AUDITS<div class="loading-bar"></div></div>
       <table class="tbl hidden" id="rights-audits-table">
-        <thead><tr><th>ARTIST</th><th>EMAIL</th><th>CATALOG</th><th>CONCERNS</th><th>STATUS</th><th>SUBMITTED</th></tr></thead>
+        <thead><tr><th>ARTIST</th><th>EMAIL</th><th>CATALOG</th><th>CONCERNS</th><th>STATUS</th><th>PAYMENT</th><th>SUBMITTED</th></tr></thead>
         <tbody id="rights-audits-tbody"></tbody>
       </table>
     </div>
@@ -903,17 +916,19 @@ function renderRightsAudits(){
   tbody.innerHTML = ''
   rightsAudits.forEach(a=>{
     const concerns = Array.isArray(a.rights_concerns) ? a.rights_concerns.join(', ') : ''
+    const paid = a.paid_status === 'PAID'
     tbody.innerHTML += `<tr>
       <td><div class="artist-name">${esc(a.artist_name)}</div><div class="reg-cat">${esc(a.audit_id)}</div></td>
       <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">${esc(a.email)}</td>
       <td><div class="reg-name-cell">${esc(a.catalog_size)}</div><div class="reg-cat">${esc(a.released_music)}</div></td>
       <td style="max-width:340px;color:#aaa;font-size:12px;line-height:1.5">${esc(concerns)}</td>
       <td>${badgeHTML(a.status || 'NEW')}</td>
+      <td><span class="badge" style="color:${paid?'var(--green)':'var(--amber)'};background:${paid?'rgba(34,197,94,0.1)':'rgba(240,160,32,0.1)'};border:1px solid ${paid?'rgba(34,197,94,0.2)':'rgba(240,160,32,0.2)'}"><span class="badge-dot" style="background:${paid?'var(--green)':'var(--amber)'}"></span>${paid?'PAID':'UNPAID'}</span>${paid && a.paid_at ? `<div class="reg-cat">${fmtDate(a.paid_at)}</div>` : ''}</td>
       <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">${fmtDate(a.created_at)}</td>
     </tr>`
   })
   if(rightsAudits.length===0){
-    tbody.innerHTML=`<tr><td colspan="6" style="padding:32px;text-align:center;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px">NO RIGHTS AUDITS SUBMITTED</td></tr>`
+    tbody.innerHTML=`<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px">NO RIGHTS AUDITS SUBMITTED</td></tr>`
   }
 }
 

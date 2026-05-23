@@ -1,8 +1,10 @@
+const { captureException, withSentry } = require('./_sentry')
+
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY
 
-module.exports = async function handler(req, res) {
+module.exports = withSentry(async function handler(req, res) {
   setCors(req, res)
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
@@ -25,16 +27,23 @@ module.exports = async function handler(req, res) {
     if (!auditId || !email) return res.status(400).json({ error: 'audit_id and email are required' })
 
     const rows = await sbFetch(
-      `rights_audits_v1?audit_id=eq.${encodeURIComponent(auditId)}&email=eq.${encodeURIComponent(email)}&select=audit_id,status,artist_name,email,catalog_size,released_music,platforms,rights_concerns,created_at,updated_at&limit=1`,
+      `rights_audits_v1?audit_id=eq.${encodeURIComponent(auditId)}&email=eq.${encodeURIComponent(email)}&select=audit_id,status,paid_status,paid_at,artist_name,email,catalog_size,released_music,platforms,rights_concerns,created_at,updated_at&limit=1`,
       'public'
     )
     if (!rows?.length) return res.status(404).json({ error: 'Rights audit not found' })
     return res.status(200).json({ audit: rows[0] })
   } catch (err) {
     console.error('get-rights-audit error:', err)
+    captureException(err, {
+      route: 'get-rights-audit',
+      method: req.method,
+      path: req.url,
+      statusCode: 500,
+      admin,
+    })
     return res.status(500).json({ error: 'Rights audit lookup failed' })
   }
-}
+}, 'get-rights-audit')
 
 function requireAdmin(req) {
   if (!ADMIN_API_KEY) return { status: 500, error: 'ADMIN_API_KEY is not configured' }

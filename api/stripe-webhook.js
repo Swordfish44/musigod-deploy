@@ -1,9 +1,10 @@
 const crypto = require('crypto')
+const { captureException, withSentry } = require('./_sentry')
 
 const SB_URL = process.env.SUPABASE_URL
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-module.exports = async function handler(req, res) {
+module.exports = withSentry(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const rawBody = await getRawBody(req)
@@ -33,15 +34,28 @@ module.exports = async function handler(req, res) {
     }
   } catch (e) {
     console.error('Webhook handler error:', e)
+    captureException(e, {
+      route: 'stripe-webhook',
+      method: req.method,
+      path: req.url,
+      statusCode: 500,
+      stripeEventType: event?.type,
+      stripeEventId: event?.id,
+    })
     return res.status(500).json({ error: 'Handler failed' })
   }
 
   res.status(200).json({ received: true })
-}
+}, 'stripe-webhook')
 
 async function handleCheckoutComplete(session) {
   const artistId = session.metadata?.artist_id
   const plan     = session.metadata?.plan
+  const productType = session.metadata?.product_type
+  if (productType === 'rights_audit_unlock' || plan === 'rights_audit_unlock') {
+    await handleRightsAuditUnlock(session)
+    return
+  }
   if (!artistId) return
 
   await sbPatch(`registrations_v1?artist_id=eq.${artistId}`, {
@@ -49,6 +63,18 @@ async function handleCheckoutComplete(session) {
     stripe_subscription_id:  session.subscription,
     plan_status:             'ACTIVE',
     plan_type:               plan,
+  })
+}
+
+async function handleRightsAuditUnlock(session) {
+  const auditId = session.metadata?.audit_id
+  if (!auditId) return
+
+  await sbPatchWithSchema('public', `rights_audits_v1?audit_id=eq.${encodeURIComponent(auditId)}`, {
+    paid_status: 'PAID',
+    paid_at: session.created ? new Date(session.created * 1000).toISOString() : new Date().toISOString(),
+    stripe_session_id: session.id,
+    stripe_customer_email: session.customer_details?.email || session.customer_email || session.metadata?.email || null,
   })
 }
 
@@ -91,14 +117,18 @@ async function artistIdByCustomer(customerId) {
 }
 
 async function sbPatch(path, data) {
+  return sbPatchWithSchema('registrations', path, data)
+}
+
+async function sbPatchWithSchema(schema, path, data) {
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
     method: 'PATCH',
     headers: {
       apikey:           SB_KEY,
       Authorization:    `Bearer ${SB_KEY}`,
       'Content-Type':   'application/json',
-      'Accept-Profile': 'registrations',
-      'Content-Profile':'registrations',
+      'Accept-Profile': schema,
+      'Content-Profile':schema,
     },
     body: JSON.stringify(data),
   })
