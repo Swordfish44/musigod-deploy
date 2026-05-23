@@ -56,6 +56,16 @@ function captureException(error, context = {}) {
   }
 }
 
+async function flush(timeoutMs = 5000) {
+  try {
+    const client = getSentry()
+    if (!client || typeof client.flush !== 'function') return false
+    return Boolean(await client.flush(timeoutMs))
+  } catch (_) {
+    return false
+  }
+}
+
 function withSentry(handler, name) {
   return async function sentryWrappedHandler(req, res) {
     let statusCode = 200
@@ -84,5 +94,6 @@ function withSentry(handler, name) {
 
 module.exports = {
   captureException,
+  flush,
   withSentry,
 }

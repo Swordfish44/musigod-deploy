@@ -1,4 +1,4 @@
-const { captureException, withSentry } = require('./_sentry')
+const { captureException, flush, withSentry } = require('./_sentry')
 
 module.exports = withSentry(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -12,17 +12,7 @@ module.exports = withSentry(async function handler(req, res) {
     source: 'manual-production-check',
   })
 
-  let flushed = false
-  if (process.env.SENTRY_DSN) {
-    try {
-      const Sentry = require('@sentry/node')
-      if (typeof Sentry.flush === 'function') {
-        flushed = await Sentry.flush(2000)
-      }
-    } catch (_) {
-      flushed = false
-    }
-  }
+  const flushed = await flush(5000)
 
   return res.status(200).json({
     ok: true,
