@@ -1,6 +1,14 @@
 let Sentry = null
 let initialized = false
 
+function sentryEnvironment() {
+  return process.env.VERCEL_ENV || process.env.NODE_ENV || 'production'
+}
+
+function sentryRelease() {
+  return process.env.VERCEL_GIT_COMMIT_SHA || 'unknown'
+}
+
 function getSentry() {
   if (initialized) return Sentry
   initialized = true
@@ -11,7 +19,9 @@ function getSentry() {
     Sentry = require('@sentry/node')
     Sentry.init({
       dsn: process.env.SENTRY_DSN,
-      environment: process.env.VERCEL_ENV || 'production',
+      environment: sentryEnvironment(),
+      release: sentryRelease(),
+      serverName: 'musigod-vercel',
       tracesSampleRate: 0,
       defaultIntegrations: true,
       beforeSend(event) {
@@ -40,8 +50,9 @@ function safeContext(context) {
 function captureException(error, context = {}) {
   try {
     const client = getSentry()
-    if (!client) return
+    if (!client) return undefined
 
+    let eventId
     client.withScope((scope) => {
       const safe = safeContext(context)
       if (safe.route) scope.setTag('route', safe.route)
@@ -49,10 +60,12 @@ function captureException(error, context = {}) {
       if (safe.statusCode) scope.setTag('status_code', String(safe.statusCode))
       scope.setTag('app', 'musigod')
       scope.setContext('request', safe)
-      client.captureException(error)
+      eventId = client.captureException(error)
     })
+    return eventId
   } catch (_) {
     // Sentry must never break production request handling.
+    return undefined
   }
 }
 
@@ -64,6 +77,10 @@ async function flush(timeoutMs = 5000) {
   } catch (_) {
     return false
   }
+}
+
+function isConfigured() {
+  return Boolean(getSentry())
 }
 
 function withSentry(handler, name) {
@@ -95,5 +112,6 @@ function withSentry(handler, name) {
 module.exports = {
   captureException,
   flush,
+  isConfigured,
   withSentry,
 }
