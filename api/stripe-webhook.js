@@ -34,6 +34,8 @@ module.exports = withSentry(async function handler(req, res) {
       await handleSubscriptionUpdated(event.data.object)
     } else if (event.type === 'customer.subscription.deleted') {
       await handleSubscriptionDeleted(event.data.object)
+    } else {
+      console.info('Stripe webhook ignored event', { eventType: event.type, eventId: event.id })
     }
   } catch (e) {
     console.error('Webhook handler error:', e)
@@ -53,8 +55,9 @@ module.exports = withSentry(async function handler(req, res) {
 
 async function handleCheckoutComplete(session) {
   const artistId = session.metadata?.artist_id
-  const plan     = session.metadata?.plan
+  const plan = session.metadata?.plan
   const productType = session.metadata?.product_type
+
   if (productType === 'rights_audit_unlock' || plan === 'rights_audit_unlock') {
     await handleRightsAuditUnlock(session)
     return
@@ -62,42 +65,101 @@ async function handleCheckoutComplete(session) {
   if (!artistId) return
 
   await sbPatch(`registrations_v1?artist_id=eq.${artistId}`, {
-    stripe_customer_id:      session.customer,
-    stripe_subscription_id:  session.subscription,
-    plan_status:             'ACTIVE',
-    plan_type:               plan,
+    stripe_customer_id: session.customer,
+    stripe_subscription_id: session.subscription,
+    plan_status: 'ACTIVE',
+    plan_type: plan,
   })
 }
 
 async function handleRightsAuditUnlock(session) {
-  const auditId = session.metadata?.audit_id
-  const email = rightsAuditEmail(session)
+  const auditId = clean(session.metadata?.audit_id)
+  const sessionId = clean(session.id)
   if (!auditId) throw new Error('Rights audit unlock missing audit_id')
-  if (!email) throw new Error('Rights audit unlock missing customer email')
+  if (session.payment_status && session.payment_status !== 'paid') {
+    console.info('Rights audit checkout not paid; fulfillment skipped', {
+      audit_id: auditId,
+      stripe_session_id: sessionId,
+      payment_status: session.payment_status,
+    })
+    return
+  }
+
+  logFulfillment('started', {
+    audit_id: auditId,
+    stripe_session_id: sessionId,
+    resend_configured: Boolean(RESEND_API_KEY),
+    n8n_configured: Boolean(RIGHTS_AUDIT_PAYMENT_WEBHOOK_URL),
+  })
 
   const existingRows = await sbGetWithSchema(
     'public',
-    `rights_audits_v1?audit_id=eq.${encodeURIComponent(auditId)}&select=audit_id,email,artist_name,paid_status,next_steps_email_sent_at,fulfilled_at&limit=1`
+    `rights_audits_v1?audit_id=eq.${encodeURIComponent(auditId)}&select=audit_id,email,artist_name,paid_status,next_steps_email_sent_at,fulfilled_at,n8n_fulfillment_sent_at,n8n_fulfillment_status&limit=1`
   )
   const audit = existingRows?.[0]
   if (!audit) throw new Error(`Rights audit not found for paid unlock: ${auditId}`)
 
+  const recipient = resolveRightsAuditRecipient(audit, session)
+  logFulfillment('recipient_resolved', {
+    audit_id: auditId,
+    stripe_session_id: sessionId,
+    recipient_email: recipient || null,
+    recipient_source: recipientSource(audit, session),
+  })
+  if (!recipient) {
+    await markFulfillmentFailure(auditId, 'EMAIL_FAILED', 'No valid artist email found for paid rights audit fulfillment')
+    throw new Error('No valid artist email found for paid rights audit fulfillment')
+  }
+
+  const paidAt = session.created ? new Date(session.created * 1000).toISOString() : new Date().toISOString()
   await sbPatchWithSchema('public', `rights_audits_v1?audit_id=eq.${encodeURIComponent(auditId)}`, {
     paid_status: 'PAID',
-    paid_at: session.created ? new Date(session.created * 1000).toISOString() : new Date().toISOString(),
-    stripe_session_id: session.id,
-    stripe_customer_email: email,
+    paid_at: paidAt,
+    stripe_session_id: sessionId,
+    stripe_customer_email: recipient,
+    fulfillment_status: audit.next_steps_email_sent_at ? 'EMAIL_SENT' : 'PAYMENT_CONFIRMED',
+    fulfillment_error: null,
   })
 
-  if (audit.next_steps_email_sent_at || audit.fulfilled_at) return
+  let emailSent = Boolean(audit.next_steps_email_sent_at)
+  if (emailSent) {
+    logFulfillment('email_already_sent', { audit_id: auditId, stripe_session_id: sessionId, recipient_email: recipient })
+  } else {
+    try {
+      await sendRightsAuditNextStepsEmail(audit, session, recipient)
+      emailSent = true
+      const sentAt = new Date().toISOString()
+      await sbPatchWithSchema('public', `rights_audits_v1?audit_id=eq.${encodeURIComponent(auditId)}`, {
+        next_steps_email_sent_at: sentAt,
+        fulfillment_status: 'EMAIL_SENT',
+        fulfillment_error: null,
+      })
+      logFulfillment('email_sent', { audit_id: auditId, stripe_session_id: sessionId, recipient_email: recipient })
+    } catch (err) {
+      const message = safeErrorMessage(err)
+      await markFulfillmentFailure(auditId, 'EMAIL_FAILED', message)
+      throw err
+    }
+  }
 
-  await sendRightsAuditNextStepsEmail(audit, session, email)
-  await notifyRightsAuditPaymentConfirmed(audit, session, email)
-
+  const n8nStatus = audit.n8n_fulfillment_sent_at
+    ? { ok: true, attempted: false, status: audit.n8n_fulfillment_status || 'ALREADY_SENT', message: null }
+    : await notifyRightsAuditPaymentConfirmed(audit, session, recipient, paidAt)
   const fulfilledAt = new Date().toISOString()
   await sbPatchWithSchema('public', `rights_audits_v1?audit_id=eq.${encodeURIComponent(auditId)}`, {
-    next_steps_email_sent_at: fulfilledAt,
     fulfilled_at: fulfilledAt,
+    fulfillment_status: n8nStatus.ok ? 'FULFILLED' : 'EMAIL_SENT_N8N_WARNING',
+    fulfillment_error: n8nStatus.ok ? null : n8nStatus.message,
+    n8n_fulfillment_sent_at: n8nStatus.attempted ? fulfilledAt : audit.n8n_fulfillment_sent_at || null,
+    n8n_fulfillment_status: n8nStatus.status,
+  })
+
+  logFulfillment('complete', {
+    audit_id: auditId,
+    stripe_session_id: sessionId,
+    recipient_email: recipient,
+    email_sent: emailSent,
+    n8n_status: n8nStatus.status,
   })
 }
 
@@ -164,11 +226,11 @@ async function sbPatchWithSchema(schema, path, data) {
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
     method: 'PATCH',
     headers: {
-      apikey:           SB_KEY,
-      Authorization:    `Bearer ${SB_KEY}`,
-      'Content-Type':   'application/json',
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      'Content-Type': 'application/json',
       'Accept-Profile': schema,
-      'Content-Profile':schema,
+      'Content-Profile': schema,
     },
     body: JSON.stringify(data),
   })
@@ -194,26 +256,50 @@ async function sendRightsAuditNextStepsEmail(audit, session, email) {
     <p>Artist: ${artistName}</p>
   `
 
+  logFulfillment('resend_request', {
+    audit_id: auditId,
+    stripe_session_id: session.id,
+    recipient_email: email,
+    resend_configured: Boolean(RESEND_API_KEY),
+  })
+
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       from: FROM_EMAIL,
       to: email,
-      subject: 'Your full MusiGod Rights Audit is unlocked',
+      subject: 'Your MusiGod Rights Audit next steps',
       html,
     }),
   })
 
+  logFulfillment('resend_response', {
+    audit_id: auditId,
+    stripe_session_id: session.id,
+    status: response.status,
+    ok: response.ok,
+  })
+
   if (!response.ok) {
-    const text = await response.text()
-    console.error('Resend rights audit email failed:', response.status, text)
-    throw new Error(`Resend rights audit email failed: ${response.status}`)
+    const body = await safeJson(response)
+    const code = clean(body?.name || body?.error?.code || body?.code || `HTTP_${response.status}`)
+    const message = clean(body?.message || body?.error?.message || `Resend request failed with status ${response.status}`)
+    console.error('Resend rights audit email failed:', { status: response.status, code, message })
+    throw new Error(`Resend failed ${response.status}: ${code || message}`)
   }
 }
 
-async function notifyRightsAuditPaymentConfirmed(audit, session, email) {
-  if (!RIGHTS_AUDIT_PAYMENT_WEBHOOK_URL) return
+async function notifyRightsAuditPaymentConfirmed(audit, session, email, paidAt) {
+  if (!RIGHTS_AUDIT_PAYMENT_WEBHOOK_URL) {
+    logFulfillment('n8n_skipped', {
+      audit_id: audit.audit_id || session.metadata?.audit_id,
+      stripe_session_id: session.id,
+      n8n_configured: false,
+    })
+    return { ok: true, attempted: false, status: 'NOT_CONFIGURED', message: null }
+  }
+
   try {
     const response = await fetch(RIGHTS_AUDIT_PAYMENT_WEBHOOK_URL, {
       method: 'POST',
@@ -222,21 +308,75 @@ async function notifyRightsAuditPaymentConfirmed(audit, session, email) {
         event: 'rights_audit.payment_confirmed',
         audit_id: audit.audit_id || session.metadata?.audit_id,
         email,
-        stripe_session_id: session.id,
         paid_status: 'PAID',
-        paid_at: session.created ? new Date(session.created * 1000).toISOString() : new Date().toISOString(),
+        stripe_session_id: session.id,
+        stripe_customer_email: email,
+        paid_at: paidAt,
       }),
     })
+    logFulfillment('n8n_response', {
+      audit_id: audit.audit_id || session.metadata?.audit_id,
+      stripe_session_id: session.id,
+      status: response.status,
+      ok: response.ok,
+    })
     if (!response.ok) {
-      console.warn('n8n rights audit payment webhook failed:', response.status)
+      return { ok: false, attempted: true, status: `FAILED_${response.status}`, message: `n8n webhook failed: ${response.status}` }
     }
+    return { ok: true, attempted: true, status: `OK_${response.status}`, message: null }
   } catch (err) {
-    console.warn('n8n rights audit payment webhook error:', err.message)
+    const message = safeErrorMessage(err)
+    console.warn('n8n rights audit payment webhook error:', message)
+    return { ok: false, attempted: true, status: 'ERROR', message }
   }
 }
 
-function rightsAuditEmail(session) {
-  return clean(session.customer_details?.email || session.customer_email || session.metadata?.email).toLowerCase()
+async function markFulfillmentFailure(auditId, status, message) {
+  await sbPatchWithSchema('public', `rights_audits_v1?audit_id=eq.${encodeURIComponent(auditId)}`, {
+    fulfillment_status: status,
+    fulfillment_error: message,
+  })
+}
+
+function resolveRightsAuditRecipient(audit, session) {
+  const candidates = [
+    audit?.email,
+    session.metadata?.email,
+    session.customer_details?.email,
+    session.customer_email,
+  ]
+  return candidates.map(value => clean(value).toLowerCase()).find(isEmail) || ''
+}
+
+function recipientSource(audit, session) {
+  if (isEmail(clean(audit?.email))) return 'audit.email'
+  if (isEmail(clean(session.metadata?.email))) return 'session.metadata.email'
+  if (isEmail(clean(session.customer_details?.email))) return 'session.customer_details.email'
+  if (isEmail(clean(session.customer_email))) return 'session.customer_email'
+  return 'none'
+}
+
+function isEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean(value))
+}
+
+function logFulfillment(checkpoint, data) {
+  console.info('rights_audit_fulfillment', {
+    checkpoint,
+    ...data,
+  })
+}
+
+async function safeJson(response) {
+  try {
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
+function safeErrorMessage(err) {
+  return clean(err?.message || String(err)).slice(0, 500)
 }
 
 function escapeHtml(value) {
@@ -254,8 +394,8 @@ function clean(value) {
 
 function sbReadHeaders() {
   return {
-    apikey:           SB_KEY,
-    Authorization:    `Bearer ${SB_KEY}`,
+    apikey: SB_KEY,
+    Authorization: `Bearer ${SB_KEY}`,
     'Accept-Profile': 'registrations',
   }
 }
