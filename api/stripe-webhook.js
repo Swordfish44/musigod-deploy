@@ -353,14 +353,15 @@ async function sbPatchWithSchema(schema, path, data) {
 async function sendRightsAuditNextStepsEmail(audit, session, email) {
   if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY is not configured')
 
-  const auditId = audit.audit_id || session.metadata?.audit_id
-  const unlockUrl = `https://musigod.com/rights-audit.html?audit_id=${encodeURIComponent(auditId)}&email=${encodeURIComponent(email)}&unlock=success`
+  const auditId = clean(audit.audit_id || session.metadata?.audit_id)
+  const recipientEmail = clean(email)
+  const unlockUrl = buildRightsAuditUnlockUrl(auditId, recipientEmail)
   const artistName = escapeHtml(audit.artist_name || 'artist')
   const html = `
     <p>Your full MusiGod Rights Audit has been unlocked.</p>
     <p><strong>Audit ID:</strong> ${escapeHtml(auditId)}</p>
     <p>Next step: open your audit link below and reply to this email with any distributor, PRO, publishing admin, SoundExchange, or label-access details MusiGod should use to verify missing registrations and royalty recovery opportunities.</p>
-    <p><a href="${unlockUrl}">Open your unlocked MusiGod Rights Audit</a></p>
+    <p><a href="${escapeHtml(unlockUrl)}">Open your unlocked MusiGod Rights Audit</a></p>
     <p>MusiGod will review your catalog for missing registrations, DSP claim issues, publishing gaps, neighboring rights problems, recovery opportunities, and your action plan.</p>
     <p>Artist: ${artistName}</p>
   `
@@ -368,7 +369,7 @@ async function sendRightsAuditNextStepsEmail(audit, session, email) {
   logFulfillment('resend_request', {
     audit_id: auditId,
     stripe_session_id: session.id,
-    recipient_email: email,
+    recipient_email: recipientEmail,
     resend_configured: Boolean(RESEND_API_KEY),
   })
 
@@ -377,7 +378,7 @@ async function sendRightsAuditNextStepsEmail(audit, session, email) {
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       from: FROM_EMAIL,
-      to: email,
+      to: recipientEmail,
       subject: 'Your MusiGod Rights Audit next steps',
       html,
     }),
@@ -397,6 +398,14 @@ async function sendRightsAuditNextStepsEmail(audit, session, email) {
     console.error('Resend rights audit email failed:', { status: response.status, code, message })
     throw new Error(`Resend failed ${response.status}: ${code || message}`)
   }
+}
+
+function buildRightsAuditUnlockUrl(auditId, email) {
+  const url = new URL('https://musigod.com/rights-audit.html')
+  url.searchParams.set('audit_id', auditId)
+  url.searchParams.set('email', email)
+  url.searchParams.set('unlock', 'success')
+  return url.toString()
 }
 
 async function notifyRightsAuditPaymentConfirmed(audit, session, email, paidAt) {
