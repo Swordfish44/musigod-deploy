@@ -3,6 +3,9 @@ const { captureException, withSentry } = require('./_sentry')
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
+const RESEND_API_KEY = process.env.RESEND_API_KEY
+const FROM_EMAIL = process.env.FROM_EMAIL || 'MusiGod <support@musigod.com>'
+const RIGHTS_AUDIT_PAYMENT_WEBHOOK_URL = process.env.N8N_RIGHTS_AUDIT_WEBHOOK_URL || process.env.RIGHTS_AUDIT_PAYMENT_WEBHOOK_URL
 
 module.exports = withSentry(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -68,13 +71,33 @@ async function handleCheckoutComplete(session) {
 
 async function handleRightsAuditUnlock(session) {
   const auditId = session.metadata?.audit_id
-  if (!auditId) return
+  const email = rightsAuditEmail(session)
+  if (!auditId) throw new Error('Rights audit unlock missing audit_id')
+  if (!email) throw new Error('Rights audit unlock missing customer email')
+
+  const existingRows = await sbGetWithSchema(
+    'public',
+    `rights_audits_v1?audit_id=eq.${encodeURIComponent(auditId)}&select=audit_id,email,artist_name,paid_status,next_steps_email_sent_at,fulfilled_at&limit=1`
+  )
+  const audit = existingRows?.[0]
+  if (!audit) throw new Error(`Rights audit not found for paid unlock: ${auditId}`)
 
   await sbPatchWithSchema('public', `rights_audits_v1?audit_id=eq.${encodeURIComponent(auditId)}`, {
     paid_status: 'PAID',
     paid_at: session.created ? new Date(session.created * 1000).toISOString() : new Date().toISOString(),
     stripe_session_id: session.id,
-    stripe_customer_email: session.customer_details?.email || session.customer_email || session.metadata?.email || null,
+    stripe_customer_email: email,
+  })
+
+  if (audit.next_steps_email_sent_at || audit.fulfilled_at) return
+
+  await sendRightsAuditNextStepsEmail(audit, session, email)
+  await notifyRightsAuditPaymentConfirmed(audit, session, email)
+
+  const fulfilledAt = new Date().toISOString()
+  await sbPatchWithSchema('public', `rights_audits_v1?audit_id=eq.${encodeURIComponent(auditId)}`, {
+    next_steps_email_sent_at: fulfilledAt,
+    fulfilled_at: fulfilledAt,
   })
 }
 
@@ -120,6 +143,23 @@ async function sbPatch(path, data) {
   return sbPatchWithSchema('registrations', path, data)
 }
 
+async function sbGetWithSchema(schema, path) {
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    method: 'GET',
+    headers: {
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      'Accept-Profile': schema,
+    },
+  })
+  const text = await res.text()
+  if (!res.ok) {
+    console.error('Supabase GET error:', res.status, text)
+    throw new Error(`Supabase GET failed: ${res.status}`)
+  }
+  return text ? JSON.parse(text) : null
+}
+
 async function sbPatchWithSchema(schema, path, data) {
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
     method: 'PATCH',
@@ -137,6 +177,79 @@ async function sbPatchWithSchema(schema, path, data) {
     console.error('Supabase PATCH error:', res.status, text)
     throw new Error(`Supabase PATCH failed: ${res.status}`)
   }
+}
+
+async function sendRightsAuditNextStepsEmail(audit, session, email) {
+  if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY is not configured')
+
+  const auditId = audit.audit_id || session.metadata?.audit_id
+  const unlockUrl = `https://musigod.com/rights-audit.html?audit_id=${encodeURIComponent(auditId)}&email=${encodeURIComponent(email)}&unlock=success`
+  const artistName = escapeHtml(audit.artist_name || 'artist')
+  const html = `
+    <p>Your full MusiGod Rights Audit has been unlocked.</p>
+    <p><strong>Audit ID:</strong> ${escapeHtml(auditId)}</p>
+    <p>Next step: open your audit link below and reply to this email with any distributor, PRO, publishing admin, SoundExchange, or label-access details MusiGod should use to verify missing registrations and royalty recovery opportunities.</p>
+    <p><a href="${unlockUrl}">Open your unlocked MusiGod Rights Audit</a></p>
+    <p>MusiGod will review your catalog for missing registrations, DSP claim issues, publishing gaps, neighboring rights problems, recovery opportunities, and your action plan.</p>
+    <p>Artist: ${artistName}</p>
+  `
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: FROM_EMAIL,
+      to: email,
+      subject: 'Your full MusiGod Rights Audit is unlocked',
+      html,
+    }),
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    console.error('Resend rights audit email failed:', response.status, text)
+    throw new Error(`Resend rights audit email failed: ${response.status}`)
+  }
+}
+
+async function notifyRightsAuditPaymentConfirmed(audit, session, email) {
+  if (!RIGHTS_AUDIT_PAYMENT_WEBHOOK_URL) return
+  try {
+    const response = await fetch(RIGHTS_AUDIT_PAYMENT_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'rights_audit.payment_confirmed',
+        audit_id: audit.audit_id || session.metadata?.audit_id,
+        email,
+        stripe_session_id: session.id,
+        paid_status: 'PAID',
+        paid_at: session.created ? new Date(session.created * 1000).toISOString() : new Date().toISOString(),
+      }),
+    })
+    if (!response.ok) {
+      console.warn('n8n rights audit payment webhook failed:', response.status)
+    }
+  } catch (err) {
+    console.warn('n8n rights audit payment webhook error:', err.message)
+  }
+}
+
+function rightsAuditEmail(session) {
+  return clean(session.customer_details?.email || session.customer_email || session.metadata?.email).toLowerCase()
+}
+
+function escapeHtml(value) {
+  return clean(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function clean(value) {
+  return String(value || '').trim()
 }
 
 function sbReadHeaders() {

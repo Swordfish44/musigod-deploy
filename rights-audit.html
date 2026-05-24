@@ -271,8 +271,11 @@ if(savedEmail) document.getElementById('lookup_email').value = savedEmail
 const unlockParams = new URLSearchParams(window.location.search)
 if(unlockParams.get('unlock') === 'success'){
   const auditId = unlockParams.get('audit_id') || savedId || ''
+  const email = unlockParams.get('email') || savedEmail || ''
   if(auditId) localStorage.setItem('musigod_rights_audit_id', auditId)
+  if(email) localStorage.setItem('musigod_rights_audit_email', email)
   if(auditId) document.getElementById('lookup_id').value = auditId
+  if(email) document.getElementById('lookup_email').value = email
   document.getElementById('unlock-success').classList.add('show')
   document.getElementById('unlock-success').scrollIntoView({behavior:'smooth',block:'center'})
 }else if(unlockParams.get('unlock') === 'cancelled'){
