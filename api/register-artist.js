@@ -1,5 +1,5 @@
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
-const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
 const N8N_REGISTERED_WEBHOOK_URL = process.env.N8N_REGISTERED_WEBHOOK_URL || 'https://musigod-n8n.onrender.com/webhook/artist-registered'
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const OPS_EMAIL = process.env.OPS_EMAIL || process.env.VA_EMAIL || 'support@musigod.com'

@@ -1,7 +1,7 @@
 const { captureException, withSentry } = require('./_sentry')
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
-const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY
 
 module.exports = withSentry(async function handler(req, res) {
