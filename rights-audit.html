@@ -42,9 +42,10 @@
   .success{display:none;margin-bottom:16px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-left:4px solid var(--green);border-radius:6px;padding:16px 18px;color:#d8ffe3;font-size:14px;line-height:1.6}.success.show{display:block}
   .unlock-card{display:none;margin-top:16px;background:rgba(200,16,46,0.08);border:1px solid rgba(200,16,46,0.28);border-left:4px solid var(--red);border-radius:6px;padding:18px;color:#ddd;line-height:1.65}.unlock-card.show{display:block}.unlock-card h3{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:0.08em;color:#fff;margin-bottom:8px}.unlock-card p{font-size:14px;color:#bbb;margin-bottom:16px}.unlock-card .btn{width:100%;font-size:12px;padding:14px 18px}
   .result.show{display:block}.error{display:none;margin-top:16px;background:rgba(200,16,46,0.08);border:1px solid rgba(200,16,46,0.28);border-radius:6px;padding:14px;color:#ff9ba8;font-size:13px}.error.show{display:block}
+  .unlocked-view{display:none;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.28);border-left:4px solid var(--green);border-radius:8px;padding:22px;color:#d8ffe3;line-height:1.65}.unlocked-view.show{display:block}.unlocked-view h2{font-family:'Bebas Neue',sans-serif;font-size:34px;letter-spacing:0.06em;color:#fff;margin-bottom:8px}.unlocked-view p{font-size:14px;color:#c8f5d4;margin-bottom:14px}.audit-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}.audit-meta div{background:rgba(255,255,255,0.04);border:1px solid var(--line);border-radius:5px;padding:11px}.audit-meta span{display:block;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.12em;color:#8ed9a2;margin-bottom:4px}.unlocked-view ul{margin:10px 0 18px 18px;color:#c8f5d4;font-size:14px}.unlocked-view li{margin-bottom:7px}.form-muted{opacity:0.28;pointer-events:none}
   .mono{font-family:'DM Mono',monospace}.status-box{background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:12px;font-size:12px;color:#aaa;line-height:1.6;min-height:52px}
   footer{border-top:1px solid var(--line);padding:24px 32px;color:#444;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;text-align:center}
-  @media(max-width:850px){header{padding:0 18px}.hdr-actions{gap:8px}.hdr-link{display:none}.wrap{grid-template-columns:1fr;padding:24px 18px 52px}.hero{padding:42px 18px 28px}.grid,.checks{grid-template-columns:1fr}.actions{flex-direction:column}.btn{width:100%}}
+  @media(max-width:850px){header{padding:0 18px}.hdr-actions{gap:8px}.hdr-link{display:none}.wrap{grid-template-columns:1fr;padding:24px 18px 52px}.hero{padding:42px 18px 28px}.grid,.checks,.audit-meta{grid-template-columns:1fr}.actions{flex-direction:column}.btn{width:100%}}
 </style>
   <script>
     window.MUSIGOD_PUBLIC_CONFIG_READY = fetch('/api/public-config', { credentials: 'same-origin' })
@@ -84,6 +85,8 @@
     </div>
     <div class="panel-b">
       <div class="success" id="unlock-success">Your full MusiGod Rights Audit has been unlocked. Check your email for next steps.</div>
+      <div class="unlocked-view" id="unlocked-view"></div>
+      <div class="error" id="unlock-status-error"></div>
       <div class="notice">This is not legal advice. The audit identifies operational gaps in registrations, claims, royalty collection, and account setup so MusiGod can prioritize recovery and administration work.</div>
       <form id="audit-form">
         <div class="grid">
@@ -164,6 +167,7 @@
 <script>
 function val(id){return (document.getElementById(id)?.value || '').trim()}
 function checked(id){return [...document.querySelectorAll(`#${id} input:checked`)].map(el=>el.value)}
+function esc(value){return String(value || '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
 function showError(msg){const el=document.getElementById('error');el.textContent=msg;el.classList.add('show')}
 function clearError(){const el=document.getElementById('error');el.textContent='';el.classList.remove('show')}
 function resetForm(){document.getElementById('audit-form').reset();clearError();document.getElementById('result').classList.remove('show');document.getElementById('unlock').classList.remove('show');document.getElementById('unlock-btn').disabled=true}
@@ -229,6 +233,61 @@ async function lookupAudit(){
   }catch(err){box.textContent=err.message}
 }
 
+async function loadUnlockedAudit(auditId, email){
+  const statusError = document.getElementById('unlock-status-error')
+  const panel = document.getElementById('unlocked-view')
+  statusError.classList.remove('show')
+  statusError.textContent = ''
+  panel.classList.add('show')
+  panel.innerHTML = '<p>Loading your unlocked audit status...</p>'
+  try{
+    const res = await fetch(`/api/get-rights-audit?audit_id=${encodeURIComponent(auditId)}&email=${encodeURIComponent(email)}`)
+    const body = await res.json().catch(()=>({}))
+    if(!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+    const a = body.audit
+    const paid = a.paid_status === 'PAID'
+    document.getElementById('lookup_id').value = a.audit_id || auditId
+    document.getElementById('lookup_email').value = a.email || email
+    document.getElementById('status-box').innerHTML = `<span class="mono">${esc(a.audit_id)}</span><br>Status: ${esc(a.status)}<br>Payment: ${paid ? 'PAID' : 'UNPAID'}<br>Artist: ${esc(a.artist_name)}`
+    if(!paid){
+      panel.innerHTML = `
+        <h2>Rights Audit locked</h2>
+        <p>This audit is not marked paid yet. If you just completed checkout, refresh this page in a moment or contact support with your audit ID.</p>
+        <div class="audit-meta">
+          <div><span>Audit ID</span>${esc(a.audit_id)}</div>
+          <div><span>Paid status</span>${esc(a.paid_status || 'UNPAID')}</div>
+        </div>
+      `
+      return
+    }
+    document.getElementById('audit-form').classList.add('form-muted')
+    document.getElementById('unlock').classList.remove('show')
+    document.getElementById('result').classList.remove('show')
+    panel.innerHTML = `
+      <h2>Your MusiGod Rights Audit is unlocked</h2>
+      <p>Your payment is confirmed. MusiGod can now review the rights and royalty gaps attached to this audit.</p>
+      <div class="audit-meta">
+        <div><span>Audit ID</span>${esc(a.audit_id)}</div>
+        <div><span>Artist name</span>${esc(a.artist_name)}</div>
+        <div><span>Paid status</span>${esc(a.paid_status)}</div>
+        <div><span>Submitted</span>${a.created_at ? esc(new Date(a.created_at).toLocaleDateString()) : 'Received'}</div>
+      </div>
+      <p><strong>Next steps:</strong> reply to the email MusiGod sent you with distributor, PRO, publishing admin, SoundExchange, or label-access details.</p>
+      <p><strong>What MusiGod will review:</strong></p>
+      <ul>
+        <li>Missing songwriter, publisher, SoundExchange, and neighboring rights registrations.</li>
+        <li>DSP artist profile claims, YouTube Content ID, metadata, and catalog identifier gaps.</li>
+        <li>Publishing, master-rights, collection, and recovery opportunities for released catalog.</li>
+      </ul>
+      <a class="btn btn-red" href="mailto:support@musigod.com?subject=${encodeURIComponent('Rights Audit details - '+a.audit_id)}">Reply with access details</a>
+    `
+  }catch(err){
+    panel.classList.remove('show')
+    statusError.textContent = err.message || 'Unable to load unlocked audit status.'
+    statusError.classList.add('show')
+  }
+}
+
 function scrollUnlock(event){
   const card = document.getElementById('unlock')
   if(card.classList.contains('show')) return
@@ -277,6 +336,12 @@ if(unlockParams.get('unlock') === 'success'){
   if(auditId) document.getElementById('lookup_id').value = auditId
   if(email) document.getElementById('lookup_email').value = email
   document.getElementById('unlock-success').classList.add('show')
+  if(auditId && email){
+    loadUnlockedAudit(auditId, email)
+  }else{
+    document.getElementById('unlock-status-error').textContent = 'Audit ID and email are required to load the unlocked audit view.'
+    document.getElementById('unlock-status-error').classList.add('show')
+  }
   document.getElementById('unlock-success').scrollIntoView({behavior:'smooth',block:'center'})
 }else if(unlockParams.get('unlock') === 'cancelled'){
   showError('Checkout was cancelled. You can unlock the full audit when you are ready.')
