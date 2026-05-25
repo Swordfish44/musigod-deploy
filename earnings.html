@@ -130,6 +130,19 @@
     main { padding: 1.5rem 1rem; }
   }
 </style>
+  <script>
+    window.MUSIGOD_PUBLIC_CONFIG_READY = fetch('/api/public-config', { credentials: 'same-origin' })
+      .then(function (response) { return response.ok ? response.json() : {}; })
+      .then(function (config) {
+        window.MUSIGOD_SENTRY_DSN = config.sentryDsn || '';
+        window.MUSIGOD_ENVIRONMENT = config.environment || 'production';
+      })
+      .catch(function () {
+        window.MUSIGOD_SENTRY_DSN = '';
+        window.MUSIGOD_ENVIRONMENT = 'production';
+      });
+  </script>
+  <script src="/sentry-browser.js"></script>
 </head>
 <body>
 

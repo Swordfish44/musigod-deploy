@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "dependencies": {
+    "@sentry/browser": "^8.55.0",
+    "@sentry/node": "^8.55.0"
+  },
+  "scripts": {
+    "dns:check": "node scripts/check-dns-state.js",
+    "dns:email": "node scripts/check-email-security.js",
+    "dns:sync": "node scripts/check-vercel-cloudflare-sync.js",
+    "sentry:test": "node scripts/test-sentry-config.js"
+  }
+}

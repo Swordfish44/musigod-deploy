@@ -1,8 +1,10 @@
+const { captureException, withSentry } = require('./_sentry')
+
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY
 
-module.exports = async function handler(req, res) {
+module.exports = withSentry(async function handler(req, res) {
   setCors(req, res)
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -36,9 +38,16 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true })
   } catch (err) {
     console.error('admin-registration-action error:', err)
+    captureException(err, {
+      route: 'admin-registration-action',
+      method: req.method,
+      path: req.url,
+      statusCode: 500,
+      action,
+    })
     return res.status(500).json({ error: 'Admin action failed' })
   }
-}
+}, 'admin-registration-action')
 
 async function getRegistration(id) {
   const rows = await sbFetch(`registrations_v1?id=eq.${encodeURIComponent(id)}&select=artist_id&limit=1`, 'registrations')

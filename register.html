@@ -259,6 +259,19 @@
   footer { margin-top: 0; padding: 1.5rem 2rem; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
   footer p { font-size: 0.7rem; color: var(--text-muted); }
 </style>
+  <script>
+    window.MUSIGOD_PUBLIC_CONFIG_READY = fetch('/api/public-config', { credentials: 'same-origin' })
+      .then(function (response) { return response.ok ? response.json() : {}; })
+      .then(function (config) {
+        window.MUSIGOD_SENTRY_DSN = config.sentryDsn || '';
+        window.MUSIGOD_ENVIRONMENT = config.environment || 'production';
+      })
+      .catch(function () {
+        window.MUSIGOD_SENTRY_DSN = '';
+        window.MUSIGOD_ENVIRONMENT = 'production';
+      });
+  </script>
+  <script src="/sentry-browser.js"></script>
 </head>
 <body>
 
