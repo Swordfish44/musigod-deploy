@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod - Audit Status</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/audit-status.css">
+  <script>
+    window.MUSIGOD_PUBLIC_CONFIG_READY = fetch('/api/public-config', { credentials: 'same-origin' })
+      .then(function (response) { return response.ok ? response.json() : {}; })
+      .then(function (config) {
+        window.MUSIGOD_SENTRY_DSN = config.sentryDsn || '';
+        window.MUSIGOD_ENVIRONMENT = config.environment || 'production';
+      })
+      .catch(function () {
+        window.MUSIGOD_SENTRY_DSN = '';
+        window.MUSIGOD_ENVIRONMENT = 'production';
+      });
+  </script>
+  <script src="/sentry-browser.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="logo" href="/"><span>MUSI</span>GOD</a>
+  <a class="toplink" href="/rights-audit.html">RIGHTS AUDIT</a>
+</header>
+
+<main class="shell">
+  <section class="hero">
+    <p class="eyebrow">POST-PAYMENT STATUS</p>
+    <h1>Your audit is being handled.</h1>
+    <p>Use this page to track payment confirmation, fulfillment progress, and the latest MusiGod update. It refreshes automatically every 10 seconds.</p>
+  </section>
+
+  <section class="status-card" id="status-card" aria-live="polite">
+    <div class="status-head">
+      <div>
+        <p class="label">CURRENT STATUS</p>
+        <h2 id="status-title">Loading status</h2>
+      </div>
+      <div class="pulse" id="pulse"></div>
+    </div>
+    <p class="message" id="status-message">Checking your MusiGod audit status now.</p>
+    <div class="progress">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+    <div class="meta-grid">
+      <div><span>Audit ID</span><strong id="audit-id">-</strong></div>
+      <div><span>Payment</span><strong id="paid-status">Checking</strong></div>
+      <div><span>Estimated turnaround</span><strong id="estimate">Loading</strong></div>
+      <div><span>Latest update</span><strong id="latest-update">Loading</strong></div>
+    </div>
+  </section>
+
+  <section class="panel-grid">
+    <div class="panel">
+      <p class="label">NEXT STEPS</p>
+      <h3>Check your email</h3>
+      <p>Reply to the MusiGod next-steps email with distributor, PRO, publishing admin, SoundExchange, or label-access details so review can move faster.</p>
+      <a class="btn" href="mailto:support@musigod.com?subject=Rights Audit status">Contact support</a>
+    </div>
+    <div class="panel">
+      <p class="label">WHAT MUSIGOD REVIEWS</p>
+      <ul>
+        <li>Missing PRO, publisher, SoundExchange, and neighboring rights registrations.</li>
+        <li>DSP profile claims, YouTube Content ID, metadata, and identifier gaps.</li>
+        <li>Publishing, master-rights, and royalty recovery opportunities.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="events panel">
+    <div class="events-head">
+      <div>
+        <p class="label">LATEST UPDATE</p>
+        <h3>Fulfillment activity</h3>
+      </div>
+      <span id="poll-state">Polling every 10 seconds</span>
+    </div>
+    <div id="event-list" class="event-list">No events loaded yet.</div>
+  </section>
+</main>
+
+<script src="/audit-status.js"></script>
+</body>
+</html>

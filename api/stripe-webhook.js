@@ -1,5 +1,6 @@
 const crypto = require('crypto')
 const { captureException, withSentry } = require('./_sentry')
+const { STATUS, correlationId, log, safeLogAuditEvent, safeUpsertAuditStatus } = require('./_fulfillment')
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
@@ -9,6 +10,7 @@ const RIGHTS_AUDIT_PAYMENT_WEBHOOK_URL = process.env.N8N_RIGHTS_AUDIT_WEBHOOK_UR
 const RIGHTS_AUDIT_PLAN_VALUES = new Set(['rights_audit_unlock', 'rights_audit', 'audit_unlock'])
 
 module.exports = withSentry(async function handler(req, res) {
+  const requestId = correlationId('stripe_webhook')
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const rawBody = await getRawBody(req)
@@ -28,7 +30,16 @@ module.exports = withSentry(async function handler(req, res) {
 
   try {
     if (event.type === 'checkout.session.completed') {
-      await handleCheckoutComplete(event.data.object)
+      await safeLogAuditEvent({
+        audit_id: event.data.object?.metadata?.audit_id || null,
+        event_type: 'webhook_received',
+        severity: 'info',
+        source_system: 'stripe',
+        correlation_id: requestId,
+        payload: { stripe_event_id: event.id, stripe_event_type: event.type },
+      })
+      log('info', 'STRIPE_WEBHOOK_RECEIVED', { request_id: requestId, stripe_event_id: event.id, stripe_event_type: event.type })
+      await handleCheckoutComplete(event.data.object, requestId)
     } else if (event.type === 'customer.subscription.created') {
       await handleSubscriptionCreated(event.data.object)
     } else if (event.type === 'customer.subscription.updated') {
@@ -58,7 +69,7 @@ module.exports = withSentry(async function handler(req, res) {
   res.status(200).json({ received: true })
 }, 'stripe-webhook')
 
-async function handleCheckoutComplete(session) {
+async function handleCheckoutComplete(session, requestId) {
   const artistId = session.metadata?.artist_id
   const plan = session.metadata?.plan
   const productType = session.metadata?.product_type
@@ -79,7 +90,7 @@ async function handleCheckoutComplete(session) {
   })
 
   if (isRightsAuditUnlockSession(session)) {
-    await handleRightsAuditUnlock(session)
+    await handleRightsAuditUnlock(session, requestId)
     return
   }
   if (!artistId) {
@@ -107,7 +118,7 @@ function isRightsAuditUnlockSession(session) {
   return values.some(value => RIGHTS_AUDIT_PLAN_VALUES.has(value))
 }
 
-async function handleRightsAuditUnlock(session) {
+async function handleRightsAuditUnlock(session, requestId = correlationId('rights_audit_fulfillment')) {
   const auditId = clean(session.metadata?.audit_id)
   const sessionId = clean(session.id)
   if (!auditId) {
@@ -132,6 +143,21 @@ async function handleRightsAuditUnlock(session) {
     stripe_session_id: sessionId,
     resend_configured: Boolean(RESEND_API_KEY),
     n8n_configured: Boolean(RIGHTS_AUDIT_PAYMENT_WEBHOOK_URL),
+  })
+  await safeUpsertAuditStatus({
+    audit_id: auditId,
+    stripe_session_id: sessionId,
+    current_status: STATUS.PAID,
+    status_message: 'Stripe payment confirmed. Preparing fulfillment.',
+    estimated_completion: 'Most paid audits move into review within 1 business day.',
+  })
+  await safeLogAuditEvent({
+    audit_id: auditId,
+    event_type: 'checkout_success',
+    severity: 'info',
+    source_system: 'stripe',
+    correlation_id: requestId,
+    payload: { stripe_session_id: sessionId, payment_status: session.payment_status || null },
   })
 
   const existingRows = await sbGetWithSchema(
@@ -186,6 +212,23 @@ async function handleRightsAuditUnlock(session) {
       fulfillment_status: audit.next_steps_email_sent_at ? 'EMAIL_SENT' : 'PAYMENT_CONFIRMED',
       fulfillment_error: null,
     })
+    await safeUpsertAuditStatus({
+      audit_id: auditId,
+      email: recipient,
+      stripe_session_id: sessionId,
+      current_status: STATUS.FULFILLMENT_QUEUED,
+      status_message: 'Payment confirmed. Sending next steps and queueing fulfillment.',
+      estimated_completion: 'Initial review usually begins within 1 business day.',
+      fulfillment_queued_at: new Date().toISOString(),
+    })
+    await safeLogAuditEvent({
+      audit_id: auditId,
+      event_type: 'fulfillment_queued',
+      severity: 'info',
+      source_system: 'fulfillment',
+      correlation_id: requestId,
+      payload: { stripe_session_id: sessionId, recipient_email: recipient },
+    })
 
     console.info('BEFORE_FULFILLMENT', {
       audit_id: auditId,
@@ -199,6 +242,14 @@ async function handleRightsAuditUnlock(session) {
     let emailSentAt = audit.next_steps_email_sent_at || null
     if (emailSent) {
       logFulfillment('email_already_sent', { audit_id: auditId, stripe_session_id: sessionId, recipient_email: recipient })
+      await safeLogAuditEvent({
+        audit_id: auditId,
+        event_type: 'resend_success',
+        severity: 'info',
+        source_system: 'resend',
+        correlation_id: requestId,
+        payload: { recipient_email: recipient, status: 'ALREADY_SENT' },
+      })
       console.info('FULFILLMENT_EMAIL_SENT', {
         audit_id: auditId,
         stripe_session_id: sessionId,
@@ -228,6 +279,14 @@ async function handleRightsAuditUnlock(session) {
         recipient_email: recipient,
         next_steps_email_sent_at: emailSentAt,
       })
+      await safeLogAuditEvent({
+        audit_id: auditId,
+        event_type: 'unlock_email_sent',
+        severity: 'info',
+        source_system: 'resend',
+        correlation_id: requestId,
+        payload: { recipient_email: recipient, next_steps_email_sent_at: emailSentAt },
+      })
       console.info('AFTER_RESEND', {
         audit_id: auditId,
         stripe_session_id: sessionId,
@@ -236,9 +295,20 @@ async function handleRightsAuditUnlock(session) {
       })
     }
 
-    const n8nStatus = audit.n8n_fulfillment_sent_at
+    await safeUpsertAuditStatus({
+      audit_id: auditId,
+      email: recipient,
+      stripe_session_id: sessionId,
+      current_status: STATUS.PROCESSING,
+      status_message: 'Payment confirmed and next-step email sent. Fulfillment processing is underway.',
+      estimated_completion: 'MusiGod reviews paid audits within 1 business day.',
+      processing_started_at: new Date().toISOString(),
+    })
+
+    const n8nAlreadyOk = audit.n8n_fulfillment_sent_at && String(audit.n8n_fulfillment_status || '').startsWith('OK_')
+    const n8nStatus = n8nAlreadyOk
       ? { ok: true, attempted: false, status: audit.n8n_fulfillment_status || 'ALREADY_SENT', message: null }
-      : await notifyRightsAuditPaymentConfirmed(audit, session, recipient, paidAt)
+      : await notifyRightsAuditPaymentConfirmed(audit, session, recipient, paidAt, requestId)
     console.info('AFTER_N8N', {
       audit_id: auditId,
       stripe_session_id: sessionId,
@@ -254,16 +324,52 @@ async function handleRightsAuditUnlock(session) {
       fulfillment_status: finalStatus,
       fulfillment_error: n8nStatus.ok ? null : n8nStatus.message,
       next_steps_email_sent_at: emailSentAt,
-      n8n_fulfillment_sent_at: n8nStatus.attempted ? fulfilledAt : audit.n8n_fulfillment_sent_at || null,
+      n8n_fulfillment_sent_at: n8nStatus.ok && n8nStatus.attempted ? fulfilledAt : audit.n8n_fulfillment_sent_at || null,
       n8n_fulfillment_status: n8nStatus.status,
     })
 
     if (!n8nStatus.ok) {
+      await safeUpsertAuditStatus({
+        audit_id: auditId,
+        email: recipient,
+        stripe_session_id: sessionId,
+        current_status: STATUS.ACTION_REQUIRED,
+        status_message: 'Payment and artist email are complete. Internal automation needs staff attention.',
+        estimated_completion: 'MusiGod can continue manually while automation is corrected.',
+        last_error: n8nStatus.message,
+        n8n_retry_count: Number(audit.n8n_retry_count || 0) + 1,
+      })
+      await safeLogAuditEvent({
+        audit_id: auditId,
+        event_type: 'fulfillment_failure',
+        severity: 'warn',
+        source_system: 'n8n',
+        correlation_id: requestId,
+        payload: { n8n_status: n8nStatus.status, message: n8nStatus.message },
+      })
       console.warn('N8N_FAILURE_NON_FATAL', {
         audit_id: auditId,
         stripe_session_id: sessionId,
         n8n_fulfillment_status: n8nStatus.status,
         fulfillment_error: n8nStatus.message,
+      })
+    } else {
+      await safeUpsertAuditStatus({
+        audit_id: auditId,
+        email: recipient,
+        stripe_session_id: sessionId,
+        current_status: STATUS.COMPLETED,
+        status_message: 'Payment confirmed, email sent, and fulfillment workflow completed.',
+        estimated_completion: 'Review is active. Watch your email for follow-up.',
+        completed_at: fulfilledAt,
+      })
+      await safeLogAuditEvent({
+        audit_id: auditId,
+        event_type: 'fulfillment_completed',
+        severity: 'info',
+        source_system: 'fulfillment',
+        correlation_id: requestId,
+        payload: { n8n_status: n8nStatus.status, email_sent: emailSent },
       })
     }
 
@@ -288,6 +394,22 @@ async function handleRightsAuditUnlock(session) {
       audit_id: auditId,
       stripe_session_id: sessionId,
       message,
+    })
+    await safeLogAuditEvent({
+      audit_id: auditId,
+      event_type: message.toLowerCase().includes('resend') ? 'resend_failure' : 'fulfillment_failure',
+      severity: 'error',
+      source_system: message.toLowerCase().includes('resend') ? 'resend' : 'fulfillment',
+      correlation_id: requestId,
+      payload: { stripe_session_id: sessionId, message },
+    })
+    await safeUpsertAuditStatus({
+      audit_id: auditId,
+      stripe_session_id: sessionId,
+      current_status: STATUS.FAILED_RETRYING,
+      status_message: 'Fulfillment hit an error and will be reviewed by MusiGod operations.',
+      estimated_completion: 'MusiGod operations will retry or complete manually.',
+      last_error: message,
     })
     await markFulfillmentFailure(auditId, 'FAILED', message)
     throw err
@@ -378,13 +500,16 @@ async function sendRightsAuditNextStepsEmail(audit, session, email) {
   const auditId = clean(audit.audit_id || session.metadata?.audit_id)
   const recipientEmail = clean(email)
   const unlockUrl = buildRightsAuditUnlockUrl(auditId, recipientEmail)
+  const statusUrl = `https://musigod.com/audit-status?id=${encodeURIComponent(auditId)}`
   const artistName = escapeHtml(audit.artist_name || 'artist')
   const html = `
-    <p>Your full MusiGod Rights Audit has been unlocked.</p>
+    <p><strong>Your payment was successful and your full MusiGod Rights Audit is unlocked.</strong></p>
     <p><strong>Audit ID:</strong> ${escapeHtml(auditId)}</p>
-    <p>Next step: open your audit link below and reply to this email with any distributor, PRO, publishing admin, SoundExchange, or label-access details MusiGod should use to verify missing registrations and royalty recovery opportunities.</p>
+    <p><strong>Next step:</strong> reply to this email with distributor, PRO, publishing admin, SoundExchange, or label-access details MusiGod should use to verify missing registrations and royalty recovery opportunities.</p>
+    <p><a href="${escapeHtml(statusUrl)}">Track your MusiGod audit status</a></p>
     <p><a href="${escapeHtml(unlockUrl)}">Open your unlocked MusiGod Rights Audit</a></p>
-    <p>MusiGod will review your catalog for missing registrations, DSP claim issues, publishing gaps, neighboring rights problems, recovery opportunities, and your action plan.</p>
+    <p><strong>Turnaround:</strong> MusiGod begins paid audit review within 1 business day. Watch your email for follow-up questions or action items.</p>
+    <p>MusiGod will review missing registrations, DSP claim issues, publishing gaps, neighboring rights problems, recovery opportunities, and your action plan.</p>
     <p>Artist: ${artistName}</p>
   `
 
@@ -420,6 +545,7 @@ async function sendRightsAuditNextStepsEmail(audit, session, email) {
     console.error('Resend rights audit email failed:', { status: response.status, code, message })
     throw new Error(`Resend failed ${response.status}: ${code || message}`)
   }
+  return { ok: true, status: response.status }
 }
 
 function buildRightsAuditUnlockUrl(auditId, email) {
@@ -430,7 +556,7 @@ function buildRightsAuditUnlockUrl(auditId, email) {
   return url.toString()
 }
 
-async function notifyRightsAuditPaymentConfirmed(audit, session, email, paidAt) {
+async function notifyRightsAuditPaymentConfirmed(audit, session, email, paidAt, requestId) {
   console.info('N8N_URL_CONFIGURED', {
     configured: Boolean(RIGHTS_AUDIT_PAYMENT_WEBHOOK_URL),
   })
@@ -441,10 +567,26 @@ async function notifyRightsAuditPaymentConfirmed(audit, session, email, paidAt) 
       stripe_session_id: session.id,
       n8n_configured: false,
     })
+    await safeLogAuditEvent({
+      audit_id: audit.audit_id || session.metadata?.audit_id,
+      event_type: 'n8n_dispatch_skipped',
+      severity: 'warn',
+      source_system: 'n8n',
+      correlation_id: requestId,
+      payload: { reason: 'N8N_RIGHTS_AUDIT_WEBHOOK_URL missing' },
+    })
     return { ok: true, attempted: false, status: 'NOT_CONFIGURED', message: null }
   }
 
   try {
+    await safeLogAuditEvent({
+      audit_id: audit.audit_id || session.metadata?.audit_id,
+      event_type: 'n8n_dispatch',
+      severity: 'info',
+      source_system: 'n8n',
+      correlation_id: requestId,
+      payload: { stripe_session_id: session.id },
+    })
     const response = await fetch(RIGHTS_AUDIT_PAYMENT_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -456,6 +598,8 @@ async function notifyRightsAuditPaymentConfirmed(audit, session, email, paidAt) 
         stripe_session_id: session.id,
         stripe_customer_email: email,
         paid_at: paidAt,
+        status_url: `https://musigod.com/audit-status?id=${encodeURIComponent(audit.audit_id || session.metadata?.audit_id || '')}`,
+        correlation_id: requestId,
       }),
     })
     console.info('N8N_RESPONSE_STATUS', {
@@ -471,6 +615,14 @@ async function notifyRightsAuditPaymentConfirmed(audit, session, email, paidAt) 
       ok: response.ok,
     })
     if (!response.ok) {
+      await safeLogAuditEvent({
+        audit_id: audit.audit_id || session.metadata?.audit_id,
+        event_type: 'n8n_retry',
+        severity: 'warn',
+        source_system: 'n8n',
+        correlation_id: requestId,
+        payload: { stripe_session_id: session.id, status: response.status },
+      })
       console.warn('N8N_FAILURE_NON_FATAL', {
         audit_id: audit.audit_id || session.metadata?.audit_id,
         stripe_session_id: session.id,
@@ -478,6 +630,14 @@ async function notifyRightsAuditPaymentConfirmed(audit, session, email, paidAt) 
       })
       return { ok: false, attempted: true, status: `FAILED_${response.status}`, message: `n8n webhook failed: ${response.status}` }
     }
+    await safeLogAuditEvent({
+      audit_id: audit.audit_id || session.metadata?.audit_id,
+      event_type: 'n8n_dispatch_success',
+      severity: 'info',
+      source_system: 'n8n',
+      correlation_id: requestId,
+      payload: { stripe_session_id: session.id, status: response.status },
+    })
     return { ok: true, attempted: true, status: `OK_${response.status}`, message: null }
   } catch (err) {
     const message = safeErrorMessage(err)
@@ -487,6 +647,14 @@ async function notifyRightsAuditPaymentConfirmed(audit, session, email, paidAt) 
       stripe_session_id: session.id,
       status: 'FAILED',
       message,
+    })
+    await safeLogAuditEvent({
+      audit_id: audit.audit_id || session.metadata?.audit_id,
+      event_type: 'n8n_retry',
+      severity: 'warn',
+      source_system: 'n8n',
+      correlation_id: requestId,
+      payload: { stripe_session_id: session.id, message },
     })
     return { ok: false, attempted: true, status: 'FAILED', message }
   }

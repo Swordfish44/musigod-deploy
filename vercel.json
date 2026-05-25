@@ -17,6 +17,8 @@
     { "source": "/registration/:path*", "destination": "/registration-detail.html" },
     { "source": "/success", "destination": "/success.html" },
     { "source": "/rights-audit", "destination": "/rights-audit.html" },
+    { "source": "/audit-status", "destination": "/audit-status.html" },
+    { "source": "/admin-fulfillment", "destination": "/admin-fulfillment.html" },
     { "source": "/affiliates", "destination": "/affiliate-dashboard.html" }
   ]
 }

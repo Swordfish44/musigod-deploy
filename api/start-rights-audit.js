@@ -1,3 +1,6 @@
+const { captureException, withSentry } = require('./_sentry')
+const { STATUS, correlationId, log, safeLogAuditEvent, safeUpsertAuditStatus } = require('./_fulfillment')
+
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
 const RESEND_API_KEY = process.env.RESEND_API_KEY
@@ -5,7 +8,8 @@ const OPS_EMAIL = process.env.OPS_EMAIL || process.env.VA_EMAIL || 'support@musi
 const FROM_EMAIL = process.env.FROM_EMAIL || 'MusiGod <support@musigod.com>'
 const RIGHTS_AUDIT_WEBHOOK_URL = process.env.RIGHTS_AUDIT_WEBHOOK_URL || 'https://musigod-n8n.onrender.com/webhook/rights-audit-started'
 
-module.exports = async function handler(req, res) {
+module.exports = withSentry(async function handler(req, res) {
+  const requestId = correlationId('rights_audit_start')
   setCors(req, res)
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -24,12 +28,28 @@ module.exports = async function handler(req, res) {
 
   try {
     const audit = await createAudit(payload)
-    await Promise.allSettled([
+    log('info', 'RIGHTS_AUDIT_CREATED', { request_id: requestId, audit_id: audit.audit_id, email: payload.email })
+    await safeUpsertAuditStatus({
+      audit_id: audit.audit_id,
+      email: payload.email,
+      current_status: STATUS.PENDING_PAYMENT,
+      status_message: 'Audit request received. Payment is required to unlock full review.',
+      estimated_completion: 'Payment unlocks the next-step review queue.',
+    })
+    await safeLogAuditEvent({
+      audit_id: audit.audit_id,
+      event_type: 'audit_intake_created',
+      severity: 'info',
+      source_system: 'api',
+      correlation_id: requestId,
+      payload: { email: payload.email, artist_name: payload.artist_name },
+    })
+    const sideEffects = await Promise.allSettled([
       notifyN8n(audit),
       sendEmail({
         to: payload.email,
         subject: 'MusiGod rights audit received',
-        html: `<p>We received your rights audit request.</p><p>Audit ID: <strong>${audit.audit_id}</strong></p><p>MusiGod will review your rights, registrations, and royalty collection gaps and follow up with next steps.</p>`,
+        html: `<p>We received your rights audit request.</p><p>Audit ID: <strong>${audit.audit_id}</strong></p><p>Unlock the full audit when ready. After payment, your status page will show payment confirmation, fulfillment progress, and next steps.</p><p><a href="https://musigod.com/audit-status?id=${encodeURIComponent(audit.audit_id)}">Check your MusiGod audit status</a></p>`,
       }),
       sendEmail({
         to: OPS_EMAIL,
@@ -37,17 +57,33 @@ module.exports = async function handler(req, res) {
         html: `<p>New rights audit request.</p><p><strong>Audit ID:</strong> ${audit.audit_id}<br><strong>Artist:</strong> ${payload.artist_name}<br><strong>Email:</strong> ${payload.email}<br><strong>Catalog:</strong> ${payload.catalog_size}</p>`,
       }),
     ])
+    sideEffects.forEach((result, idx) => {
+      const label = ['intake_n8n_dispatch', 'artist_intake_email', 'ops_intake_email'][idx]
+      if (result.status === 'fulfilled') {
+        log('info', 'RIGHTS_AUDIT_SIDE_EFFECT_OK', { request_id: requestId, audit_id: audit.audit_id, label })
+      } else {
+        log('warn', 'RIGHTS_AUDIT_SIDE_EFFECT_FAILED', { request_id: requestId, audit_id: audit.audit_id, label, message: safeErrorMessage(result.reason) })
+      }
+    })
 
     return res.status(200).json({
       audit_id: audit.audit_id,
       status: audit.status,
       created_at: audit.created_at,
+      status_url: `/audit-status?id=${encodeURIComponent(audit.audit_id)}`,
     })
   } catch (err) {
+    log('error', 'RIGHTS_AUDIT_START_FAILED', { request_id: requestId, message: safeErrorMessage(err) })
     console.error('start-rights-audit error:', err)
+    captureException(err, {
+      route: 'start-rights-audit',
+      method: req.method,
+      path: req.url,
+      statusCode: 500,
+    })
     return res.status(500).json({ error: 'Rights audit could not be started' })
   }
-}
+}, 'start-rights-audit')
 
 function normalizePayload(body, req) {
   return {
@@ -108,7 +144,7 @@ async function createAudit(payload) {
 
 async function notifyN8n(audit) {
   if (!RIGHTS_AUDIT_WEBHOOK_URL) return
-  await fetch(RIGHTS_AUDIT_WEBHOOK_URL, {
+  const response = await fetch(RIGHTS_AUDIT_WEBHOOK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -126,15 +162,17 @@ async function notifyN8n(audit) {
       submitted_at: audit.created_at,
     }),
   })
+  if (!response.ok) throw new Error(`Rights audit intake n8n failed: ${response.status}`)
 }
 
 async function sendEmail({ to, subject, html }) {
   if (!RESEND_API_KEY || !to) return
-  await fetch('https://api.resend.com/emails', {
+  const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ from: FROM_EMAIL, to, subject, html }),
   })
+  if (!response.ok) throw new Error(`Resend failed: ${response.status}`)
 }
 
 async function sbFetch(path, schema, options = {}) {
@@ -166,6 +204,10 @@ function normalizeList(value) {
 
 function clean(value) {
   return String(value || '').trim()
+}
+
+function safeErrorMessage(err) {
+  return clean(err?.message || String(err)).slice(0, 500)
 }
 
 function setCors(req, res) {

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod - Fulfillment Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/admin-fulfillment.css">
+</head>
+<body>
+<header>
+  <div class="logo">MUSI<span>GOD</span></div>
+  <div class="badge">FULFILLMENT OPS</div>
+</header>
+<main>
+  <section class="toolbar">
+    <div>
+      <p class="label">RIGHTS AUDIT FULFILLMENT</p>
+      <h1>Operational status</h1>
+    </div>
+    <div class="filters">
+      <input id="admin-key" type="password" placeholder="Admin API key">
+      <input id="search" placeholder="audit_id, email, or session">
+      <select id="status">
+        <option value="">All statuses</option>
+        <option>PENDING_PAYMENT</option>
+        <option>PAID</option>
+        <option>FULFILLMENT_QUEUED</option>
+        <option>PROCESSING</option>
+        <option>COMPLETED</option>
+        <option>FAILED_RETRYING</option>
+        <option>ACTION_REQUIRED</option>
+      </select>
+      <button onclick="loadFulfillment()">Refresh</button>
+    </div>
+  </section>
+
+  <section class="metrics" id="metrics">
+    <div><strong>-</strong><span>Total</span></div>
+    <div><strong>-</strong><span>Active</span></div>
+    <div><strong>-</strong><span>Failed</span></div>
+    <div><strong>-</strong><span>Retrying</span></div>
+    <div><strong>-</strong><span>Completed</span></div>
+  </section>
+
+  <section class="table-wrap">
+    <table>
+      <thead><tr><th>Audit</th><th>Email</th><th>Status</th><th>Message</th><th>Email/Stripe</th><th>Updated</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="6">Enter admin key and refresh.</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="events">
+    <p class="label">EVENTS</p>
+    <div id="events">Search an audit to load latest events.</div>
+  </section>
+</main>
+<script src="/admin-fulfillment.js"></script>
+</body>
+</html>

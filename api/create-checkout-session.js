@@ -1,4 +1,5 @@
 const { captureException, withSentry } = require('./_sentry')
+const { STATUS, correlationId, log, safeLogAuditEvent, safeUpsertAuditStatus } = require('./_fulfillment')
 
 const PRICE_IDS = {
   starter: process.env.STRIPE_STARTER_PRICE_ID,
@@ -7,6 +8,7 @@ const PRICE_IDS = {
 }
 
 module.exports = withSentry(async function handler(req, res) {
+  const requestId = correlationId('checkout')
   setCors(req, res)
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
@@ -51,7 +53,7 @@ module.exports = withSentry(async function handler(req, res) {
     params.append('success_url', `https://musigod.com/success.html?artist_id=${encodeURIComponent(artist_id)}&session_id={CHECKOUT_SESSION_ID}`)
     params.append('cancel_url', `https://musigod.com/register.html?artist_id=${encodeURIComponent(artist_id)}&checkout=cancelled`)
   } else {
-    params.append('success_url', `https://musigod.com/rights-audit.html?audit_id=${encodeURIComponent(audit_id || '')}&unlock=success&session_id={CHECKOUT_SESSION_ID}`)
+    params.append('success_url', `https://musigod.com/audit-status?id=${encodeURIComponent(audit_id || '')}&session_id={CHECKOUT_SESSION_ID}`)
     params.append('cancel_url', `https://musigod.com/rights-audit.html?audit_id=${encodeURIComponent(audit_id || '')}&unlock=cancelled`)
   }
 
@@ -76,6 +78,26 @@ module.exports = withSentry(async function handler(req, res) {
       plan,
     })
     return res.status(500).json({ error: session.error?.message || 'Stripe error' })
+  }
+
+  if (plan === 'rights_audit_unlock') {
+    log('info', 'RIGHTS_AUDIT_CHECKOUT_CREATED', { request_id: requestId, audit_id, stripe_session_id: session.id })
+    await safeUpsertAuditStatus({
+      audit_id,
+      email,
+      stripe_session_id: session.id,
+      current_status: STATUS.PENDING_PAYMENT,
+      status_message: 'Checkout started. Waiting for Stripe payment confirmation.',
+      estimated_completion: 'Payment confirmation usually posts within one minute.',
+    })
+    await safeLogAuditEvent({
+      audit_id,
+      event_type: 'checkout_session_created',
+      severity: 'info',
+      source_system: 'stripe',
+      correlation_id: requestId,
+      payload: { stripe_session_id: session.id, plan },
+    })
   }
 
   res.status(200).json({ url: session.url })
