@@ -33,7 +33,7 @@
       renderStatus(body.status, body.events || [])
       els.poll.textContent = 'Polling every 10 seconds'
     }catch(err){
-      renderFallback('Status temporarily unavailable', 'Your payment flow is not affected. Refresh this page or contact support if this persists.')
+      renderFallback('Status still syncing', 'We received your payment, but your audit status is still syncing. Check your email for confirmation. Contact support with your payment email if this does not update shortly.')
       els.poll.textContent = 'Retrying every 10 seconds'
     }
   }

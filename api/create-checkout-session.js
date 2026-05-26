@@ -63,7 +63,7 @@ module.exports = withSentry(async function handler(req, res) {
   params.append('cancel_url', cancelUrl)
   log('info', 'STRIPE_CHECKOUT_URLS_RESOLVED', {
     request_id: requestId,
-    baseUrl,
+    base_url: baseUrl,
     success_url: successUrl,
     cancel_url: cancelUrl,
     audit_id: audit_id || null,
@@ -97,9 +97,10 @@ module.exports = withSentry(async function handler(req, res) {
       request_id: requestId,
       audit_id,
       stripe_session_id: session.id,
-      baseUrl,
+      base_url: baseUrl,
       success_url: successUrl,
       cancel_url: cancelUrl,
+      checkout_url_present: Boolean(session.url),
     })
     await safeUpsertAuditStatus({
       audit_id,

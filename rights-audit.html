@@ -295,14 +295,21 @@ function scrollUnlock(event){
   document.getElementById('audit-form').scrollIntoView({behavior:'smooth',block:'start'})
 }
 
+let checkoutOpening = false
+
 async function unlockFullAudit(){
   clearError()
   const btn = document.getElementById('unlock-btn')
   const auditId = localStorage.getItem('musigod_rights_audit_id') || val('lookup_id')
   const email = localStorage.getItem('musigod_rights_audit_email') || val('lookup_email') || val('email')
   if(!auditId || !email){showError('Submit the audit form first so checkout can attach your audit ID.');return}
+  if(checkoutOpening) return
+  checkoutOpening = true
   btn.disabled = true
-  btn.textContent = 'OPENING CHECKOUT...'
+  btn.textContent = 'Opening secure Stripe checkout...'
+  const slowCheckoutTimer = setTimeout(()=>{
+    showError('Stripe is taking longer than usual. Do not refresh if the checkout window is loading. If it fails, return here and try again.')
+  }, 10000)
   try{
     const res = await fetch('/api/create-checkout-session', {
       method:'POST',
@@ -317,6 +324,8 @@ async function unlockFullAudit(){
     if(!res.ok || !body.url) throw new Error(body.error || `Checkout failed (${res.status})`)
     window.location.href = body.url
   }catch(err){
+    clearTimeout(slowCheckoutTimer)
+    checkoutOpening = false
     showError(err.message)
     btn.disabled = false
     btn.textContent = 'UNLOCK FULL AUDIT'
