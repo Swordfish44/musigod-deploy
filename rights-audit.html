@@ -84,7 +84,7 @@
       <div><div class="panel-title">REQUEST AUDIT</div><div class="panel-sub">Complete every required field for a usable review.</div></div>
     </div>
     <div class="panel-b">
-      <div class="success" id="unlock-success">Your full MusiGod Rights Audit has been unlocked. Check your email for next steps.</div>
+      <div class="success" id="unlock-success">Payment received. Redirecting to your audit status page.</div>
       <div class="unlocked-view" id="unlocked-view"></div>
       <div class="error" id="unlock-status-error"></div>
       <div class="notice">This is not legal advice. The audit identifies operational gaps in registrations, claims, royalty collection, and account setup so MusiGod can prioritize recovery and administration work.</div>
@@ -322,6 +322,11 @@ async function unlockFullAudit(){
     })
     const body = await res.json().catch(()=>({}))
     if(!res.ok || !body.url) throw new Error(body.error || `Checkout failed (${res.status})`)
+    console.info('RIGHTS_AUDIT_FINAL_REDIRECT_TARGET', {
+      target: body.url,
+      audit_id: auditId,
+      session_id: null,
+    })
     window.location.href = body.url
   }catch(err){
     clearTimeout(slowCheckoutTimer)
@@ -340,15 +345,23 @@ const unlockParams = new URLSearchParams(window.location.search)
 if(unlockParams.get('unlock') === 'success'){
   const auditId = unlockParams.get('audit_id') || savedId || ''
   const email = unlockParams.get('email') || savedEmail || ''
+  const sessionId = unlockParams.get('session_id') || ''
   if(auditId) localStorage.setItem('musigod_rights_audit_id', auditId)
   if(email) localStorage.setItem('musigod_rights_audit_email', email)
-  if(auditId) document.getElementById('lookup_id').value = auditId
-  if(email) document.getElementById('lookup_email').value = email
   document.getElementById('unlock-success').classList.add('show')
-  if(auditId && email){
-    loadUnlockedAudit(auditId, email)
+  const statusUrl = new URL('/audit-status', window.location.origin)
+  if(auditId) statusUrl.searchParams.set('id', auditId)
+  if(sessionId) statusUrl.searchParams.set('session_id', sessionId)
+  console.info('RIGHTS_AUDIT_UNLOCK_QUERY_HANDLING', {
+    unlock: 'success',
+    audit_id: auditId || null,
+    session_id: sessionId || null,
+    final_redirect_target: statusUrl.pathname + statusUrl.search,
+  })
+  if(auditId){
+    window.location.replace(statusUrl.toString())
   }else{
-    document.getElementById('unlock-status-error').textContent = 'Audit ID and email are required to load the unlocked audit view.'
+    document.getElementById('unlock-status-error').textContent = 'Payment received. Your audit status is syncing. Contact support with your payment email if this does not update shortly.'
     document.getElementById('unlock-status-error').classList.add('show')
   }
   document.getElementById('unlock-success').scrollIntoView({behavior:'smooth',block:'center'})

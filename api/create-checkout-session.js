@@ -102,6 +102,12 @@ module.exports = withSentry(async function handler(req, res) {
       cancel_url: cancelUrl,
       checkout_url_present: Boolean(session.url),
     })
+    log('info', 'RIGHTS_AUDIT_FINAL_REDIRECT_TARGET', {
+      request_id: requestId,
+      audit_id,
+      session_id: session.id,
+      final_redirect_target: successUrl.replace('{CHECKOUT_SESSION_ID}', session.id || ''),
+    })
     await safeUpsertAuditStatus({
       audit_id,
       email,

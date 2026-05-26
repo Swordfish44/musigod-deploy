@@ -518,6 +518,7 @@ async function sendRightsAuditNextStepsEmail(audit, session, email) {
     stripe_session_id: session.id,
     recipient_email: recipientEmail,
     resend_configured: Boolean(RESEND_API_KEY),
+    final_redirect_target: statusUrl,
   })
 
   const response = await fetch('https://api.resend.com/emails', {

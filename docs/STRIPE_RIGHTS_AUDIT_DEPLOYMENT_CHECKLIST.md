@@ -46,16 +46,15 @@ The migration is idempotent and adds:
 4. Confirm Stripe redirects to:
 
 ```text
-https://musigod.com/rights-audit.html?audit_id=AUDIT_ID&unlock=success&session_id=CHECKOUT_SESSION_ID
+https://musigod.com/audit-status?id=AUDIT_ID&session_id=CHECKOUT_SESSION_ID
 ```
 
 5. Confirm the page shows:
 
 ```text
-Your full MusiGod Rights Audit has been unlocked. Check your email for next steps.
+Payment received. Your audit is unlocked and in progress.
 ```
 
 6. Confirm the Stripe webhook delivery returns HTTP 200.
 7. Confirm `public.rights_audits_v1` shows `paid_status = 'PAID'`.
 8. Confirm the admin Rights Audits view shows `PAID`.
-
