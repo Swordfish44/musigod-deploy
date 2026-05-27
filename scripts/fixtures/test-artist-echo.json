@@ -1,0 +1,45 @@
+{
+  "meta": {
+    "description": "Permanent QA fixture for Test Artist Echo. Never use in production customer flows.",
+    "version": "1.0.0",
+    "qa_artist": true
+  },
+  "profile": {
+    "artist_name": "Test Artist Echo",
+    "legal_name": "Echo Validation",
+    "email": "swordfishlp44+testartist@proton.me",
+    "phone": "313-555-0199",
+    "pro_affiliation": "ASCAP",
+    "publisher_name": "Echo Test Publishing",
+    "catalog_size": "6-20 songs",
+    "released_music": "Already released",
+    "platforms": [
+      "Spotify",
+      "Apple Music",
+      "YouTube",
+      "TikTok"
+    ],
+    "rights_concerns": [
+      "Publishing not registered",
+      "Missing songwriter royalties",
+      "No SoundExchange or neighboring rights",
+      "YouTube Content ID missing"
+    ],
+    "notes": "QA TEST RECORD \u2014 Echo Validation / Test Artist Echo. DistroKid distributor. Unsure about PRO, SoundExchange, YouTube Content ID, neighboring rights registration status.",
+    "source": "qa-test-artist-echo"
+  },
+  "social": {
+    "spotify_url": "https://open.spotify.com/artist/test-artist-echo",
+    "apple_music_url": "https://music.apple.com/us/artist/test-artist-echo",
+    "youtube_url": "https://youtube.com/@testartistecho",
+    "instagram_url": "https://instagram.com/testartistecho",
+    "tiktok_url": "https://tiktok.com/@testartistecho"
+  },
+  "stripe": {
+    "test_card": "4242 4242 4242 4242",
+    "test_card_declined": "4000 0000 0000 0002",
+    "test_card_requires_auth": "4000 0025 0000 3155",
+    "expiry": "12/34",
+    "cvc": "424"
+  }
+}
