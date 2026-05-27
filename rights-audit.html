@@ -350,7 +350,7 @@ if(unlockParams.get('unlock') === 'success'){
   if(email) localStorage.setItem('musigod_rights_audit_email', email)
   document.getElementById('unlock-success').classList.add('show')
   const statusUrl = new URL('/audit-status', window.location.origin)
-  if(auditId) statusUrl.searchParams.set('id', auditId)
+  if(auditId) statusUrl.searchParams.set('audit_id', auditId)
   if(sessionId) statusUrl.searchParams.set('session_id', sessionId)
   console.info('RIGHTS_AUDIT_UNLOCK_QUERY_HANDLING', {
     unlock: 'success',
