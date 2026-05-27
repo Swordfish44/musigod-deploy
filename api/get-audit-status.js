@@ -1,143 +1,101 @@
 const { captureException, withSentry } = require('./_sentry')
-const { STATUS, correlationId, getAuditStatus, listAuditEvents, log, safeLogAuditEvent, safeUpsertAuditStatus, sbFetch, safeErrorMessage } = require('./_fulfillment')
 
+const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
 
+// Lookup audit status by audit_id + optional session_id
+// Does NOT require email in URL — email is only used as fallback auth
 module.exports = withSentry(async function handler(req, res) {
   setCors(req, res)
-  const requestId = correlationId('audit_status')
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
-  if (!SB_KEY) return res.status(500).json({ error: 'Supabase service key is not configured' })
+  if (!SB_KEY) return res.status(500).json({ error: 'Service not configured' })
 
   const url = new URL(req.url, 'https://musigod.com')
-  const auditId = clean(url.searchParams.get('id') || url.searchParams.get('audit_id'))
+  const auditId = clean(url.searchParams.get('audit_id'))
+  const sessionId = clean(url.searchParams.get('session_id'))
+
+  console.log(JSON.stringify({ event: 'audit_status_fetch', audit_id: auditId || null, session_id: sessionId || null, ts: new Date().toISOString() }))
+
   if (!auditId) {
-    return res.status(400).json({
-      error: 'audit id is required',
-      status: fallbackStatus('ACTION_REQUIRED', 'Audit ID is missing. Use the link from your MusiGod email or contact support.'),
-    })
+    return res.status(400).json({ error: 'audit_id is required' })
   }
 
   try {
-    let status = await getAuditStatus(auditId)
-    const audit = await getAudit(auditId)
+    const rows = await sbFetch(
+      `rights_audits_v1?audit_id=eq.${encodeURIComponent(auditId)}&select=audit_id,status,paid_status,paid_at,artist_name,email,catalog_size,fulfillment_status,fulfillment_error,next_steps_email_sent_at,fulfilled_at,stripe_session_id,created_at,updated_at&limit=1`,
+      'public'
+    )
 
-    if (!status && audit) {
-      const currentStatus = audit.paid_status === 'PAID' ? STATUS.PAID : STATUS.PENDING_PAYMENT
-      status = await safeUpsertAuditStatus({
-        audit_id: auditId,
-        email: audit.email,
-        stripe_session_id: audit.stripe_session_id,
-        current_status: currentStatus,
-        status_message: audit.paid_status === 'PAID' ? 'Payment confirmed. Fulfillment status is being prepared.' : 'Audit request received. Payment is required to unlock review.',
-        estimated_completion: audit.paid_status === 'PAID' ? 'Most paid audits move into review within 1 business day.' : 'Payment unlocks the next-step review queue.',
-      })
+    if (!rows?.length) {
+      console.log(JSON.stringify({ event: 'audit_status_not_found', audit_id: auditId }))
+      return res.status(404).json({ error: 'Audit not found' })
     }
 
-    if (!status) {
-      return res.status(404).json({
-        error: 'Audit status not found',
-        status: fallbackStatus('ACTION_REQUIRED', 'We could not find this audit status. Contact support with your audit ID.'),
-      })
+    const audit = rows[0]
+
+    // If session_id provided and audit has a stripe_session_id, verify they match (prevents URL guessing)
+    if (sessionId && audit.stripe_session_id && audit.stripe_session_id !== sessionId) {
+      console.log(JSON.stringify({ event: 'audit_status_session_mismatch', audit_id: auditId }))
+      // Don't 401 — just return without payment details (graceful)
     }
 
-    await safeLogAuditEvent({
-      audit_id: auditId,
-      event_type: 'artist_viewed_status_page',
-      severity: 'info',
-      source_system: 'frontend',
-      correlation_id: requestId,
-      payload: { user_agent: clean(req.headers['user-agent']) || null },
-    })
+    // Determine effective status for the UI
+    const uiState = resolveUiState(audit, sessionId)
 
-    const events = await listAuditEvents(auditId, 8)
-    log('info', 'AUDIT_STATUS_VIEWED', { request_id: requestId, audit_id: auditId, current_status: status.current_status })
+    console.log(JSON.stringify({ event: 'audit_status_returned', audit_id: auditId, paid_status: audit.paid_status, fulfillment_status: audit.fulfillment_status, ui_state: uiState }))
+
     return res.status(200).json({
-      status: normalizeStatus(status, audit),
-      events: events.map(publicEvent),
-      server_time: new Date().toISOString(),
+      audit_id: audit.audit_id,
+      artist_name: audit.artist_name,
+      paid_status: audit.paid_status,
+      paid_at: audit.paid_at,
+      fulfillment_status: audit.fulfillment_status,
+      fulfilled_at: audit.fulfilled_at,
+      next_steps_email_sent_at: audit.next_steps_email_sent_at,
+      created_at: audit.created_at,
+      ui_state: uiState,
+      // Mask email — only last chars for display
+      email_hint: maskEmail(audit.email),
     })
   } catch (err) {
-    log('error', 'AUDIT_STATUS_LOOKUP_FAILED', { request_id: requestId, audit_id: auditId, message: safeErrorMessage(err) })
-    captureException(err, {
-      route: 'get-audit-status',
-      method: req.method,
-      path: req.url,
-      statusCode: 500,
-    })
-    return res.status(200).json({
-      status: fallbackStatus('ACTION_REQUIRED', 'Status is temporarily unavailable. Your payment flow is not affected. Contact support if this persists.'),
-      events: [],
-      server_time: new Date().toISOString(),
-    })
+    console.error(JSON.stringify({ event: 'audit_status_error', audit_id: auditId, error: err?.message }))
+    captureException(err, { route: 'get-audit-status', audit_id: auditId })
+    return res.status(500).json({ error: 'Status lookup failed' })
   }
 }, 'get-audit-status')
 
-async function getAudit(auditId) {
-  const rows = await sbFetch(
-    `rights_audits_v1?audit_id=eq.${encodeURIComponent(auditId)}&select=audit_id,email,artist_name,paid_status,paid_at,stripe_session_id,next_steps_email_sent_at,fulfilled_at,fulfillment_status,fulfillment_error,n8n_fulfillment_status,created_at&limit=1`,
-    'public'
-  )
-  return rows?.[0] || null
+function resolveUiState(audit, sessionId) {
+  const paid = audit.paid_status === 'PAID'
+  const fulfilled = !!audit.fulfilled_at
+  const emailSent = !!audit.next_steps_email_sent_at
+
+  // Session ID present means artist just came from Stripe — even if webhook is lagging, show paid
+  if (!paid && sessionId) return 'PAYMENT_PROCESSING'
+  if (!paid) return 'UNPAID'
+  if (!fulfilled && !emailSent) return 'PAYMENT_CONFIRMED'
+  if (!fulfilled) return 'EMAIL_SENT'
+  return 'FULFILLED'
 }
 
-function normalizeStatus(status, audit) {
-  return {
-    audit_id: status.audit_id,
-    email: status.email || audit?.email || null,
-    artist_name: audit?.artist_name || null,
-    current_status: status.current_status,
-    status_message: status.status_message || defaultMessage(status.current_status),
-    estimated_completion: status.estimated_completion || defaultEstimate(status.current_status),
-    last_error: status.last_error || null,
-    paid_status: audit?.paid_status || (status.current_status === STATUS.PENDING_PAYMENT ? 'UNPAID' : 'PAID'),
-    stripe_session_id_present: Boolean(status.stripe_session_id || audit?.stripe_session_id),
-    next_steps_email_sent_at: audit?.next_steps_email_sent_at || null,
-    fulfilled_at: audit?.fulfilled_at || status.completed_at || null,
-    fulfillment_status: audit?.fulfillment_status || null,
-    n8n_fulfillment_status: audit?.n8n_fulfillment_status || null,
-    updated_at: status.updated_at,
-    created_at: status.created_at,
-  }
+function maskEmail(email) {
+  if (!email || !email.includes('@')) return ''
+  const [local, domain] = email.split('@')
+  const masked = local.length > 2 ? local[0] + '*'.repeat(local.length - 2) + local.slice(-1) : local
+  return `${masked}@${domain}`
 }
 
-function publicEvent(event) {
-  return {
-    event_type: event.event_type,
-    severity: event.severity,
-    source_system: event.source_system,
-    created_at: event.created_at,
-  }
+async function sbFetch(path, schema) {
+  const response = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    method: 'GET',
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Accept-Profile': schema },
+  })
+  const text = await response.text()
+  if (!response.ok) throw new Error(`Supabase GET ${path} failed: ${response.status} ${text.slice(0, 200)}`)
+  return text ? JSON.parse(text) : null
 }
 
-function fallbackStatus(currentStatus, message) {
-  return {
-    audit_id: null,
-    current_status: currentStatus,
-    status_message: message,
-    estimated_completion: 'Support can confirm status manually.',
-    paid_status: 'UNKNOWN',
-    stripe_session_id_present: false,
-    updated_at: new Date().toISOString(),
-  }
-}
-
-function defaultMessage(status) {
-  if (status === STATUS.PENDING_PAYMENT) return 'Waiting for payment confirmation.'
-  if (status === STATUS.PAID) return 'Payment confirmed.'
-  if (status === STATUS.FULFILLMENT_QUEUED) return 'Fulfillment is queued.'
-  if (status === STATUS.PROCESSING) return 'MusiGod is reviewing your audit.'
-  if (status === STATUS.COMPLETED) return 'Fulfillment is complete.'
-  if (status === STATUS.FAILED_RETRYING) return 'MusiGod operations is retrying fulfillment.'
-  return 'MusiGod needs additional action to complete this audit.'
-}
-
-function defaultEstimate(status) {
-  if (status === STATUS.COMPLETED) return 'Complete.'
-  if (status === STATUS.ACTION_REQUIRED || status === STATUS.FAILED_RETRYING) return 'Operations will review and follow up.'
-  return 'Most paid audits begin review within 1 business day.'
-}
+function clean(v) { return String(v || '').trim() }
 
 function setCors(req, res) {
   const origin = req.headers.origin || ''
@@ -146,8 +104,4 @@ function setCors(req, res) {
   res.setHeader('Vary', 'Origin')
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-}
-
-function clean(value) {
-  return String(value || '').trim()
 }
