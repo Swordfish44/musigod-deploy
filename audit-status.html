@@ -7,84 +7,275 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/audit-status.css">
-  <script>
-    window.MUSIGOD_PUBLIC_CONFIG_READY = fetch('/api/public-config', { credentials: 'same-origin' })
-      .then(function (response) { return response.ok ? response.json() : {}; })
-      .then(function (config) {
-        window.MUSIGOD_SENTRY_DSN = config.sentryDsn || '';
-        window.MUSIGOD_ENVIRONMENT = config.environment || 'production';
-      })
-      .catch(function () {
-        window.MUSIGOD_SENTRY_DSN = '';
-        window.MUSIGOD_ENVIRONMENT = 'production';
-      });
-  </script>
-  <script src="/sentry-browser.js"></script>
+<style>
+  :root{--red:#C8102E;--red2:#E8262A;--black:#080808;--bg:#0c0c0c;--bg2:#111;--bg3:#1a1a1a;--line:rgba(255,255,255,0.08);--text:#e8e8e8;--muted:#888;--dim:#555;--green:#22c55e;--amber:#f0a020}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--black);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column}
+  header{height:64px;background:rgba(12,12,12,0.96);border-bottom:1px solid rgba(200,16,46,0.2);display:flex;align-items:center;justify-content:space-between;padding:0 32px;position:sticky;top:0;z-index:20}
+  .logo{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:0.14em;color:#fff;text-decoration:none}.logo span{color:var(--red)}
+  main{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:48px 20px 80px}
+  .card{width:100%;max-width:580px}
+
+  /* Status badge */
+  .status-icon{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 28px}
+  .icon-paid{background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.35)}
+  .icon-processing{background:rgba(240,160,32,0.1);border:1px solid rgba(240,160,32,0.35)}
+  .icon-unpaid{background:rgba(200,16,46,0.1);border:1px solid rgba(200,16,46,0.25)}
+
+  /* Main headline */
+  .headline{font-family:'Bebas Neue',sans-serif;font-size:clamp(32px,6vw,52px);letter-spacing:0.06em;color:#fff;text-align:center;margin-bottom:10px}
+  .sub{text-align:center;color:#888;font-size:15px;line-height:1.7;margin-bottom:36px}
+
+  /* Info block */
+  .info-block{background:var(--bg);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:20px}
+  .info-row{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line)}
+  .info-row:last-child{border-bottom:none}
+  .info-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.12em;color:var(--dim)}
+  .info-value{font-size:14px;color:#ddd;text-align:right;max-width:60%}
+  .badge{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;padding:4px 10px;border-radius:4px}
+  .badge-paid{background:rgba(34,197,94,0.12);color:#4ade80;border:1px solid rgba(34,197,94,0.25)}
+  .badge-processing{background:rgba(240,160,32,0.12);color:#fbbf24;border:1px solid rgba(240,160,32,0.25)}
+  .badge-unpaid{background:rgba(200,16,46,0.1);color:#f87171;border:1px solid rgba(200,16,46,0.2)}
+
+  /* Next steps */
+  .steps-block{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:22px;margin-bottom:20px}
+  .steps-title{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.14em;color:var(--red);margin-bottom:16px}
+  .step{display:flex;gap:14px;margin-bottom:14px}
+  .step:last-child{margin-bottom:0}
+  .step-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--red);min-width:24px;margin-top:1px}
+  .step-text{font-size:14px;color:#aaa;line-height:1.6}
+  .step-text strong{color:#ddd}
+
+  /* Alert blocks */
+  .alert{border-radius:6px;padding:16px 20px;font-size:13px;line-height:1.7;margin-bottom:20px}
+  .alert-green{background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-left:3px solid var(--green);color:#aaa}
+  .alert-amber{background:rgba(240,160,32,0.06);border:1px solid rgba(240,160,32,0.2);border-left:3px solid var(--amber);color:#aaa}
+  .alert-red{background:rgba(200,16,46,0.06);border:1px solid rgba(200,16,46,0.18);border-left:3px solid var(--red);color:#aaa}
+  .alert strong{display:block;margin-bottom:6px;letter-spacing:0.06em}
+  .alert-green strong{color:var(--green)}
+  .alert-amber strong{color:var(--amber)}
+  .alert-red strong{color:var(--red)}
+
+  .btn{display:inline-block;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.1em;padding:13px 28px;border-radius:4px;text-decoration:none;text-align:center;cursor:pointer;border:0;width:100%;margin-bottom:10px}
+  .btn-red{background:var(--red);color:#fff}.btn-red:hover{background:#a00d25}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--muted)}.btn-ghost:hover{border-color:rgba(255,255,255,0.2);color:#ccc}
+
+  .support-line{text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:var(--dim);margin-top:8px}
+  .support-line a{color:var(--muted);text-decoration:none}.support-line a:hover{color:#ccc}
+
+  /* Skeleton loader */
+  .skeleton{background:linear-gradient(90deg,var(--bg2) 25%,var(--bg3) 50%,var(--bg2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:4px;height:16px;margin-bottom:8px}
+  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  .loading-state{padding:20px 0}
+
+  footer{border-top:1px solid var(--line);padding:20px 32px;color:#333;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;text-align:center}
+
+  @media(max-width:600px){header{padding:0 18px}main{padding:32px 16px 60px}.info-value{max-width:55%}}
+</style>
 </head>
 <body>
-<header class="topbar">
+<header>
   <a class="logo" href="/"><span>MUSI</span>GOD</a>
-  <span class="toplink">PAYMENT CONFIRMED</span>
 </header>
 
-<main class="shell">
-  <section class="hero">
-    <p class="eyebrow">POST-PAYMENT STATUS</p>
-    <h1>Payment received. Your audit is unlocked and in progress.</h1>
-    <p>Your audit request was received. This page shows the current status, next steps, estimated turnaround, support guidance, and what to watch for in your email.</p>
-  </section>
+<main>
+  <div class="card">
+    <div id="loading-state" class="loading-state">
+      <div class="skeleton" style="width:72px;height:72px;border-radius:50%;margin:0 auto 28px"></div>
+      <div class="skeleton" style="width:70%;margin:0 auto 10px;height:40px"></div>
+      <div class="skeleton" style="width:50%;margin:0 auto 36px;height:16px"></div>
+      <div class="skeleton" style="height:160px;margin-bottom:20px;border-radius:8px"></div>
+      <div class="skeleton" style="height:200px;border-radius:8px"></div>
+    </div>
 
-  <section class="status-card" id="status-card" aria-live="polite">
-    <div class="status-head">
-      <div>
-        <p class="label">CURRENT STATUS</p>
-        <h2 id="status-title">Loading status</h2>
+    <div id="paid-state" style="display:none">
+      <div class="status-icon icon-paid">&#10003;</div>
+      <div class="headline">AUDIT UNLOCKED</div>
+      <p class="sub">Payment confirmed. Your MusiGod Rights Audit is active.</p>
+
+      <div class="info-block">
+        <div class="info-row"><span class="info-label">PAYMENT</span><span class="badge badge-paid">CONFIRMED</span></div>
+        <div class="info-row"><span class="info-label">ARTIST</span><span class="info-value" id="artist-name-paid">—</span></div>
+        <div class="info-row"><span class="info-label">AUDIT ID</span><span class="info-value" style="font-family:'DM Mono',monospace;font-size:12px" id="audit-id-paid">—</span></div>
+        <div class="info-row"><span class="info-label">PAID AT</span><span class="info-value" id="paid-at">—</span></div>
+        <div class="info-row"><span class="info-label">EMAIL SENT TO</span><span class="info-value" id="email-hint">—</span></div>
       </div>
-      <div class="pulse" id="pulse"></div>
-    </div>
-    <p class="message" id="status-message">Checking your MusiGod audit status now.</p>
-    <div class="progress">
-      <div class="progress-fill" id="progress-fill"></div>
-    </div>
-    <div class="meta-grid">
-      <div><span>Audit ID</span><strong id="audit-id">-</strong></div>
-      <div><span>Payment</span><strong id="paid-status">Checking</strong></div>
-      <div><span>Estimated turnaround</span><strong id="estimate">Loading</strong></div>
-      <div><span>Latest update</span><strong id="latest-update">Loading</strong></div>
-    </div>
-  </section>
 
-  <section class="panel-grid">
-    <div class="panel">
-      <p class="label">NEXT STEPS</p>
-      <h3>Check your email for confirmation</h3>
-      <p>Your paid audit is unlocked. MusiGod will review the audit request and contact you if distributor, PRO, publishing admin, SoundExchange, or label-access details are needed. Most paid audits begin review within 1 business day.</p>
-      <p>If you do not see the email, check spam or promotions first. If it still does not appear shortly, contact support with the payment email used at checkout.</p>
-      <a class="btn" href="mailto:support@musigod.com?subject=Rights Audit status">Contact support</a>
-    </div>
-    <div class="panel">
-      <p class="label">WHAT MUSIGOD REVIEWS</p>
-      <ul>
-        <li>Missing PRO, publisher, SoundExchange, and neighboring rights registrations.</li>
-        <li>DSP profile claims, YouTube Content ID, metadata, and identifier gaps.</li>
-        <li>Publishing, master-rights, and royalty recovery opportunities.</li>
-      </ul>
-    </div>
-  </section>
-
-  <section class="events panel">
-    <div class="events-head">
-      <div>
-        <p class="label">LATEST UPDATE</p>
-        <h3>Fulfillment activity</h3>
+      <div class="alert alert-green">
+        <strong>&#9993; CHECK YOUR EMAIL</strong>
+        We sent your audit confirmation and next steps to the email you provided. Check spam if you don't see it within 5 minutes.
       </div>
-      <span id="poll-state">Polling every 10 seconds</span>
+
+      <div class="steps-block">
+        <div class="steps-title">WHAT HAPPENS NEXT</div>
+        <div class="step"><span class="step-num">01</span><span class="step-text"><strong>Our team reviews your catalog</strong> — PRO registrations, DSP claims, SoundExchange, YouTube Content ID, and royalty collection gaps.</span></div>
+        <div class="step"><span class="step-num">02</span><span class="step-text"><strong>Reply to your confirmation email</strong> with any distributor credentials, PRO login info, or release details to accelerate the process.</span></div>
+        <div class="step"><span class="step-num">03</span><span class="step-text"><strong>Turnaround: 3–5 business days.</strong> You'll receive an email with findings and your recommended action plan.</span></div>
+        <div class="step"><span class="step-num">04</span><span class="step-text"><strong>Questions?</strong> Reply to your confirmation email or contact <a href="mailto:support@musigod.com" style="color:var(--red)">support@musigod.com</a>.</span></div>
+      </div>
     </div>
-    <div id="event-list" class="event-list">No events loaded yet.</div>
-  </section>
+
+    <div id="processing-state" style="display:none">
+      <div class="status-icon icon-processing">&#9203;</div>
+      <div class="headline">PROCESSING</div>
+      <p class="sub">Payment received. Finalizing your audit activation now.</p>
+
+      <div class="alert alert-amber">
+        <strong>&#128337; JUST A MOMENT</strong>
+        Your payment was received. We're activating your audit now — this takes 10–30 seconds. Refresh this page in a moment if the status hasn't updated.
+      </div>
+
+      <div class="info-block">
+        <div class="info-row"><span class="info-label">PAYMENT</span><span class="badge badge-processing">PROCESSING</span></div>
+        <div class="info-row"><span class="info-label">AUDIT ID</span><span class="info-value" style="font-family:'DM Mono',monospace;font-size:12px" id="audit-id-processing">—</span></div>
+      </div>
+
+      <button class="btn btn-ghost" onclick="location.reload()">REFRESH STATUS</button>
+      <div class="support-line">Questions? <a href="mailto:support@musigod.com">support@musigod.com</a></div>
+    </div>
+
+    <div id="unpaid-state" style="display:none">
+      <div class="status-icon icon-unpaid">&#33;</div>
+      <div class="headline">NOT UNLOCKED</div>
+      <p class="sub">This audit has not been paid. Complete checkout to unlock your full audit.</p>
+
+      <div class="alert alert-red">
+        <strong>PAYMENT REQUIRED</strong>
+        Your rights audit is on file but has not been unlocked yet. Click below to complete checkout.
+      </div>
+
+      <div class="info-block">
+        <div class="info-row"><span class="info-label">AUDIT ID</span><span class="info-value" style="font-family:'DM Mono',monospace;font-size:12px" id="audit-id-unpaid">—</span></div>
+        <div class="info-row"><span class="info-label">ARTIST</span><span class="info-value" id="artist-name-unpaid">—</span></div>
+      </div>
+
+      <button class="btn btn-red" id="unlock-btn" onclick="goToCheckout()">UNLOCK FULL AUDIT</button>
+      <div class="support-line">Questions? <a href="mailto:support@musigod.com">support@musigod.com</a></div>
+    </div>
+
+    <div id="error-state" style="display:none">
+      <div class="status-icon icon-unpaid">&#63;</div>
+      <div class="headline">STATUS UNAVAILABLE</div>
+      <p class="sub" id="error-message">We couldn't load your audit status. Please try again or contact support.</p>
+      <button class="btn btn-ghost" onclick="location.reload()" style="margin-bottom:10px">TRY AGAIN</button>
+      <a class="btn btn-ghost" href="mailto:support@musigod.com">EMAIL SUPPORT</a>
+    </div>
+  </div>
 </main>
 
-<script src="/audit-status.js"></script>
+<footer>MUSIGOD PUBLISHING ADMINISTRATION — RIGHTS AUDIT STATUS</footer>
+
+<script>
+(function() {
+  var params = new URLSearchParams(window.location.search)
+  var auditId = params.get('audit_id') || ''
+  var sessionId = params.get('session_id') || ''
+
+  // Persist for lookup convenience
+  if (auditId) localStorage.setItem('musigod_rights_audit_id', auditId)
+
+  function show(id) {
+    var ids = ['loading-state','paid-state','processing-state','unpaid-state','error-state']
+    ids.forEach(function(sid) {
+      document.getElementById(sid).style.display = (sid === id) ? 'block' : 'none'
+    })
+  }
+
+  function setText(id, val) {
+    var el = document.getElementById(id)
+    if (el) el.textContent = val || '—'
+  }
+
+  function renderPaid(data) {
+    setText('artist-name-paid', data.artist_name)
+    setText('audit-id-paid', data.audit_id)
+    setText('paid-at', data.paid_at ? new Date(data.paid_at).toLocaleString() : '—')
+    setText('email-hint', data.email_hint || '—')
+    show('paid-state')
+  }
+
+  function renderProcessing(data) {
+    setText('audit-id-processing', (data && data.audit_id) || auditId)
+    show('processing-state')
+    // Auto-retry once after 8 seconds
+    setTimeout(function() { location.reload() }, 8000)
+  }
+
+  function renderUnpaid(data) {
+    setText('audit-id-unpaid', data.audit_id)
+    setText('artist-name-unpaid', data.artist_name)
+    show('unpaid-state')
+  }
+
+  function renderError(msg) {
+    var el = document.getElementById('error-message')
+    if (el && msg) el.textContent = msg
+    show('error-state')
+  }
+
+  function goToCheckout() {
+    var email = localStorage.getItem('musigod_rights_audit_email') || ''
+    if (!auditId || !email) {
+      window.location.href = '/rights-audit.html'
+      return
+    }
+    var btn = document.getElementById('unlock-btn')
+    btn.textContent = 'OPENING CHECKOUT...'
+    btn.disabled = true
+    fetch('/api/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan: 'rights_audit_unlock', audit_id: auditId, email: email })
+    })
+    .then(function(r) { return r.json() })
+    .then(function(body) {
+      if (body.url) window.location.href = body.url
+      else throw new Error(body.error || 'Checkout failed')
+    })
+    .catch(function(err) {
+      btn.textContent = 'UNLOCK FULL AUDIT'
+      btn.disabled = false
+      alert('Could not open checkout: ' + err.message)
+    })
+  }
+
+  window.goToCheckout = goToCheckout
+
+  if (!auditId) {
+    renderError('No audit ID in URL. Check your email for the link or visit the rights audit page.')
+    return
+  }
+
+  // Fetch status
+  var statusUrl = '/api/get-audit-status?audit_id=' + encodeURIComponent(auditId)
+  if (sessionId) statusUrl += '&session_id=' + encodeURIComponent(sessionId)
+
+  fetch(statusUrl)
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(b) { throw new Error(b.error || 'HTTP ' + r.status) })
+      return r.json()
+    })
+    .then(function(data) {
+      var state = data.ui_state
+      if (state === 'FULFILLED' || state === 'EMAIL_SENT' || state === 'PAYMENT_CONFIRMED') {
+        renderPaid(data)
+      } else if (state === 'PAYMENT_PROCESSING') {
+        renderProcessing(data)
+      } else if (state === 'UNPAID') {
+        renderUnpaid(data)
+      } else {
+        renderPaid(data) // fail-soft: if we don't recognize state, show paid (better than blank)
+      }
+    })
+    .catch(function(err) {
+      // If session_id is present, artist came straight from Stripe — show processing, not error
+      if (sessionId) {
+        renderProcessing(null)
+      } else {
+        renderError('Could not load audit status. Please try again or contact support@musigod.com.')
+      }
+    })
+})()
+</script>
 </body>
 </html>
