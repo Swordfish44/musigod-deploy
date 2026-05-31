@@ -280,7 +280,13 @@ BEGIN
     v_narrative := v_narrative || 'MusiGod recommends immediate action on all identified issues. Artists retain full ownership throughout the recovery process.';
   END IF;
 
-  -- Upsert narrative
+  -- Delete existing and re-insert (clean upsert without unique constraint dep)
+  DELETE FROM registrations.audit_narratives_v1
+  WHERE artist_email = p_artist_email
+    AND narrative_type = 'EXECUTIVE_SUMMARY'
+    AND (p_audit_id IS NULL OR audit_id = p_audit_id)
+    AND admin_overridden = false;
+
   INSERT INTO registrations.audit_narratives_v1 (
     artist_email, artist_id, audit_id, report_id,
     narrative_type, narrative_text, confidence_level
@@ -288,20 +294,7 @@ BEGIN
     p_artist_email, p_artist_id, p_audit_id, p_report_id,
     'EXECUTIVE_SUMMARY', v_narrative, v_confidence
   )
-  ON CONFLICT DO NOTHING
   RETURNING * INTO v_row;
-
-  IF v_row.id IS NULL THEN
-    -- Update existing
-    UPDATE registrations.audit_narratives_v1
-    SET narrative_text = v_narrative,
-        confidence_level = v_confidence,
-        updated_at = now()
-    WHERE artist_email = p_artist_email
-      AND narrative_type = 'EXECUTIVE_SUMMARY'
-      AND (p_audit_id IS NULL OR audit_id = p_audit_id)
-    RETURNING * INTO v_row;
-  END IF;
 
   RETURN v_row;
 END;
@@ -399,6 +392,10 @@ BEGIN
     'open_recovery_cases', v_open_cases
   );
 
+  DELETE FROM registrations.audit_scores_v1
+  WHERE artist_email = p_artist_email
+    AND (p_audit_id IS NULL OR audit_id = p_audit_id);
+
   INSERT INTO registrations.audit_scores_v1 (
     artist_email, artist_id, audit_id,
     confidence_score, financial_impact_score, urgency_score,
@@ -408,23 +405,7 @@ BEGIN
     v_confidence, v_financial_impact, v_urgency,
     v_recovery_prob, v_op_priority, v_factors
   )
-  ON CONFLICT DO NOTHING
   RETURNING * INTO v_row;
-
-  IF v_row.id IS NULL THEN
-    UPDATE registrations.audit_scores_v1
-    SET confidence_score = v_confidence,
-        financial_impact_score = v_financial_impact,
-        urgency_score = v_urgency,
-        recovery_probability = v_recovery_prob,
-        operational_priority_score = v_op_priority,
-        score_factors = v_factors,
-        score_version = score_version + 1,
-        updated_at = now()
-    WHERE artist_email = p_artist_email
-      AND (p_audit_id IS NULL OR audit_id = p_audit_id)
-    RETURNING * INTO v_row;
-  END IF;
 
   RETURN v_row;
 END;
@@ -695,15 +676,17 @@ ON CONFLICT (rule_name) DO NOTHING;
 
 DO $$
 DECLARE
-  v_narrative registrations.audit_narratives_v1;
-  v_score     registrations.audit_scores_v1;
-  v_leakage   registrations.royalty_leakage_scores_v1;
-  v_runs      integer;
+  v_leakage_score integer;
+  v_runs          integer;
 BEGIN
-  SELECT registrations.fn_generate_narrative_v1('swordfishlp44@proton.me', NULL, '3d4788b6-2a86-4ed5-8f27-ab95b3a230d3') INTO v_narrative;
-  SELECT registrations.fn_recalculate_audit_scores_v1('swordfishlp44@proton.me', NULL, '3d4788b6-2a86-4ed5-8f27-ab95b3a230d3') INTO v_score;
-  SELECT registrations.fn_calculate_leakage_score_v1('swordfishlp44@proton.me', NULL, '3d4788b6-2a86-4ed5-8f27-ab95b3a230d3') INTO v_leakage;
+  PERFORM registrations.fn_generate_narrative_v1('swordfishlp44@proton.me', NULL, '3d4788b6-2a86-4ed5-8f27-ab95b3a230d3'::uuid);
+  PERFORM registrations.fn_recalculate_audit_scores_v1('swordfishlp44@proton.me', NULL, '3d4788b6-2a86-4ed5-8f27-ab95b3a230d3'::uuid);
+
+  SELECT leakage_score INTO v_leakage_score
+  FROM registrations.fn_calculate_leakage_score_v1('swordfishlp44@proton.me', NULL, '3d4788b6-2a86-4ed5-8f27-ab95b3a230d3'::uuid);
+
   SELECT registrations.fn_process_audit_findings_v1('swordfishlp44@proton.me', NULL) INTO v_runs;
-  RAISE NOTICE 'Intelligence pipeline complete. Leakage score: %, Automation runs: %', v_leakage.leakage_score, v_runs;
+
+  RAISE NOTICE 'Intelligence pipeline complete. Leakage score: %, Automation runs: %', v_leakage_score, v_runs;
 END;
 $$;
