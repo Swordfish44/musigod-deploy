@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod — Intelligence Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap" rel="stylesheet">
+<style>
+  :root{--red:#E8262A;--red-dark:#B81E22;--black:#0A0A0A;--surface:#111111;--surface-2:#1A1A1A;--surface-3:#252525;--border:rgba(255,255,255,0.08);--border-mid:rgba(255,255,255,0.14);--text:#FFFFFF;--text-dim:#999999;--text-muted:#555555;--green:#22C55E;--amber:#F59E0B;--blue:#3B82F6;--purple:#A855F7;}
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--black);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;}
+  header{position:sticky;top:0;z-index:100;background:rgba(10,10,10,0.96);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:64px;}
+  .logo{font-size:1.4rem;font-weight:800;letter-spacing:-0.01em;text-decoration:none;}.logo-musi{color:#fff;}.logo-god{color:var(--red);}
+  nav{display:flex;align-items:center;gap:0.25rem;}
+  nav a{font-size:0.72rem;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-dim);text-decoration:none;padding:0.45rem 0.9rem;border-radius:4px;}
+  nav a:hover{color:var(--text);}nav a.active{color:var(--text);}
+  .hero{border-bottom:1px solid var(--border);padding:2.5rem 2rem;}
+  .hero-inner{max-width:1400px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;}
+  .hero-eyebrow{font-size:0.68rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--red);margin-bottom:0.5rem;}
+  .hero h1{font-size:clamp(1.5rem,3vw,2.2rem);font-weight:800;letter-spacing:-0.02em;}
+  main{max-width:1400px;margin:0 auto;padding:2rem;}
+  .auth-gate{max-width:480px;margin:4rem auto;text-align:center;}
+  .auth-input{width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:0.88rem;padding:0.7rem 1rem;border-radius:6px;outline:none;margin-bottom:0.75rem;}
+  .btn{font-size:0.72rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;border:none;padding:0.6rem 1.25rem;border-radius:4px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:0.35rem;transition:background 0.15s;}
+  .btn-primary{background:var(--red);color:#fff;}.btn-primary:hover{background:var(--red-dark);}
+  .btn-sm{padding:0.28rem 0.65rem;font-size:0.62rem;}
+  .btn-ghost{background:var(--surface-2);color:var(--text-dim);border:1px solid var(--border);}
+  .btn-ghost:hover{background:var(--surface-3);color:var(--text);}
+
+  /* KPI strip */
+  .kpi-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:2rem;}
+  .kpi-cell{background:var(--surface);padding:1.25rem 1rem;}
+  .kpi-label{font-size:0.58rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.3rem;}
+  .kpi-val{font-size:1.75rem;font-weight:800;letter-spacing:-0.02em;line-height:1;}
+  .kpi-sub{font-size:0.65rem;color:var(--text-muted);margin-top:0.2rem;}
+
+  /* Grid layout */
+  .intel-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;}
+  .intel-grid .full{grid-column:1/-1;}
+  @media(max-width:900px){.intel-grid{grid-template-columns:1fr;}}
+
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .panel-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border);}
+  .panel-title{font-size:0.62rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);}
+  .panel-count{font-size:0.7rem;color:var(--text-muted);}
+  .panel-body{padding:0;}
+
+  /* Rows */
+  .intel-row{display:flex;align-items:center;justify-content:space-between;gap:0.75rem;padding:0.75rem 1.25rem;border-bottom:1px solid var(--border);transition:background 0.15s;}
+  .intel-row:last-child{border-bottom:none;}
+  .intel-row:hover{background:var(--surface-2);}
+  .intel-row-left{flex:1;min-width:0;}
+  .intel-row-title{font-size:0.8rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .intel-row-meta{font-size:0.68rem;color:var(--text-muted);margin-top:0.1rem;}
+  .intel-row-right{text-align:right;flex-shrink:0;}
+  .intel-val{font-size:0.9rem;font-weight:700;}
+  .intel-sub{font-size:0.62rem;color:var(--text-muted);}
+
+  /* Leakage gauge */
+  .leakage-gauge{display:inline-flex;align-items:center;gap:0.4rem;}
+  .gauge-bar{width:48px;height:6px;background:var(--surface-3);border-radius:3px;overflow:hidden;}
+  .gauge-fill{height:100%;border-radius:3px;transition:width 0.3s;}
+
+  /* Badges */
+  .badge{font-size:0.57rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:0.22rem 0.55rem;border-radius:3px;}
+  .badge-critical{background:rgba(232,38,42,0.2);color:var(--red);}
+  .badge-high{background:rgba(245,158,11,0.15);color:var(--amber);}
+  .badge-medium{background:rgba(59,130,246,0.15);color:var(--blue);}
+  .badge-low{background:rgba(255,255,255,0.06);color:var(--text-muted);}
+  .badge-minimal{background:rgba(34,197,94,0.1);color:var(--green);}
+  .badge-open{background:rgba(59,130,246,0.1);color:var(--blue);}
+  .badge-blocked{background:rgba(232,38,42,0.15);color:var(--red);}
+  .badge-urgent{background:rgba(232,38,42,0.2);color:var(--red);}
+
+  .loading-state,.empty-state{padding:2rem;text-align:center;color:var(--text-muted);font-size:0.78rem;}
+  .spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 0.75rem;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .alert-bar{background:rgba(232,38,42,0.08);border:1px solid rgba(232,38,42,0.2);border-radius:6px;padding:0.75rem 1.25rem;font-size:0.8rem;color:var(--text-dim);margin-bottom:1.5rem;display:none;}
+  .alert-bar.show{display:block;}
+
+  .refresh-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;font-size:0.7rem;color:var(--text-muted);}
+
+  footer{margin-top:4rem;padding:1.5rem 2rem;border-top:1px solid var(--border);text-align:center;}
+  footer p{font-size:0.72rem;color:var(--text-muted);}
+  @media(max-width:768px){header{padding:0 1rem;}main{padding:1rem;}.hero{padding:1.5rem 1rem;}.kpi-strip{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+<header>
+  <a href="/admin.html" class="logo"><span class="logo-musi">MUSI</span><span class="logo-god">GOD</span></a>
+  <nav>
+    <a href="/admin.html">Admin</a>
+    <a href="/admin-queues.html">Queues</a>
+    <a href="/admin-findings.html">Findings</a>
+    <a href="/admin-intelligence.html" class="active">Intelligence</a>
+    <a href="/recovered-money.html">Recovery</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div>
+      <p class="hero-eyebrow">Admin · Operations</p>
+      <h1>Intelligence Command Center</h1>
+    </div>
+    <button class="btn btn-ghost" onclick="loadAll()">↻ Refresh</button>
+  </div>
+</div>
+
+<main>
+  <div id="auth-gate" class="auth-gate">
+    <h2>Admin Access Required</h2>
+    <input type="password" class="auth-input" id="admin-key-input" placeholder="Admin key" onkeydown="if(event.key==='Enter')authenticate()">
+    <br><button class="btn btn-primary" onclick="authenticate()">ACCESS INTELLIGENCE</button>
+  </div>
+
+  <div id="admin-content" style="display:none">
+    <div class="alert-bar" id="alert-bar"></div>
+
+    <div class="refresh-bar">
+      <span id="last-refresh">Loading…</span>
+      <button class="btn btn-ghost btn-sm" onclick="loadAll()">↻ Refresh</button>
+    </div>
+
+    <!-- KPI Strip -->
+    <div class="kpi-strip" id="kpi-strip">
+      <div class="loading-state" style="grid-column:1/-1;padding:1.5rem">
+        <div class="spinner"></div>
+      </div>
+    </div>
+
+    <!-- Intelligence grid -->
+    <div class="intel-grid">
+
+      <!-- High Recovery Opportunities -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Highest Recovery Opportunities</div>
+          <div class="panel-count" id="cnt-recovery"></div>
+        </div>
+        <div class="panel-body" id="panel-recovery">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Highest Leakage Scores -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Royalty Leakage Score™ — Top Artists</div>
+          <div class="panel-count" id="cnt-leakage"></div>
+        </div>
+        <div class="panel-body" id="panel-leakage">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Stalled Cases -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Stalled Recovery Cases <span style="font-size:0.6rem;color:var(--amber)">(14+ days idle)</span></div>
+          <div class="panel-count" id="cnt-stalled"></div>
+        </div>
+        <div class="panel-body" id="panel-stalled">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Queue Bottlenecks -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Queue Bottlenecks</div>
+          <div class="panel-count" id="cnt-queues"></div>
+        </div>
+        <div class="panel-body" id="panel-queues">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Critical Findings -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">High-Confidence Critical Findings</div>
+          <div class="panel-count" id="cnt-findings"></div>
+        </div>
+        <div class="panel-body" id="panel-findings">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Pending Document Reviews -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Pending Document Reviews</div>
+          <div class="panel-count" id="cnt-docs"></div>
+        </div>
+        <div class="panel-body" id="panel-docs">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Recent Activity — full width -->
+      <div class="panel full">
+        <div class="panel-header">
+          <div class="panel-title">Recent Recovery Activity</div>
+          <div class="panel-count" id="cnt-activity"></div>
+        </div>
+        <div class="panel-body" id="panel-activity">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<footer><p>MusiGod Intelligence Command Center · Admin only.</p></footer>
+
+<script>
+let ADMIN_KEY = sessionStorage.getItem('musigod_admin_key') || ''
+if (ADMIN_KEY) showContent()
+
+function authenticate() {
+  const key = document.getElementById('admin-key-input').value.trim()
+  if (!key) return
+  ADMIN_KEY = key
+  sessionStorage.setItem('musigod_admin_key', key)
+  showContent()
+}
+
+function showContent() {
+  document.getElementById('auth-gate').style.display = 'none'
+  document.getElementById('admin-content').style.display = 'block'
+  loadAll()
+}
+
+async function loadAll() {
+  try {
+    const res = await fetch('/api/get-admin-intelligence', {
+      headers: { 'x-admin-key': ADMIN_KEY }
+    })
+    if (res.status === 401) {
+      ADMIN_KEY = ''
+      sessionStorage.removeItem('musigod_admin_key')
+      document.getElementById('auth-gate').style.display = 'block'
+      document.getElementById('admin-content').style.display = 'none'
+      return
+    }
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Load failed')
+
+    document.getElementById('last-refresh').textContent = 'Last refreshed: ' + new Date().toLocaleTimeString()
+
+    renderKPIs(data.summary)
+    renderRecovery(data.high_recovery_opportunities)
+    renderLeakage(data.high_leakage_artists)
+    renderStalled(data.stalled_cases)
+    renderQueues(data.queue_bottlenecks)
+    renderFindings(data.critical_findings)
+    renderDocs(data.pending_doc_reviews)
+    renderActivity(data.recent_activity)
+
+    // Show alert if critical issues
+    const s = data.summary
+    if (s.critical_open_findings > 0 || s.blocked_queue_tasks > 0 || s.failed_automation > 0) {
+      const parts = []
+      if (s.critical_open_findings > 0) parts.push(s.critical_open_findings + ' critical findings unreviewed')
+      if (s.blocked_queue_tasks > 0) parts.push(s.blocked_queue_tasks + ' blocked queue tasks')
+      if (s.failed_automation > 0) parts.push(s.failed_automation + ' failed automation runs')
+      const alert = document.getElementById('alert-bar')
+      alert.textContent = '⚠ Action required: ' + parts.join(' · ')
+      alert.classList.add('show')
+    }
+
+  } catch (err) {
+    document.getElementById('last-refresh').textContent = 'Error: ' + err.message
+  }
+}
+
+function renderKPIs(s) {
+  if (!s) return
+  document.getElementById('kpi-strip').innerHTML = [
+    ['Total Identified',    '$' + fmt(s.total_identified),    'var(--amber)',  'Royalties identified'],
+    ['Total Recovered',     '$' + fmt(s.total_recovered),     'var(--green)',  'Confirmed recovered'],
+    ['Fees Projected',      '$' + fmt(s.total_fees_projected),'var(--blue)',   '15% of recoveries'],
+    ['Open Cases',          s.open_cases,                     '#fff',          'Active recovery'],
+    ['Open Findings',       s.open_findings,                  '#fff',          'Pending review'],
+    ['Critical Findings',   s.critical_open_findings,         s.critical_open_findings > 0 ? 'var(--red)' : '#fff', 'Immediate action'],
+    ['Open Queue Tasks',    s.open_queue_tasks,               '#fff',          'In operations'],
+    ['Urgent Tasks',        s.urgent_tasks,                   s.urgent_tasks > 0 ? 'var(--red)' : '#fff', 'Priority'],
+    ['Avg Leakage Score',   (s.avg_leakage_score || 0) + '%', leakageColor(s.avg_leakage_score), 'Portfolio average'],
+    ['High Leakage Artists',s.high_leakage_artists,           s.high_leakage_artists > 0 ? 'var(--amber)' : '#fff', 'Score ≥70'],
+    ['Pending Docs',        s.pending_doc_reviews,            '#fff',          'Awaiting review'],
+    ['Ready Reports',       s.ready_reports,                  'var(--green)',  'Generated'],
+  ].map(([l, v, c, sub]) => `
+    <div class="kpi-cell">
+      <div class="kpi-label">${l}</div>
+      <div class="kpi-val" style="color:${c}">${esc(String(v ?? '—'))}</div>
+      <div class="kpi-sub">${sub}</div>
+    </div>`).join('')
+}
+
+function renderRecovery(rows) {
+  const cnt = document.getElementById('cnt-recovery')
+  cnt.textContent = (rows || []).length + ' cases'
+  if (!rows?.length) { document.getElementById('panel-recovery').innerHTML = '<div class="empty-state">No open cases.</div>'; return }
+  document.getElementById('panel-recovery').innerHTML = rows.map(r => `
+    <div class="intel-row">
+      <div class="intel-row-left">
+        <div class="intel-row-title">${esc(r.artist_name || r.artist_email)}</div>
+        <div class="intel-row-meta">${esc(r.case_type)} · ${esc(r.royalty_source || '—')}</div>
+      </div>
+      <div class="intel-row-right">
+        <div class="intel-val" style="color:var(--amber)">$${fmt(r.amount_identified)}</div>
+        <div class="intel-sub">${esc(r.priority)}</div>
+      </div>
+    </div>`).join('')
+}
+
+function renderLeakage(rows) {
+  const cnt = document.getElementById('cnt-leakage')
+  cnt.textContent = (rows || []).length + ' artists'
+  if (!rows?.length) { document.getElementById('panel-leakage').innerHTML = '<div class="empty-state">No leakage data yet.</div>'; return }
+  document.getElementById('panel-leakage').innerHTML = rows.map(r => `
+    <div class="intel-row">
+      <div class="intel-row-left">
+        <div class="intel-row-title">${esc(r.artist_email)}</div>
+        <div class="intel-row-meta">${r.open_cases || 0} open cases · ${r.total_findings || 0} findings</div>
+      </div>
+      <div class="intel-row-right">
+        <div class="leakage-gauge">
+          <span class="intel-val" style="color:${leakageColor(r.leakage_score)}">${r.leakage_score}</span>
+          <div class="gauge-bar"><div class="gauge-fill" style="width:${r.leakage_score}%;background:${leakageColor(r.leakage_score)}"></div></div>
+        </div>
+        <div class="intel-sub"><span class="badge badge-${(r.leakage_label||'low').toLowerCase()}">${esc(r.leakage_label)}</span></div>
+      </div>
+    </div>`).join('')
+}
+
+function renderStalled(rows) {
+  document.getElementById('cnt-stalled').textContent = (rows || []).length + ' cases'
+  if (!rows?.length) { document.getElementById('panel-stalled').innerHTML = '<div class="empty-state">No stalled cases.</div>'; return }
+  document.getElementById('panel-stalled').innerHTML = rows.map(r => `
+    <div class="intel-row">
+      <div class="intel-row-left">
+        <div class="intel-row-title">${esc(r.artist_name || r.artist_email)}</div>
+        <div class="intel-row-meta">${esc(r.case_type)} · Status: ${esc(r.status)}</div>
+      </div>
+      <div class="intel-row-right">
+        <div class="intel-val" style="color:var(--amber)">$${fmt(r.amount_identified)}</div>
+        <div class="intel-sub">${daysSince(r.updated_at)}d idle</div>
+      </div>
+    </div>`).join('')
+}
+
+function renderQueues(rows) {
+  document.getElementById('cnt-queues').textContent = (rows || []).length + ' queues'
+  if (!rows?.length) { document.getElementById('panel-queues').innerHTML = '<div class="empty-state">No open queue tasks.</div>'; return }
+  document.getElementById('panel-queues').innerHTML = rows.map(r => `
+    <div class="intel-row">
+      <div class="intel-row-left">
+        <div class="intel-row-title">${esc((r.queue_name||'').replace(/_/g,' '))}</div>
+        <div class="intel-row-meta">Status: ${esc(r.status)} · Priority: ${esc(r.priority)}</div>
+      </div>
+      <div class="intel-row-right">
+        <div class="intel-val">${r.task_count}</div>
+        <div class="intel-sub">tasks</div>
+      </div>
+    </div>`).join('')
+}
+
+function renderFindings(rows) {
+  document.getElementById('cnt-findings').textContent = (rows || []).length + ' findings'
+  if (!rows?.length) { document.getElementById('panel-findings').innerHTML = '<div class="empty-state">No critical findings.</div>'; return }
+  document.getElementById('panel-findings').innerHTML = rows.map(r => `
+    <div class="intel-row">
+      <div class="intel-row-left">
+        <div class="intel-row-title">${esc(r.finding_title)}</div>
+        <div class="intel-row-meta">${esc(r.artist_email)} · ${esc((r.finding_type||'').replace(/_/g,' '))}</div>
+      </div>
+      <div class="intel-row-right">
+        <div class="intel-val" style="color:var(--green)">$${fmt(r.estimated_recovery_amount)}</div>
+        <div class="intel-sub"><a href="/admin-findings.html" style="color:var(--red);font-size:0.62rem;">Review →</a></div>
+      </div>
+    </div>`).join('')
+}
+
+function renderDocs(rows) {
+  document.getElementById('cnt-docs').textContent = (rows || []).length + ' documents'
+  if (!rows?.length) { document.getElementById('panel-docs').innerHTML = '<div class="empty-state">No pending documents.</div>'; return }
+  document.getElementById('panel-docs').innerHTML = rows.slice(0, 8).map(r => `
+    <div class="intel-row">
+      <div class="intel-row-left">
+        <div class="intel-row-title">${esc(r.file_name)}</div>
+        <div class="intel-row-meta">${esc(r.artist_email)} · ${esc((r.document_type||'').replace(/_/g,' '))}</div>
+      </div>
+      <div class="intel-row-right">
+        <div class="intel-sub">${new Date(r.created_at).toLocaleDateString()}</div>
+      </div>
+    </div>`).join('')
+}
+
+function renderActivity(rows) {
+  document.getElementById('cnt-activity').textContent = (rows || []).length + ' events'
+  if (!rows?.length) { document.getElementById('panel-activity').innerHTML = '<div class="empty-state">No recent activity.</div>'; return }
+  document.getElementById('panel-activity').innerHTML = rows.slice(0,15).map(r => `
+    <div class="intel-row">
+      <div class="intel-row-left">
+        <div class="intel-row-title">${esc(r.event_title)}</div>
+        <div class="intel-row-meta">${esc(r.artist_email)} · ${esc((r.event_type||'').replace(/_/g,' '))}</div>
+      </div>
+      <div class="intel-row-right">
+        <div class="intel-sub">${new Date(r.created_at).toLocaleString()}</div>
+      </div>
+    </div>`).join('')
+}
+
+function leakageColor(score) {
+  const s = parseInt(score) || 0
+  if (s >= 80) return 'var(--red)'
+  if (s >= 60) return 'var(--amber)'
+  if (s >= 40) return 'var(--blue)'
+  return 'var(--green)'
+}
+
+function daysSince(ts) {
+  return Math.floor((Date.now() - new Date(ts).getTime()) / 86400000)
+}
+
+function fmt(v) {
+  const n = parseFloat(v) || 0
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M'
+  if (n >= 1000) return (n/1000).toFixed(0) + 'K'
+  return n.toFixed(0)
+}
+function esc(v) { return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) }
+</script>
+</body>
+</html>
