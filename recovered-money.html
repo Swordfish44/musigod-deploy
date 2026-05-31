@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod — Recovered Royalties</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #E8262A; --red-dark: #B81E22;
+    --black: #0A0A0A; --surface: #111111; --surface-2: #1A1A1A; --surface-3: #252525;
+    --border: rgba(255,255,255,0.08); --border-mid: rgba(255,255,255,0.14);
+    --text: #FFFFFF; --text-dim: #999999; --text-muted: #555555;
+    --green: #22C55E; --amber: #F59E0B; --blue: #3B82F6;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--black); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+  header { position: sticky; top: 0; z-index: 100; background: rgba(10,10,10,0.96); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .logo { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.01em; text-decoration: none; }
+  .logo-musi { color: #fff; } .logo-god { color: var(--red); }
+  nav { display: flex; align-items: center; gap: 0.25rem; }
+  nav a { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); text-decoration: none; padding: 0.45rem 0.9rem; border-radius: 4px; transition: all 0.15s; }
+  nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+  nav a.active { color: var(--text); }
+  .btn-nav-red { background: var(--red) !important; color: #fff !important; font-weight: 600 !important; margin-left: 0.5rem; }
+  .hero { border-bottom: 1px solid var(--border); padding: 4rem 2rem 3rem; background: linear-gradient(180deg, rgba(232,38,42,0.04) 0%, transparent 100%); }
+  .hero-inner { max-width: 1300px; margin: 0 auto; }
+  .hero-eyebrow { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); margin-bottom: 0.75rem; }
+  .hero h1 { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; margin-bottom: 0.75rem; }
+  .hero h1 span { color: var(--green); }
+  .hero-sub { color: var(--text-dim); font-size: 1rem; max-width: 520px; line-height: 1.6; }
+  main { max-width: 1300px; margin: 0 auto; padding: 3rem 2rem; }
+  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 3rem; }
+  .metric-cell { background: var(--surface); padding: 1.75rem 1.5rem; }
+  .metric-label { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; }
+  .metric-val { font-size: 2.2rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+  .metric-sub { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.35rem; }
+  .val-green  { color: var(--green); }
+  .val-amber  { color: var(--amber); }
+  .val-blue   { color: var(--blue); }
+  .val-red    { color: var(--red); }
+  .val-white  { color: var(--text); }
+  .section { margin-bottom: 3rem; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+  .section-title { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); }
+  .case-type-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.75rem; }
+  .case-type-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; }
+  .case-type-name { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 0.75rem; color: var(--text-dim); }
+  .case-type-stats { display: flex; gap: 1rem; }
+  .ct-stat { }
+  .ct-stat-label { font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.15rem; }
+  .ct-stat-val { font-size: 1.1rem; font-weight: 700; }
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; overflow-x: auto; }
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+  .data-table td { font-size: 0.78rem; padding: 0.9rem 1rem; border-bottom: 1px solid var(--border); }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--surface-2); }
+  .badge { font-size: 0.57rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.22rem 0.55rem; border-radius: 3px; }
+  .badge-pro   { background: rgba(59,130,246,0.15); color: var(--blue); }
+  .badge-mlc   { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .badge-sx    { background: rgba(34,197,94,0.15);  color: var(--green); }
+  .badge-other { background: rgba(255,255,255,0.06); color: var(--text-muted); }
+  .loading-state { padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.82rem; }
+  .spinner { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--red); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 0.75rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .proof-bar { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem 2rem; margin-bottom: 3rem; display: flex; align-items: center; gap: 2rem; flex-wrap: wrap; }
+  .proof-item { display: flex; align-items: center; gap: 0.6rem; }
+  .proof-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .proof-text { font-size: 0.78rem; color: var(--text-dim); }
+  .proof-text strong { color: var(--text); }
+  .identified-notice { background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2); border-left: 3px solid var(--amber); border-radius: 6px; padding: 1rem 1.25rem; margin-bottom: 2rem; font-size: 0.82rem; color: var(--text-dim); }
+  .identified-notice strong { color: var(--amber); }
+  footer { margin-top: 4rem; padding: 2rem; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+  footer p { font-size: 0.72rem; color: var(--text-muted); }
+  footer .tagline { font-style: italic; }
+  @media (max-width: 768px) { header { padding: 0 1rem; } main { padding: 1.5rem 1rem; } .hero { padding: 2.5rem 1rem 2rem; } .metrics-grid { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><span class="logo-musi">MUSI</span><span class="logo-god">GOD</span></a>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/recovered-money.html" class="active">Recovery</a>
+    <a href="/rights-audit.html" class="btn-nav-red">Get Audit</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">Royalty Recovery Dashboard</p>
+    <h1>Recovered royalties.<br><span>Verified rights.</span></h1>
+    <p class="hero-sub">Artists keep ownership. MusiGod identifies missing registrations, closes royalty gaps, and recovers what's owed.</p>
+  </div>
+</div>
+
+<main>
+  <div class="proof-bar" id="proof-bar">
+    <div class="loading-state" style="padding:0.5rem;width:100%"><div class="spinner" style="margin:0 auto 0"></div></div>
+  </div>
+
+  <div id="identified-notice" style="display:none" class="identified-notice">
+    <strong>Note:</strong> Royalties shown reflect identified opportunities and active cases. Recovered amounts will update as cases close. MusiGod never claims to have recovered money that hasn't been confirmed.
+  </div>
+
+  <div class="metrics-grid" id="metrics-grid">
+    <div class="loading-state" style="grid-column:1/-1"><div class="spinner"></div>Loading dashboard…</div>
+  </div>
+
+  <div class="section">
+    <div class="section-header"><div class="section-title">Recovery by Case Type</div></div>
+    <div class="case-type-grid" id="case-type-grid">
+      <div class="loading-state">Loading…</div>
+    </div>
+  </div>
+
+  <div class="section" id="recent-section" style="display:none">
+    <div class="section-header"><div class="section-title">Recent Recoveries</div></div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Artist</th><th>Work / Source</th><th>Type</th><th>Amount Recovered</th><th>Territory</th><th>Date</th></tr></thead>
+        <tbody id="recent-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header"><div class="section-title">Artist Recovery Summary</div></div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Artist</th><th>Cases</th><th>Identified</th><th>Recovered</th><th>MusiGod Fee</th><th>Open</th></tr></thead>
+        <tbody id="artist-tbody"><tr><td colspan="6" class="loading-state">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <p>MusiGod Publishing Administration</p>
+  <p class="tagline">"Recovered royalties. Verified rights. Artists keep ownership."</p>
+</footer>
+
+<script>
+const ADMIN_KEY = new URLSearchParams(window.location.search).get('admin_key') || sessionStorage.getItem('musigod_admin_key') || ''
+
+async function loadDashboard() {
+  try {
+    const res = await fetch('/api/get-recovered-money-dashboard', {
+      headers: ADMIN_KEY ? { 'x-admin-key': ADMIN_KEY } : {}
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Failed to load')
+
+    renderProofBar(data.dashboard)
+    renderMetrics(data.dashboard)
+    renderCaseTypes(data.by_case_type || [])
+    renderRecentRecoveries(data.recent_recoveries || [])
+    renderArtistSummary(data.artist_summary || [])
+
+    if (!data.dashboard.total_amount_recovered || data.dashboard.total_amount_recovered === 0) {
+      document.getElementById('identified-notice').style.display = 'block'
+    }
+
+  } catch (err) {
+    document.getElementById('metrics-grid').innerHTML = `<div class="loading-state" style="grid-column:1/-1">Error: ${esc(err.message)}</div>`
+  }
+}
+
+function renderProofBar(d) {
+  const items = [
+    { label: `<strong>$${fmt(d.total_amount_identified)}</strong> in royalties identified` },
+    { label: `<strong>${d.open_cases}</strong> active recovery cases` },
+    { label: `<strong>${d.recovered_cases}</strong> cases recovered` },
+    { label: '<strong>100%</strong> artist rights retained — MusiGod never takes ownership' },
+  ]
+  document.getElementById('proof-bar').innerHTML = items.map(i => `
+    <div class="proof-item"><div class="proof-dot"></div><div class="proof-text">${i.label}</div></div>`).join('')
+}
+
+function renderMetrics(d) {
+  const cells = [
+    ['Royalties Identified',  '$' + fmt(d.total_amount_identified),  'val-amber',  'Total royalty opportunity identified across all cases'],
+    ['Royalties Recovered',   '$' + fmt(d.total_amount_recovered),   'val-green',  'Confirmed recovered and returned to artists'],
+    ['MusiGod Fees Earned',   '$' + fmt(d.total_musigod_fees),       'val-blue',   '15% of confirmed recoveries only'],
+    ['Open Cases',             String(d.open_cases),                  'val-white',  'Currently in progress'],
+    ['Recovered Cases',        String(d.recovered_cases),             'val-green',  'Fully recovered'],
+    ['Avg Confidence Score',   (d.avg_recovery_confidence || 0) + '%','val-amber',  'Recovery likelihood score across all cases'],
+  ]
+  document.getElementById('metrics-grid').innerHTML = cells.map(([label, val, cls, sub]) => `
+    <div class="metric-cell">
+      <div class="metric-label">${label}</div>
+      <div class="metric-val ${cls}">${esc(val)}</div>
+      <div class="metric-sub">${sub}</div>
+    </div>`).join('')
+}
+
+function renderCaseTypes(rows) {
+  if (!rows.length) {
+    document.getElementById('case-type-grid').innerHTML = '<div class="loading-state" style="grid-column:1/-1;color:var(--text-muted)">No cases yet.</div>'
+    return
+  }
+  document.getElementById('case-type-grid').innerHTML = rows.map(r => `
+    <div class="case-type-card">
+      <div class="case-type-name">${esc(r.case_type.replace(/_/g,' '))}</div>
+      <div class="case-type-stats">
+        <div class="ct-stat">
+          <div class="ct-stat-label">Identified</div>
+          <div class="ct-stat-val val-amber">$${fmt(r.total_identified)}</div>
+        </div>
+        <div class="ct-stat">
+          <div class="ct-stat-label">Recovered</div>
+          <div class="ct-stat-val val-green">$${fmt(r.total_recovered)}</div>
+        </div>
+        <div class="ct-stat">
+          <div class="ct-stat-label">Cases</div>
+          <div class="ct-stat-val val-white">${r.case_count}</div>
+        </div>
+      </div>
+    </div>`).join('')
+}
+
+function renderRecentRecoveries(rows) {
+  if (!rows.length) return
+  document.getElementById('recent-section').style.display = 'block'
+  document.getElementById('recent-tbody').innerHTML = rows.map(r => `
+    <tr>
+      <td>${esc(r.artist_name || r.artist_email)}</td>
+      <td>${esc(r.work_title || r.royalty_source || '—')}</td>
+      <td><span class="badge badge-${typeBadge(r.case_type)}">${esc(r.case_type)}</span></td>
+      <td style="color:var(--green);font-weight:600">$${fmt(r.amount_recovered)}</td>
+      <td>${esc(r.territory || 'US')}</td>
+      <td style="color:var(--text-muted)">${r.recovered_at ? new Date(r.recovered_at).toLocaleDateString() : '—'}</td>
+    </tr>`).join('')
+}
+
+function renderArtistSummary(rows) {
+  if (!rows.length) {
+    document.getElementById('artist-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;font-size:0.78rem">No artist data yet.</td></tr>'
+    return
+  }
+  document.getElementById('artist-tbody').innerHTML = rows.map(r => `
+    <tr>
+      <td style="font-size:0.78rem">${esc(r.artist_name || r.artist_email)}</td>
+      <td>${r.total_cases}</td>
+      <td style="color:var(--amber)">$${fmt(r.total_identified)}</td>
+      <td style="color:var(--green);font-weight:600">$${fmt(r.total_recovered)}</td>
+      <td style="color:var(--blue)">$${fmt(r.total_musigod_fee)}</td>
+      <td>${r.open_cases}</td>
+    </tr>`).join('')
+}
+
+function typeBadge(t) {
+  return { PRO: 'pro', MLC: 'mlc', SOUND_EXCHANGE: 'sx' }[t] || 'other'
+}
+function fmt(v) {
+  const n = parseFloat(v) || 0
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M'
+  if (n >= 1000) return (n/1000).toFixed(0) + 'K'
+  return n.toFixed(0)
+}
+function esc(v) { return String(v||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) }
+
+loadDashboard()
+</script>
+</body>
+</html>
