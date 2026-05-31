@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod — Audit Findings Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap" rel="stylesheet">
+<style>
+  :root{--red:#E8262A;--red-dark:#B81E22;--black:#0A0A0A;--surface:#111111;--surface-2:#1A1A1A;--surface-3:#252525;--border:rgba(255,255,255,0.08);--border-mid:rgba(255,255,255,0.14);--text:#FFFFFF;--text-dim:#999999;--text-muted:#555555;--green:#22C55E;--amber:#F59E0B;--blue:#3B82F6;--purple:#A855F7;}
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--black);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;}
+  header{position:sticky;top:0;z-index:100;background:rgba(10,10,10,0.96);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:64px;}
+  .logo{font-size:1.4rem;font-weight:800;letter-spacing:-0.01em;text-decoration:none;}.logo-musi{color:#fff;}.logo-god{color:var(--red);}
+  nav a{font-size:0.72rem;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-dim);text-decoration:none;padding:0.45rem 0.9rem;border-radius:4px;}
+  nav a:hover{color:var(--text);}
+  .hero{border-bottom:1px solid var(--border);padding:2.5rem 2rem;}
+  .hero-inner{max-width:1300px;margin:0 auto;}
+  .hero-eyebrow{font-size:0.68rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--red);margin-bottom:0.5rem;}
+  .hero h1{font-size:clamp(1.5rem,3vw,2.2rem);font-weight:800;letter-spacing:-0.02em;}
+  main{max-width:1300px;margin:0 auto;padding:2rem;}
+  .auth-gate{max-width:480px;margin:4rem auto;text-align:center;}
+  .auth-gate h2{font-size:1.1rem;font-weight:700;margin-bottom:0.75rem;}
+  .auth-input{width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:0.88rem;padding:0.7rem 1rem;border-radius:6px;outline:none;margin-bottom:0.75rem;}
+  .btn{font-size:0.72rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;border:none;padding:0.6rem 1.25rem;border-radius:4px;cursor:pointer;transition:background 0.15s;text-decoration:none;display:inline-flex;align-items:center;gap:0.35rem;}
+  .btn-primary{background:var(--red);color:#fff;}.btn-primary:hover{background:var(--red-dark);}
+  .btn-sm{padding:0.28rem 0.65rem;font-size:0.62rem;}
+  .btn-green{background:rgba(34,197,94,0.15);color:var(--green);border:1px solid rgba(34,197,94,0.3);}
+  .btn-red-soft{background:rgba(232,38,42,0.15);color:var(--red);border:1px solid rgba(232,38,42,0.3);}
+  .btn-amber{background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.3);}
+  .btn-purple{background:rgba(168,85,247,0.15);color:var(--purple);border:1px solid rgba(168,85,247,0.3);}
+  .btn-ghost{background:var(--surface-2);color:var(--text-dim);border:1px solid var(--border);}
+  .btn-ghost:hover{background:var(--surface-3);color:var(--text);}
+  .controls{display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.5rem;align-items:center;}
+  .select-filter{background:var(--surface-2);border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:0.75rem;padding:0.45rem 0.8rem;border-radius:4px;outline:none;}
+  .text-input{background:var(--surface-2);border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:0.75rem;padding:0.45rem 0.8rem;border-radius:4px;outline:none;width:220px;}
+  .finding-row{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.25rem;margin-bottom:0.75rem;transition:border-color 0.15s;}
+  .finding-row:hover{border-color:var(--border-mid);}
+  .finding-row.sev-critical{border-left:3px solid var(--red);}
+  .finding-row.sev-high{border-left:3px solid var(--amber);}
+  .finding-row.sev-medium{border-left:3px solid var(--blue);}
+  .finding-row.sev-low{border-left:3px solid var(--text-muted);}
+  .finding-top{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:0.5rem;}
+  .finding-title{font-size:0.9rem;font-weight:600;}
+  .finding-email{font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;}
+  .badges{display:flex;gap:0.35rem;flex-wrap:wrap;flex-shrink:0;}
+  .badge{font-size:0.57rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:0.22rem 0.55rem;border-radius:3px;}
+  .badge-critical{background:rgba(232,38,42,0.2);color:var(--red);}
+  .badge-high{background:rgba(245,158,11,0.15);color:var(--amber);}
+  .badge-medium{background:rgba(59,130,246,0.15);color:var(--blue);}
+  .badge-low{background:rgba(255,255,255,0.06);color:var(--text-muted);}
+  .badge-open{background:rgba(59,130,246,0.1);color:var(--blue);}
+  .badge-approved{background:rgba(34,197,94,0.15);color:var(--green);}
+  .badge-rejected{background:rgba(255,255,255,0.06);color:var(--text-muted);}
+  .badge-escalated{background:rgba(168,85,247,0.15);color:var(--purple);}
+  .finding-body{font-size:0.78rem;color:var(--text-dim);line-height:1.5;margin-bottom:0.75rem;}
+  .finding-actions{display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;}
+  .notes-input{background:var(--surface-3);border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:0.72rem;padding:0.3rem 0.6rem;border-radius:3px;width:200px;outline:none;}
+  .finding-meta{font-size:0.65rem;color:var(--text-muted);display:flex;gap:1rem;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border);flex-wrap:wrap;}
+  .recovery-val{font-size:0.88rem;font-weight:700;color:var(--green);}
+  .msg{padding:0.75rem 1rem;border-radius:6px;font-size:0.78rem;margin-bottom:1rem;display:none;}
+  .msg.show{display:block;}
+  .msg-success{background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:var(--green);}
+  .msg-error{background:rgba(232,38,42,0.1);border:1px solid rgba(232,38,42,0.3);color:#ff6b6b;}
+  .loading-state,.empty-state{padding:3rem;text-align:center;color:var(--text-muted);font-size:0.82rem;}
+  .spinner{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 1rem;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;}
+  .section-title{font-size:0.62rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);}
+  .summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:2rem;}
+  .summary-cell{background:var(--surface-2);padding:0.9rem 1rem;}
+  .summary-label{font-size:0.58rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.2rem;}
+  .summary-val{font-size:1.5rem;font-weight:700;}
+  footer{margin-top:4rem;padding:1.5rem 2rem;border-top:1px solid var(--border);text-align:center;}
+  footer p{font-size:0.72rem;color:var(--text-muted);}
+  @media(max-width:768px){header{padding:0 1rem;}main{padding:1rem;}.hero{padding:1.5rem 1rem;}}
+</style>
+</head>
+<body>
+<header>
+  <a href="/admin.html" class="logo"><span class="logo-musi">MUSI</span><span class="logo-god">GOD</span></a>
+  <nav>
+    <a href="/admin.html">Admin</a>
+    <a href="/admin-queues.html">Queues</a>
+    <a href="/admin-findings.html">Findings</a>
+    <a href="/recovered-money.html">Recovery</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">Admin · Audit Intelligence</p>
+    <h1>Findings Review</h1>
+  </div>
+</div>
+
+<main>
+  <div id="auth-gate" class="auth-gate">
+    <h2>Admin Access Required</h2>
+    <input type="password" class="auth-input" id="admin-key-input" placeholder="Admin key" onkeydown="if(event.key==='Enter')authenticate()">
+    <br><button class="btn btn-primary" onclick="authenticate()">ACCESS FINDINGS</button>
+    <div class="msg msg-error" id="auth-error" style="display:none;margin-top:0.75rem;text-align:left"></div>
+  </div>
+
+  <div id="admin-content" style="display:none">
+    <div class="msg msg-success" id="msg-success"></div>
+    <div class="msg msg-error" id="msg-error"></div>
+
+    <div class="summary-grid" id="summary-grid">
+      <div class="loading-state" style="grid-column:1/-1;padding:1rem">Loading…</div>
+    </div>
+
+    <div class="controls">
+      <input type="text" class="text-input" id="filter-email" placeholder="Filter by email…" onkeydown="if(event.key==='Enter')loadFindings()">
+      <select class="select-filter" id="filter-severity" onchange="loadFindings()">
+        <option value="">All Severities</option>
+        <option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+      </select>
+      <select class="select-filter" id="filter-status" onchange="loadFindings()">
+        <option value="">All Statuses</option>
+        <option>OPEN</option><option>APPROVED</option><option>REJECTED</option><option>ESCALATED</option><option>IN_REVIEW</option>
+      </select>
+      <select class="select-filter" id="filter-type" onchange="loadFindings()">
+        <option value="">All Types</option>
+        <option>PRO_MISSING_REGISTRATION</option>
+        <option>MLC_NOT_REGISTERED</option>
+        <option>NEIGHBORING_RIGHTS_MISSING</option>
+        <option>FOREIGN_COLLECTION_GAP</option>
+        <option>PUBLISHING_ADMIN_CONFLICT</option>
+        <option>ISRC_MISMATCH</option>
+        <option>DUPLICATE_SPLIT</option>
+        <option>MISSING_WRITER_SHARE</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="loadFindings()">↻ Refresh</button>
+      <button class="btn btn-amber btn-sm" onclick="generateFindings()">⚡ Run Audit Rules</button>
+    </div>
+
+    <div class="section-header">
+      <div class="section-title" id="findings-count">Findings</div>
+    </div>
+
+    <div id="findings-container">
+      <div class="loading-state"><div class="spinner"></div>Loading findings…</div>
+    </div>
+  </div>
+</main>
+
+<footer><p>MusiGod Admin · Audit Intelligence Layer</p></footer>
+
+<script>
+let ADMIN_KEY = sessionStorage.getItem('musigod_admin_key') || ''
+if (ADMIN_KEY) showContent()
+
+const SB_URL = 'https://uykzkrnoetcldeuxzqyy.supabase.co'
+
+function authenticate() {
+  const key = document.getElementById('admin-key-input').value.trim()
+  if (!key) return
+  ADMIN_KEY = key
+  sessionStorage.setItem('musigod_admin_key', key)
+  showContent()
+}
+
+function showContent() {
+  document.getElementById('auth-gate').style.display = 'none'
+  document.getElementById('admin-content').style.display = 'block'
+  loadFindings()
+}
+
+async function loadFindings() {
+  document.getElementById('findings-container').innerHTML = '<div class="loading-state"><div class="spinner"></div>Loading…</div>'
+
+  const email    = document.getElementById('filter-email').value.trim()
+  const severity = document.getElementById('filter-severity').value
+  const status   = document.getElementById('filter-status').value
+  const type     = document.getElementById('filter-type').value
+
+  try {
+    const filters = ['order=estimated_recovery_amount.desc', 'limit=100']
+    if (email)    filters.push(`artist_email=eq.${encodeURIComponent(email)}`)
+    if (severity) filters.push(`severity=eq.${encodeURIComponent(severity)}`)
+    if (status)   filters.push(`status=eq.${encodeURIComponent(status)}`)
+    if (type)     filters.push(`finding_type=eq.${encodeURIComponent(type)}`)
+
+    const res = await fetch(`/api/get-audit-report?email=${encodeURIComponent(email || 'all')}`, {
+      headers: { 'x-admin-key': ADMIN_KEY }
+    })
+
+    // Use direct Supabase via API proxy — fetch all findings
+    const sbRes = await fetch(`${SB_URL}/rest/v1/audit_findings_v1?${filters.join('&')}`, {
+      headers: {
+        apikey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDYxOSwiZXhwIjoyMDkzMTA2NjE5fQ.jmBLX9VwFvFT4rc3lzqSJS9hFjis2QxRkmWpFizQtKk',
+        Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDYxOSwiZXhwIjoyMDkzMTA2NjE5fQ.jmBLX9VwFvFT4rc3lzqSJS9hFjis2QxRkmWpFizQtKk',
+        'Accept-Profile': 'registrations',
+      }
+    })
+    const findings = await sbRes.json()
+
+    renderSummary(findings)
+    renderFindings(findings)
+
+  } catch (err) {
+    document.getElementById('findings-container').innerHTML = `<div class="empty-state">Error: ${esc(err.message)}</div>`
+  }
+}
+
+function renderSummary(findings) {
+  const totals = {
+    total: findings.length,
+    critical: findings.filter(f => f.severity === 'CRITICAL').length,
+    open: findings.filter(f => f.status === 'OPEN').length,
+    approved: findings.filter(f => f.status === 'APPROVED').length,
+    recovery: findings.reduce((s, f) => s + parseFloat(f.estimated_recovery_amount || 0), 0),
+  }
+  document.getElementById('summary-grid').innerHTML = [
+    ['Total', totals.total, '#fff'],
+    ['Critical', totals.critical, 'var(--red)'],
+    ['Open', totals.open, 'var(--blue)'],
+    ['Approved', totals.approved, 'var(--green)'],
+    ['Est. Recovery', '$' + fmt(totals.recovery), 'var(--amber)'],
+  ].map(([l, v, c]) => `<div class="summary-cell"><div class="summary-label">${l}</div><div class="summary-val" style="color:${c}">${v}</div></div>`).join('')
+}
+
+function renderFindings(findings) {
+  document.getElementById('findings-count').textContent = findings.length + ' finding' + (findings.length !== 1 ? 's' : '')
+  if (!findings.length) {
+    document.getElementById('findings-container').innerHTML = '<div class="empty-state">No findings match the current filters.</div>'
+    return
+  }
+  document.getElementById('findings-container').innerHTML = findings.map(f => renderFinding(f)).join('')
+}
+
+function renderFinding(f) {
+  const sevCls = 'sev-' + (f.severity || 'medium').toLowerCase()
+  const badgeSev = 'badge-' + (f.severity || 'medium').toLowerCase()
+  const badgeSta = 'badge-' + (f.status || 'open').toLowerCase()
+  return `
+    <div class="finding-row ${sevCls}" id="finding-${f.id}">
+      <div class="finding-top">
+        <div>
+          <div class="finding-title">${esc(f.finding_title)}</div>
+          <div class="finding-email">${esc(f.artist_email)} · ${esc(f.finding_type.replace(/_/g,' '))}</div>
+        </div>
+        <div class="badges">
+          <span class="badge ${badgeSev}">${esc(f.severity)}</span>
+          <span class="badge ${badgeSta}">${esc(f.status.replace('_',' '))}</span>
+        </div>
+      </div>
+      <div class="finding-body">${esc(f.finding_body || '')}</div>
+      <div class="finding-actions">
+        ${f.status !== 'APPROVED' ? `<button class="btn btn-sm btn-green" onclick="updateFinding('${f.id}','APPROVED')">Approve</button>` : ''}
+        ${f.status !== 'REJECTED' ? `<button class="btn btn-sm btn-red-soft" onclick="updateFinding('${f.id}','REJECTED')">Reject</button>` : ''}
+        ${f.status !== 'ESCALATED' ? `<button class="btn btn-sm btn-purple" onclick="updateFinding('${f.id}','ESCALATED')">Escalate</button>` : ''}
+        ${f.status !== 'IN_REVIEW' ? `<button class="btn btn-sm btn-amber" onclick="updateFinding('${f.id}','IN_REVIEW')">In Review</button>` : ''}
+        <input class="notes-input" placeholder="Add note…" id="note-${f.id}">
+        <button class="btn btn-sm btn-ghost" onclick="saveNote('${f.id}')">Save Note</button>
+        <a href="/audit-report.html?email=${encodeURIComponent(f.artist_email)}" class="btn btn-sm btn-ghost" target="_blank">View Report</a>
+      </div>
+      <div class="finding-meta">
+        <span>Recovery: <span class="recovery-val">$${fmt(f.estimated_recovery_amount)}</span></span>
+        <span>Confidence: ${f.confidence_score}%</span>
+        <span>Created: ${new Date(f.created_at).toLocaleDateString()}</span>
+        ${f.reviewed_by ? `<span>Reviewed by: ${esc(f.reviewed_by)}</span>` : ''}
+        ${f.admin_notes ? `<span>Note: ${esc(f.admin_notes)}</span>` : ''}
+      </div>
+    </div>`
+}
+
+async function updateFinding(findingId, status) {
+  try {
+    const res = await fetch('/api/update-audit-finding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY },
+      body: JSON.stringify({ finding_id: findingId, status, regenerate_report: true }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Update failed')
+    showMsg('success', `Finding marked ${status.toLowerCase()}.`)
+    loadFindings()
+  } catch (err) { showMsg('error', err.message) }
+}
+
+async function saveNote(findingId) {
+  const notes = document.getElementById('note-' + findingId).value.trim()
+  if (!notes) return
+  try {
+    const res = await fetch('/api/update-audit-finding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY },
+      body: JSON.stringify({ finding_id: findingId, admin_notes: notes }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Save failed')
+    showMsg('success', 'Note saved.')
+    loadFindings()
+  } catch (err) { showMsg('error', err.message) }
+}
+
+async function generateFindings() {
+  const email = document.getElementById('filter-email').value.trim()
+  if (!email) { showMsg('error', 'Enter an artist email to run audit rules.'); return }
+  try {
+    const res = await fetch('/api/generate-audit-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY },
+      body: JSON.stringify({ artist_email: email }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Failed')
+    showMsg('success', `${data.findings_created} findings generated. Est. recovery: $${fmt(data.total_estimated_recovery)}.`)
+    loadFindings()
+  } catch (err) { showMsg('error', err.message) }
+}
+
+function showMsg(type, msg) {
+  const id = type === 'success' ? 'msg-success' : 'msg-error'
+  const el = document.getElementById(id)
+  el.textContent = msg; el.classList.add('show')
+  setTimeout(() => el.classList.remove('show'), 5000)
+}
+function fmt(v){const n=parseFloat(v)||0;if(n>=1000000)return(n/1000000).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(0)+'K';return n.toFixed(0);}
+function esc(v){return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+</script>
+</body>
+</html>

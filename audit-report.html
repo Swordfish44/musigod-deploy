@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod — Rights Audit Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red:#E8262A;--red-dark:#B81E22;
+    --black:#0A0A0A;--surface:#111111;--surface-2:#1A1A1A;--surface-3:#252525;
+    --border:rgba(255,255,255,0.08);--border-mid:rgba(255,255,255,0.14);
+    --text:#FFFFFF;--text-dim:#999999;--text-muted:#555555;
+    --green:#22C55E;--amber:#F59E0B;--blue:#3B82F6;--purple:#A855F7;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--black);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;}
+  header{position:sticky;top:0;z-index:100;background:rgba(10,10,10,0.96);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:64px;}
+  .logo{font-size:1.4rem;font-weight:800;letter-spacing:-0.01em;text-decoration:none;}
+  .logo-musi{color:#fff;}.logo-god{color:var(--red);}
+  nav{display:flex;align-items:center;gap:0.25rem;}
+  nav a{font-size:0.72rem;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-dim);text-decoration:none;padding:0.45rem 0.9rem;border-radius:4px;transition:all 0.15s;}
+  nav a:hover{color:var(--text);background:rgba(255,255,255,0.06);}
+  .btn{font-size:0.72rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;border:none;padding:0.6rem 1.25rem;border-radius:4px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:0.35rem;transition:background 0.15s,transform 0.15s;}
+  .btn-primary{background:var(--red);color:#fff;}
+  .btn-primary:hover{background:var(--red-dark);transform:translateY(-1px);}
+  .btn-ghost{background:var(--surface-2);color:var(--text-dim);border:1px solid var(--border);}
+  .btn-ghost:hover{background:var(--surface-3);color:var(--text);}
+  .hero{border-bottom:1px solid var(--border);padding:3rem 2rem 2.5rem;}
+  .hero-inner{max-width:1100px;margin:0 auto;}
+  .hero-eyebrow{font-size:0.68rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--red);margin-bottom:0.6rem;}
+  .hero h1{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:800;letter-spacing:-0.02em;line-height:1.1;margin-bottom:0.4rem;}
+  .report-meta{display:flex;gap:2rem;flex-wrap:wrap;margin-top:1rem;}
+  .report-meta-item{font-size:0.72rem;color:var(--text-muted);}
+  .report-meta-item strong{color:var(--text-dim);}
+  main{max-width:1100px;margin:0 auto;padding:2.5rem 2rem;}
+  .metrics-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:2.5rem;}
+  .metric-cell{background:var(--surface);padding:1.5rem 1.25rem;}
+  .metric-label{font-size:0.6rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.4rem;}
+  .metric-val{font-size:1.9rem;font-weight:800;letter-spacing:-0.02em;line-height:1;}
+  .metric-sub{font-size:0.7rem;color:var(--text-muted);margin-top:0.25rem;}
+  .val-red{color:var(--red);}.val-amber{color:var(--amber);}.val-green{color:var(--green);}.val-blue{color:var(--blue);}.val-white{color:var(--text);}
+  .section{margin-bottom:3rem;}
+  .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;padding-bottom:0.75rem;border-bottom:1px solid var(--border);}
+  .section-title{font-size:0.62rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);}
+  .executive-summary{background:var(--surface-2);border:1px solid var(--border);border-left:3px solid var(--red);border-radius:8px;padding:1.5rem 1.75rem;margin-bottom:2.5rem;}
+  .executive-summary h2{font-size:0.62rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.75rem;}
+  .executive-summary p{font-size:0.92rem;color:var(--text-dim);line-height:1.7;}
+  .finding-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.5rem;margin-bottom:0.75rem;transition:border-color 0.15s;}
+  .finding-card:hover{border-color:var(--border-mid);}
+  .finding-card.sev-critical{border-left:3px solid var(--red);}
+  .finding-card.sev-high{border-left:3px solid var(--amber);}
+  .finding-card.sev-medium{border-left:3px solid var(--blue);}
+  .finding-card.sev-low{border-left:3px solid var(--text-muted);}
+  .finding-top{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:0.6rem;}
+  .finding-title{font-size:0.95rem;font-weight:700;}
+  .finding-badges{display:flex;gap:0.4rem;flex-shrink:0;flex-wrap:wrap;}
+  .badge{font-size:0.57rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:0.22rem 0.55rem;border-radius:3px;}
+  .badge-critical{background:rgba(232,38,42,0.2);color:var(--red);}
+  .badge-high{background:rgba(245,158,11,0.15);color:var(--amber);}
+  .badge-medium{background:rgba(59,130,246,0.15);color:var(--blue);}
+  .badge-low{background:rgba(255,255,255,0.06);color:var(--text-muted);}
+  .badge-open{background:rgba(59,130,246,0.1);color:var(--blue);}
+  .badge-approved{background:rgba(34,197,94,0.15);color:var(--green);}
+  .badge-rejected{background:rgba(255,255,255,0.06);color:var(--text-muted);}
+  .badge-escalated{background:rgba(168,85,247,0.15);color:var(--purple);}
+  .finding-body{font-size:0.82rem;color:var(--text-dim);line-height:1.6;margin-bottom:0.75rem;}
+  .finding-rec{background:var(--surface-2);border-radius:4px;padding:0.75rem 1rem;font-size:0.8rem;color:var(--text-dim);border-left:2px solid var(--green);}
+  .finding-rec strong{color:var(--green);}
+  .finding-footer{display:flex;align-items:center;justify-content:space-between;margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);font-size:0.68rem;color:var(--text-muted);}
+  .recovery-amount{font-size:1rem;font-weight:700;color:var(--green);}
+  .case-row{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1rem 1.25rem;margin-bottom:0.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;}
+  .case-row-left .case-type{font-size:0.78rem;font-weight:600;}
+  .case-row-left .case-meta{font-size:0.7rem;color:var(--text-muted);margin-top:0.2rem;}
+  .case-amount{text-align:right;}
+  .case-amount .label{font-size:0.58rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);}
+  .case-amount .val{font-size:1rem;font-weight:700;color:var(--amber);}
+  .loading-state{padding:3rem;text-align:center;color:var(--text-muted);font-size:0.82rem;}
+  .spinner{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 1rem;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .error-state{padding:3rem;text-align:center;}
+  .error-state h2{font-size:1.1rem;font-weight:700;margin-bottom:0.5rem;}
+  .error-state p{font-size:0.82rem;color:var(--text-dim);}
+  .action-bar{display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:2rem;}
+  .report-footer{margin-top:4rem;padding:2rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;}
+  .report-footer p{font-size:0.7rem;color:var(--text-muted);}
+  footer{margin-top:2rem;padding:1.5rem 2rem;border-top:1px solid var(--border);text-align:center;}
+  footer p{font-size:0.72rem;color:var(--text-muted);}
+  @media print{header,nav,.action-bar,footer{display:none!important;}body{background:#fff;color:#000;}main{padding:0;}.finding-card{border:1px solid #ddd;margin-bottom:1rem;}.metric-val{color:#000!important;}.badge{border:1px solid #ccc;}}
+  @media(max-width:600px){header{padding:0 1rem;}main{padding:1.5rem 1rem;}.hero{padding:2rem 1rem;}.metrics-row{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><span class="logo-musi">MUSI</span><span class="logo-god">GOD</span></a>
+  <nav>
+    <a href="/portal.html">Portal</a>
+    <a href="/activity.html">Activity</a>
+    <a href="/upload-documents.html">Documents</a>
+  </nav>
+</header>
+
+<div id="loading-hero" class="hero"><div class="hero-inner"><div class="loading-state"><div class="spinner"></div>Loading audit report…</div></div></div>
+<div id="report-hero" class="hero" style="display:none">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">Rights Audit Report</p>
+    <h1 id="hero-title">Rights Audit — Artist Name</h1>
+    <div class="report-meta">
+      <div class="report-meta-item"><strong>Report ID:</strong> <span id="meta-report-id">—</span></div>
+      <div class="report-meta-item"><strong>Generated:</strong> <span id="meta-generated">—</span></div>
+      <div class="report-meta-item"><strong>Status:</strong> <span id="meta-status">—</span></div>
+      <div class="report-meta-item"><strong>Version:</strong> <span id="meta-version">—</span></div>
+    </div>
+  </div>
+</div>
+
+<main id="main-content" style="display:none">
+  <div class="action-bar">
+    <button class="btn btn-ghost" onclick="window.print()">⬇ Print / Save PDF</button>
+    <a href="/upload-documents.html" class="btn btn-ghost" id="upload-link">Upload Documents</a>
+    <a href="/activity.html" class="btn btn-ghost" id="activity-link">View Activity</a>
+  </div>
+
+  <div class="executive-summary">
+    <h2>Executive Summary</h2>
+    <p id="executive-summary-text">Loading…</p>
+  </div>
+
+  <div class="metrics-row" id="metrics-row"></div>
+
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Audit Findings</div>
+      <div style="font-size:0.72rem;color:var(--text-muted)" id="findings-count"></div>
+    </div>
+    <div id="findings-list"><div class="loading-state"><div class="spinner"></div></div></div>
+  </div>
+
+  <div class="section" id="cases-section" style="display:none">
+    <div class="section-header"><div class="section-title">Active Recovery Cases</div></div>
+    <div id="cases-list"></div>
+  </div>
+
+  <div class="report-footer">
+    <p>MusiGod Publishing Administration · <span id="footer-report-id"></span></p>
+    <p>Recovered royalties. Verified rights. Artists keep ownership.</p>
+  </div>
+</main>
+
+<div id="error-content" style="display:none">
+  <div class="error-state">
+    <h2>Report not found</h2>
+    <p>No report was found for this artist. <a href="/rights-audit.html" style="color:var(--red)">Start a rights audit</a> to generate your report.</p>
+  </div>
+</div>
+
+<footer><p>MusiGod Publishing Administration</p></footer>
+
+<script>
+const params = new URLSearchParams(window.location.search)
+const REPORT_ID  = params.get('report_id') || ''
+const EMAIL      = params.get('email') || localStorage.getItem('musigod_artist_email') || localStorage.getItem('musigod_rights_audit_email') || ''
+const AUDIT_ID   = params.get('audit_id') || localStorage.getItem('musigod_rights_audit_id') || ''
+const ARTIST_ID  = params.get('artist_id') || localStorage.getItem('musigod_artist_id') || ''
+
+const SEVERITY_ORDER = { CRITICAL: 1, HIGH: 2, MEDIUM: 3, LOW: 4 }
+
+async function loadReport() {
+  const qs = new URLSearchParams()
+  if (REPORT_ID) qs.set('report_id', REPORT_ID)
+  else if (AUDIT_ID) qs.set('audit_id', AUDIT_ID)
+  else if (EMAIL) qs.set('email', EMAIL)
+  else {
+    showError()
+    return
+  }
+
+  try {
+    const res = await fetch(`/api/get-audit-report?${qs}`)
+    const data = await res.json()
+
+    if (!res.ok || !data.report) {
+      // If no report exists yet, auto-generate one
+      if (EMAIL || AUDIT_ID) {
+        await generateAndReload()
+        return
+      }
+      showError()
+      return
+    }
+
+    renderReport(data)
+  } catch (err) {
+    showError(err.message)
+  }
+}
+
+async function generateAndReload() {
+  try {
+    const res = await fetch('/api/generate-audit-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        artist_email: EMAIL,
+        audit_id: AUDIT_ID || null,
+        artist_id: ARTIST_ID || null,
+      }),
+    })
+    if (res.ok) {
+      await loadReport()
+    } else {
+      showError('Could not generate report.')
+    }
+  } catch {
+    showError('Report generation failed.')
+  }
+}
+
+function renderReport(data) {
+  const { report, findings, recovery_cases } = data
+
+  document.getElementById('loading-hero').style.display = 'none'
+  document.getElementById('report-hero').style.display = 'block'
+  document.getElementById('main-content').style.display = 'block'
+
+  // Hero
+  document.getElementById('hero-title').textContent = 'Rights Audit — ' + (report.artist_email || '')
+  document.getElementById('meta-report-id').textContent = report.report_id || '—'
+  document.getElementById('meta-generated').textContent = new Date(report.created_at).toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' })
+  document.getElementById('meta-status').textContent = report.status
+  document.getElementById('meta-version').textContent = 'v' + (report.report_version || 1)
+  document.getElementById('footer-report-id').textContent = 'Report ' + (report.report_id || '')
+
+  // Wire links with context
+  const ctx = new URLSearchParams()
+  if (EMAIL) ctx.set('artist_email', EMAIL)
+  if (ARTIST_ID) ctx.set('artist_id', ARTIST_ID)
+  if (AUDIT_ID) ctx.set('audit_id', AUDIT_ID)
+  document.getElementById('upload-link').href = '/upload-documents.html?' + ctx
+  document.getElementById('activity-link').href = '/activity.html?' + ctx
+
+  // Executive summary
+  document.getElementById('executive-summary-text').textContent = report.executive_summary || 'Rights audit analysis complete.'
+
+  // Metrics
+  const criticalCount = findings.filter(f => f.severity === 'CRITICAL').length
+  const totalRecovery = findings.reduce((s, f) => s + parseFloat(f.estimated_recovery_amount || 0), 0)
+  document.getElementById('metrics-row').innerHTML = [
+    ['Total Findings', findings.length, 'val-white', 'Issues identified'],
+    ['Critical', criticalCount, criticalCount > 0 ? 'val-red' : 'val-white', 'Require immediate action'],
+    ['Est. Recovery', '$' + fmt(totalRecovery), 'val-green', 'Potential royalties recoverable'],
+    ['Active Cases', recovery_cases.length, 'val-amber', 'Recovery cases in progress'],
+  ].map(([label, val, cls, sub]) => `
+    <div class="metric-cell">
+      <div class="metric-label">${label}</div>
+      <div class="metric-val ${cls}">${esc(String(val))}</div>
+      <div class="metric-sub">${sub}</div>
+    </div>`).join('')
+
+  // Findings
+  document.getElementById('findings-count').textContent = findings.length + ' finding' + (findings.length !== 1 ? 's' : '')
+  if (!findings.length) {
+    document.getElementById('findings-list').innerHTML = '<div class="loading-state" style="padding:2rem">No findings recorded. Upload documents to trigger analysis.</div>'
+  } else {
+    const sorted = [...findings].sort((a, b) =>
+      (SEVERITY_ORDER[a.severity] || 5) - (SEVERITY_ORDER[b.severity] || 5) ||
+      parseFloat(b.estimated_recovery_amount) - parseFloat(a.estimated_recovery_amount)
+    )
+    document.getElementById('findings-list').innerHTML = sorted.map(f => renderFinding(f)).join('')
+  }
+
+  // Recovery cases
+  if (recovery_cases.length) {
+    document.getElementById('cases-section').style.display = 'block'
+    document.getElementById('cases-list').innerHTML = recovery_cases.map(c => `
+      <div class="case-row">
+        <div class="case-row-left">
+          <div class="case-type">${esc(c.case_type.replace(/_/g,' '))} ${c.work_title ? '· ' + esc(c.work_title) : ''}</div>
+          <div class="case-meta">${esc(c.royalty_source || '')} · Status: ${esc(c.status)} · Priority: ${esc(c.priority)}</div>
+        </div>
+        <div class="case-amount">
+          <div class="label">Identified</div>
+          <div class="val">$${fmt(c.amount_identified)}</div>
+        </div>
+      </div>`).join('')
+  }
+}
+
+function renderFinding(f) {
+  const sevClass = 'sev-' + (f.severity || 'medium').toLowerCase()
+  const badgeSev = 'badge-' + (f.severity || 'medium').toLowerCase()
+  const badgeSta = 'badge-' + (f.status || 'open').toLowerCase()
+  return `
+    <div class="finding-card ${sevClass}">
+      <div class="finding-top">
+        <div class="finding-title">${esc(f.finding_title)}</div>
+        <div class="finding-badges">
+          <span class="badge ${badgeSev}">${esc(f.severity)}</span>
+          <span class="badge ${badgeSta}">${esc(f.status)}</span>
+        </div>
+      </div>
+      <div class="finding-body">${esc(f.finding_body || '')}</div>
+      ${f.recommendation ? `<div class="finding-rec"><strong>Recommendation:</strong> ${esc(f.recommendation)}</div>` : ''}
+      <div class="finding-footer">
+        <div style="font-size:0.68rem;color:var(--text-muted)">${esc(f.finding_type.replace(/_/g,' '))} · Confidence: ${f.confidence_score}%</div>
+        <div class="recovery-amount">$${fmt(f.estimated_recovery_amount)} est. recovery</div>
+      </div>
+    </div>`
+}
+
+function showError(msg) {
+  document.getElementById('loading-hero').style.display = 'none'
+  document.getElementById('error-content').style.display = 'block'
+  if (msg) {
+    document.querySelector('#error-content p').textContent = msg
+  }
+}
+
+function fmt(v) {
+  const n = parseFloat(v) || 0
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M'
+  if (n >= 1000) return (n/1000).toFixed(0) + 'K'
+  return n.toFixed(0)
+}
+function esc(v) { return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) }
+
+loadReport()
+</script>
+</body>
+</html>
