@@ -15,24 +15,18 @@
   .logo{font-size:1.4rem;font-weight:800;letter-spacing:-0.01em;text-decoration:none;}.logo-musi{color:#fff;}.logo-god{color:var(--red);}
   nav a{font-size:0.72rem;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-dim);text-decoration:none;padding:0.45rem 0.9rem;border-radius:4px;}
   nav a:hover{color:var(--text);}
-
   .hero{border-bottom:1px solid var(--border);padding:4rem 2rem 3rem;background:linear-gradient(180deg,rgba(232,38,42,0.04) 0%,transparent 100%);}
   .hero-inner{max-width:980px;margin:0 auto;}
   .hero-eyebrow{font-size:0.68rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--red);margin-bottom:0.75rem;}
   .hero h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;letter-spacing:-0.03em;line-height:1.05;margin-bottom:0.75rem;}
   .hero h1 em{color:var(--green);font-style:normal;}
   .hero-sub{color:var(--text-dim);font-size:0.95rem;max-width:520px;line-height:1.7;}
-
   main{max-width:980px;margin:0 auto;padding:3rem 2rem;}
-
-  /* Trust metrics strip */
   .trust-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:2.5rem;}
   .trust-cell{background:var(--surface);padding:1.75rem 1.5rem;text-align:center;}
   .trust-val{font-size:2.4rem;font-weight:800;letter-spacing:-0.03em;line-height:1;margin-bottom:0.3rem;}
   .trust-label{font-size:0.62rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);}
   .trust-sub{font-size:0.72rem;color:var(--text-dim);margin-top:0.3rem;}
-
-  /* Confidence badge */
   .confidence-bar{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:1rem 1.5rem;margin-bottom:2rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;}
   .confidence-left{display:flex;align-items:center;gap:0.75rem;}
   .confidence-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;}
@@ -41,21 +35,15 @@
   .conf-low{background:rgba(255,255,255,0.06);color:var(--text-muted);}
   .confidence-text h3{font-size:0.82rem;font-weight:600;margin-bottom:0.15rem;}
   .confidence-text p{font-size:0.72rem;color:var(--text-dim);}
-  .confidence-warnings{display:flex;flex-direction:column;gap:0.25rem;}
-  .warning-item{font-size:0.68rem;color:var(--amber);display:flex;align-items:center;gap:0.35rem;}
-
-  /* Narrative */
   .narrative-box{background:var(--surface-2);border:1px solid var(--border);border-left:3px solid var(--red);border-radius:8px;padding:1.5rem 1.75rem;margin-bottom:2.5rem;}
   .narrative-box h2{font-size:0.62rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.75rem;}
   .narrative-box p{font-size:0.9rem;color:var(--text-dim);line-height:1.7;}
-
-  /* Recommended actions */
   .section{margin-bottom:3rem;}
   .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;padding-bottom:0.75rem;border-bottom:1px solid var(--border);}
   .section-title{font-size:0.62rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);}
 
+  /* Action cards */
   .action-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.75rem;margin-bottom:1rem;transition:border-color 0.15s;}
-  .action-card:hover{border-color:var(--border-mid);}
   .action-card.urgency-immediate{border-left:3px solid var(--red);}
   .action-card.urgency-high{border-left:3px solid var(--amber);}
   .action-card.urgency-normal{border-left:3px solid var(--blue);}
@@ -69,14 +57,39 @@
   .badge-normal{background:rgba(59,130,246,0.1);color:var(--blue);}
   .badge-low{background:rgba(255,255,255,0.06);color:var(--text-muted);}
   .badge-authorized{background:rgba(34,197,94,0.15);color:var(--green);}
-  .badge-proposed{background:rgba(59,130,246,0.1);color:var(--blue);}
   .action-body{font-size:0.83rem;color:var(--text-dim);line-height:1.6;margin-bottom:0.75rem;}
-  .action-impact{background:var(--surface-2);border-radius:4px;padding:0.65rem 0.9rem;font-size:0.78rem;color:var(--text-dim);margin-bottom:1rem;border-left:2px solid var(--green);}
+  .action-impact{background:var(--surface-2);border-radius:4px;padding:0.65rem 0.9rem;font-size:0.78rem;color:var(--text-dim);margin-bottom:0.75rem;border-left:2px solid var(--green);}
   .action-impact strong{color:var(--green);}
-  .action-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;}
+
+  /* Why flagged expandable */
+  .why-flagged{margin-bottom:0.75rem;}
+  .why-flagged-toggle{font-size:0.72rem;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;gap:0.35rem;background:none;border:none;padding:0;font-family:inherit;}
+  .why-flagged-toggle:hover{color:var(--text-dim);}
+  .why-flagged-toggle .arrow{transition:transform 0.2s;display:inline-block;}
+  .why-flagged-toggle.open .arrow{transform:rotate(90deg);}
+  .why-flagged-body{display:none;background:var(--surface-3);border-radius:6px;padding:0.9rem 1rem;margin-top:0.5rem;font-size:0.78rem;color:var(--text-dim);line-height:1.6;border-left:2px solid var(--text-muted);}
+  .why-flagged-body.show{display:block;}
+  .why-flagged-source{font-size:0.65rem;color:var(--text-muted);margin-top:0.5rem;font-style:italic;}
+
+  /* Timeline */
+  .timeline-tag{display:inline-flex;align-items:center;gap:0.3rem;font-size:0.7rem;color:var(--text-muted);background:var(--surface-2);border:1px solid var(--border);border-radius:3px;padding:0.2rem 0.5rem;margin-bottom:0.75rem;}
+  .timeline-tag .clock{font-size:0.75rem;}
+
+  /* Required docs */
+  .required-docs{margin-bottom:0.75rem;}
+  .required-docs-toggle{font-size:0.72rem;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;gap:0.35rem;background:none;border:none;padding:0;font-family:inherit;}
+  .required-docs-toggle:hover{color:var(--text-dim);}
+  .docs-list{display:none;margin-top:0.5rem;}
+  .docs-list.show{display:block;}
+  .doc-item{display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0;font-size:0.75rem;color:var(--text-dim);}
+  .doc-check{font-size:0.8rem;}
+  .doc-check.uploaded{color:var(--green);}
+  .doc-check.missing{color:var(--text-muted);}
+  .doc-required-tag{font-size:0.55rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;background:rgba(232,38,42,0.1);color:var(--red);padding:0.1rem 0.35rem;border-radius:2px;margin-left:auto;}
+
+  .action-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);}
   .action-recovery{font-size:1.1rem;font-weight:700;color:var(--green);}
   .action-recovery span{font-size:0.68rem;color:var(--text-muted);font-weight:400;margin-left:0.25rem;}
-
   .btn{font-size:0.75rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;border:none;padding:0.75rem 1.75rem;border-radius:6px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:0.4rem;transition:background 0.15s,transform 0.1s;}
   .btn:hover{transform:translateY(-1px);}
   .btn:disabled{opacity:0.5;cursor:not-allowed;transform:none!important;}
@@ -85,33 +98,104 @@
   .btn-ghost{background:var(--surface-2);color:var(--text-dim);border:1px solid var(--border);}
   .btn-ghost:hover{background:var(--surface-3);color:var(--text);}
   .btn-authorized{background:rgba(34,197,94,0.1);color:var(--green);border:1px solid rgba(34,197,94,0.3);cursor:default;}
+  .btn-green{background:var(--green);color:#000;}
+  .btn-green:hover{background:#16a34a;}
+
+  /* Authorization modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:200;display:flex;align-items:center;justify-content:center;padding:1rem;}
+  .modal{background:var(--surface);border:1px solid var(--border-mid);border-radius:10px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;}
+  .modal-header{padding:1.5rem 1.75rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;}
+  .modal-title{font-size:1.1rem;font-weight:800;letter-spacing:-0.01em;}
+  .modal-close{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.25rem;padding:0;line-height:1;}
+  .modal-close:hover{color:var(--text);}
+  .modal-body{padding:1.5rem 1.75rem;}
+  .modal-section{margin-bottom:1.5rem;}
+  .modal-section-title{font-size:0.6rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.75rem;}
+  .disclosure-row{display:flex;align-items:flex-start;gap:0.75rem;padding:0.65rem 0;border-bottom:1px solid var(--border);}
+  .disclosure-row:last-child{border-bottom:none;}
+  .disclosure-icon{font-size:0.9rem;margin-top:1px;flex-shrink:0;}
+  .disclosure-text{font-size:0.8rem;color:var(--text-dim);line-height:1.5;}
+  .disclosure-text strong{color:var(--text);}
+  .agreement-preview{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:1rem;font-size:0.72rem;color:var(--text-muted);line-height:1.6;max-height:150px;overflow-y:auto;white-space:pre-wrap;font-family:monospace;}
+  .checkbox-row{display:flex;align-items:flex-start;gap:0.75rem;margin-bottom:1rem;}
+  .checkbox-row input[type=checkbox]{width:16px;height:16px;margin-top:2px;flex-shrink:0;accent-color:var(--green);}
+  .checkbox-label{font-size:0.82rem;color:var(--text-dim);line-height:1.5;}
+  .modal-footer{padding:1.25rem 1.75rem;border-top:1px solid var(--border);display:flex;gap:0.75rem;justify-content:flex-end;}
+  .metric-row{display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--border);font-size:0.8rem;}
+  .metric-row:last-child{border-bottom:none;}
+  .metric-label{color:var(--text-muted);}
+  .metric-val{font-weight:600;color:var(--text);}
 
   .msg{padding:1rem 1.25rem;border-radius:8px;font-size:0.82rem;margin-bottom:1.5rem;display:none;}
   .msg.show{display:block;}
   .msg-success{background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);color:var(--green);}
   .msg-error{background:rgba(232,38,42,0.1);border:1px solid rgba(232,38,42,0.3);color:#ff6b6b;}
-
-  /* Engagement history */
-  .engagement-row{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1rem 1.25rem;margin-bottom:0.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;}
-  .eng-left .eng-title{font-size:0.82rem;font-weight:500;}
-  .eng-left .eng-meta{font-size:0.68rem;color:var(--text-muted);margin-top:0.15rem;}
-  .eng-right{text-align:right;}
-  .eng-right .eng-ref{font-size:0.65rem;color:var(--text-muted);font-family:monospace;}
-
-  .loading-state{padding:3rem;text-align:center;color:var(--text-muted);font-size:0.82rem;}
-  .spinner{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 1rem;}
-  @keyframes spin{to{transform:rotate(360deg);}}
-
   .upload-nudge{background:var(--surface-2);border:1px solid rgba(245,158,11,0.2);border-left:3px solid var(--amber);border-radius:6px;padding:1rem 1.25rem;font-size:0.82rem;color:var(--text-dim);margin-bottom:2rem;}
   .upload-nudge strong{color:var(--amber);}
   .upload-nudge a{color:var(--red);}
-
+  .engagement-row{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1rem 1.25rem;margin-bottom:0.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;}
+  .eng-left .eng-title{font-size:0.82rem;font-weight:500;}
+  .eng-left .eng-meta{font-size:0.68rem;color:var(--text-muted);margin-top:0.15rem;}
+  .eng-right .eng-ref{font-size:0.65rem;color:var(--text-muted);font-family:monospace;}
+  .loading-state{padding:3rem;text-align:center;color:var(--text-muted);font-size:0.82rem;}
+  .spinner{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 1rem;}
+  @keyframes spin{to{transform:rotate(360deg);}}
   footer{margin-top:4rem;padding:2rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;}
   footer p{font-size:0.7rem;color:var(--text-muted);}
   @media(max-width:600px){header{padding:0 1rem;}main{padding:1.5rem 1rem;}.hero{padding:2.5rem 1rem 2rem;}.trust-strip{grid-template-columns:1fr 1fr;}.trust-strip .trust-cell:last-child{grid-column:1/-1;}}
 </style>
 </head>
 <body>
+
+<!-- Authorization Modal -->
+<div class="modal-overlay" id="auth-modal" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modal-title">Authorize Recovery Service</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.25rem" id="modal-sub"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Service metrics -->
+      <div class="modal-section">
+        <div class="modal-section-title">Service Summary</div>
+        <div id="modal-metrics"></div>
+      </div>
+
+      <!-- Key disclosures -->
+      <div class="modal-section">
+        <div class="modal-section-title">Key Disclosures</div>
+        <div class="disclosure-row"><div class="disclosure-icon" style="color:var(--green)">✓</div><div class="disclosure-text"><strong>Artists retain 100% ownership.</strong> MusiGod administers rights but never acquires them.</div></div>
+        <div class="disclosure-row"><div class="disclosure-icon" style="color:var(--green)">✓</div><div class="disclosure-text"><strong>MusiGod earns only from successful recovery.</strong> No upfront fees. No recovery = no fee.</div></div>
+        <div class="disclosure-row"><div class="disclosure-icon" style="color:var(--amber)">→</div><div class="disclosure-text"><strong>Standard recovery fee: 15%</strong> of royalties successfully recovered through MusiGod administration.</div></div>
+        <div class="disclosure-row"><div class="disclosure-icon" style="color:var(--text-muted)">~</div><div class="disclosure-text"><strong>Recovery estimates are probabilistic and not guaranteed.</strong> Actual recovery depends on catalog history, society response, and documentation quality.</div></div>
+      </div>
+
+      <!-- Agreement preview -->
+      <div class="modal-section">
+        <div class="modal-section-title">Agreement</div>
+        <div class="agreement-preview" id="modal-agreement-text">Loading agreement text…</div>
+      </div>
+
+      <!-- Consent -->
+      <div class="checkbox-row">
+        <input type="checkbox" id="modal-consent" onchange="checkConsent()">
+        <label class="checkbox-label" for="modal-consent">
+          I have read and agree to the terms above. I understand that artists retain 100% ownership, MusiGod's fee is 15% of successful recovery only, and estimates are not guaranteed.
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-authorize" id="modal-confirm-btn" disabled onclick="confirmAuthorization()">
+        CONFIRM AUTHORIZATION
+      </button>
+    </div>
+  </div>
+</div>
+
 <header>
   <a href="/portal.html" class="logo"><span class="logo-musi">MUSI</span><span class="logo-god">GOD</span></a>
   <nav>
@@ -124,12 +208,11 @@
 <div id="loading-hero" class="hero">
   <div class="hero-inner"><div class="loading-state"><div class="spinner"></div>Loading recovery analysis…</div></div>
 </div>
-
 <div id="main-hero" class="hero" style="display:none">
   <div class="hero-inner">
     <p class="hero-eyebrow">Recovery Opportunity Analysis</p>
     <h1>MusiGod identified <em id="hero-range">$0–$0</em> in recoverable royalties.</h1>
-    <p class="hero-sub" id="hero-sub">Analyzing your rights and registration gaps…</p>
+    <p class="hero-sub" id="hero-sub"></p>
   </div>
 </div>
 
@@ -137,14 +220,12 @@
   <div class="msg msg-success" id="msg-success"></div>
   <div class="msg msg-error" id="msg-error"></div>
 
-  <!-- Trust strip -->
-  <div class="trust-strip" id="trust-strip">
+  <div class="trust-strip">
     <div class="trust-cell"><div class="trust-val" id="ts-range">—</div><div class="trust-label">Estimated Recoverable</div><div class="trust-sub">Low–high range</div></div>
-    <div class="trust-cell"><div class="trust-val" id="ts-prob" style="color:var(--green)">—</div><div class="trust-label">Recovery Probability</div><div class="trust-sub" id="ts-prob-sub">Based on findings analysis</div></div>
+    <div class="trust-cell"><div class="trust-val" id="ts-prob" style="color:var(--green)">—</div><div class="trust-label">Recovery Probability</div><div class="trust-sub" id="ts-prob-sub"></div></div>
     <div class="trust-cell"><div class="trust-val" id="ts-leakage" style="color:var(--amber)">—</div><div class="trust-label">Royalty Leakage Score™</div><div class="trust-sub" id="ts-leakage-label">—</div></div>
   </div>
 
-  <!-- Audit confidence -->
   <div class="confidence-bar" id="confidence-bar" style="display:none">
     <div class="confidence-left">
       <div class="confidence-icon" id="conf-icon"></div>
@@ -153,22 +234,18 @@
         <p id="conf-explanation"></p>
       </div>
     </div>
-    <div class="confidence-warnings" id="conf-warnings"></div>
   </div>
 
-  <!-- Upload nudge if no docs -->
   <div class="upload-nudge" id="upload-nudge" style="display:none">
-    <strong>Increase confidence:</strong> Upload PRO statements, distributor reports, or split sheets to improve recovery accuracy.
-    <a href="/upload-documents.html" id="upload-link"> Upload documents →</a>
+    <strong>Increase recovery confidence:</strong> Upload PRO statements, distributor reports, or split sheets.
+    <a href="#" id="upload-link"> Upload documents →</a>
   </div>
 
-  <!-- Narrative -->
   <div class="narrative-box" id="narrative-box" style="display:none">
     <h2>MusiGod Analysis</h2>
     <p id="narrative-text"></p>
   </div>
 
-  <!-- Recommended Actions -->
   <div class="section">
     <div class="section-header">
       <div class="section-title">Recommended Recovery Services</div>
@@ -177,7 +254,6 @@
     <div id="actions-list"><div class="loading-state"><div class="spinner"></div></div></div>
   </div>
 
-  <!-- Existing engagements -->
   <div class="section" id="engagements-section" style="display:none">
     <div class="section-header"><div class="section-title">Authorized Engagements</div></div>
     <div id="engagements-list"></div>
@@ -190,72 +266,68 @@
 </footer>
 
 <script>
-const params = new URLSearchParams(window.location.search)
+const params    = new URLSearchParams(window.location.search)
 const EMAIL     = params.get('email')     || localStorage.getItem('musigod_artist_email') || localStorage.getItem('musigod_rights_audit_email') || ''
 const ARTIST_ID = params.get('artist_id') || localStorage.getItem('musigod_artist_id') || ''
 const AUDIT_ID  = params.get('audit_id')  || localStorage.getItem('musigod_rights_audit_id') || ''
-
 if (EMAIL) localStorage.setItem('musigod_artist_email', EMAIL)
 
-// Wire nav links with context
 const ctx = new URLSearchParams()
 if (EMAIL)     ctx.set('email', EMAIL)
 if (ARTIST_ID) ctx.set('artist_id', ARTIST_ID)
 if (AUDIT_ID)  ctx.set('audit_id', AUDIT_ID)
-document.getElementById('report-link').href    = '/audit-report.html?' + ctx
-document.getElementById('activity-link').href  = '/activity.html?' + ctx
+document.getElementById('report-link').href   = '/audit-report.html?' + ctx
+document.getElementById('activity-link').href = '/activity.html?' + ctx
 document.getElementById('upload-link') && (document.getElementById('upload-link').href = '/upload-documents.html?' + ctx)
 
+let conversionData = {}
+let trustData = {}
 const authorizedServices = new Set()
+let pendingServiceType = null
+let pendingServiceTitle = null
+let pendingAgreementText = ''
 
-async function loadConversionData() {
+async function loadAll() {
   if (!EMAIL) {
     document.getElementById('loading-hero').innerHTML = '<div class="hero-inner"><div class="loading-state">No artist context. Return to your <a href="/portal.html" style="color:var(--red)">portal</a>.</div></div>'
     return
   }
-
   try {
-    const qs = new URLSearchParams({ email: EMAIL })
-    if (AUDIT_ID)  qs.set('audit_id', AUDIT_ID)
-    if (ARTIST_ID) qs.set('artist_id', ARTIST_ID)
+    const [convRes, trustRes] = await Promise.all([
+      fetch(`/api/get-recovery-conversion?${ctx}`),
+      fetch(`/api/get-trust-surface?email=${encodeURIComponent(EMAIL)}${AUDIT_ID ? '&audit_id=' + encodeURIComponent(AUDIT_ID) : ''}`),
+    ])
+    conversionData = await convRes.json()
+    trustData      = await trustRes.json()
 
-    const res = await fetch(`/api/get-recovery-conversion?${qs}`)
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Load failed')
-
-    renderPage(data)
+    renderPage()
   } catch (err) {
     document.getElementById('loading-hero').innerHTML = `<div class="hero-inner"><div class="loading-state">Error: ${esc(err.message)}</div></div>`
   }
 }
 
-function renderPage(data) {
-  const { estimate, probability, confidence, actions, engagements, narrative, leakage } = data
+function renderPage() {
+  const { estimate, probability, confidence, actions, engagements, narrative, leakage } = conversionData
+  const { explanations, timelines, required_docs } = trustData
 
   document.getElementById('loading-hero').style.display = 'none'
-  document.getElementById('main-hero').style.display = 'block'
+  document.getElementById('main-hero').style.display    = 'block'
   document.getElementById('main-content').style.display = 'block'
 
   // Hero
   if (estimate) {
-    const range = '$' + fmt(estimate.estimate_low) + '–$' + fmt(estimate.estimate_high)
-    document.getElementById('hero-range').textContent = range
-    document.getElementById('hero-sub').textContent =
-      estimate.estimate_confidence + ' confidence estimate based on ' +
-      (actions.length || 'identified') + ' royalty recovery opportunities. ' +
-      'MusiGod recommends immediate action.'
+    document.getElementById('hero-range').textContent = '$' + fmt(estimate.estimate_low) + '–$' + fmt(estimate.estimate_high)
+    document.getElementById('hero-sub').textContent   = estimate.estimate_confidence + ' confidence estimate based on ' + (actions?.length || 'identified') + ' royalty recovery opportunities. MusiGod recommends immediate action.'
   }
 
   // Trust strip
-  document.getElementById('ts-range').textContent = estimate
-    ? '$' + fmt(estimate.estimate_low) + '–$' + fmt(estimate.estimate_high) : '—'
-  document.getElementById('ts-prob').textContent = probability
-    ? probability.recovery_probability + '%' : '—'
-  document.getElementById('ts-prob-sub').textContent = probability?.confidence_reason || 'Based on findings analysis'
-  document.getElementById('ts-leakage').textContent = leakage ? leakage.leakage_score + '/100' : '—'
+  document.getElementById('ts-range').textContent      = estimate ? '$' + fmt(estimate.estimate_low) + '–$' + fmt(estimate.estimate_high) : '—'
+  document.getElementById('ts-prob').textContent        = probability ? probability.recovery_probability + '%' : '—'
+  document.getElementById('ts-prob-sub').textContent    = probability?.confidence_reason || ''
+  document.getElementById('ts-leakage').textContent     = leakage ? leakage.leakage_score + '/100' : '—'
   document.getElementById('ts-leakage-label').textContent = leakage?.leakage_label || '—'
 
-  // Confidence bar
+  // Confidence
   if (confidence) {
     document.getElementById('confidence-bar').style.display = 'flex'
     const lvl = confidence.audit_confidence_level
@@ -264,52 +336,126 @@ function renderPage(data) {
     icon.className = 'confidence-icon conf-' + lvl.toLowerCase()
     document.getElementById('conf-title').textContent = 'Audit Confidence: ' + lvl
     document.getElementById('conf-explanation').textContent = confidence.confidence_explanation || ''
-
-    const warnings = confidence.warnings || []
-    if (warnings.length) {
-      document.getElementById('conf-warnings').innerHTML = warnings.map(w =>
-        `<div class="warning-item">⚠ ${esc(w)}</div>`
-      ).join('')
-    }
     if (confidence.document_quality_score < 50) {
       document.getElementById('upload-nudge').style.display = 'block'
-      if (document.getElementById('upload-link')) {
-        document.getElementById('upload-link').href = '/upload-documents.html?' + ctx
-      }
+      document.getElementById('upload-link').href = '/upload-documents.html?' + ctx
     }
   }
 
   // Narrative
   if (narrative) {
-    const narText = narrative.admin_overridden && narrative.admin_override_text
-      ? narrative.admin_override_text : narrative.narrative_text
-    if (narText) {
-      document.getElementById('narrative-box').style.display = 'block'
-      document.getElementById('narrative-text').textContent = narText
-    }
+    const txt = narrative.admin_overridden && narrative.admin_override_text ? narrative.admin_override_text : narrative.narrative_text
+    if (txt) { document.getElementById('narrative-box').style.display = 'block'; document.getElementById('narrative-text').textContent = txt }
   }
 
-  // Track authorized engagements
-  ;(engagements || []).forEach(e => {
-    if (e.status === 'AUTHORIZED') authorizedServices.add(e.service_type)
+  // Track authorized
+  ;(engagements || []).forEach(e => { if (e.status === 'AUTHORIZED') authorizedServices.add(e.service_type) })
+  ;(trustData.authorizations || []).forEach(a => authorizedServices.add(a.service_type))
+
+  // Build explanation map keyed by action_type
+  const explMap = {}
+  ;(explanations || []).forEach(e => {
+    // Map by finding_id — we'll match to action below
+    if (e.explanation_title) explMap[e.explanation_title] = e
   })
 
-  // Deduplicate actions by action_type — keep highest estimated_recovery_value per type
+  // Build timeline map
+  const timelineMap = {}
+  ;(timelines || []).forEach(t => { timelineMap[t.recovery_type] = t })
+
+  // Build required docs map
+  const docsMap = {}
+  ;(required_docs || []).forEach(d => {
+    if (!docsMap[d.finding_id]) docsMap[d.finding_id] = []
+    docsMap[d.finding_id].push(d)
+  })
+
+  // Deduplicate actions by action_type
   const seenTypes = new Set()
   const uniqueActions = (actions || []).filter(a => {
     if (seenTypes.has(a.action_type)) return false
-    seenTypes.add(a.action_type)
-    return true
+    seenTypes.add(a.action_type); return true
   })
 
   document.getElementById('actions-count').textContent = uniqueActions.length + ' service' + (uniqueActions.length !== 1 ? 's' : '') + ' available'
+
   if (!uniqueActions.length) {
     document.getElementById('actions-list').innerHTML = '<div class="loading-state" style="padding:2rem;color:var(--text-muted)">No recommended actions at this time. Upload documents to trigger analysis.</div>'
   } else {
-    document.getElementById('actions-list').innerHTML = uniqueActions.map(a => renderAction(a)).join('')
+    document.getElementById('actions-list').innerHTML = uniqueActions.map(a => {
+      const timeline  = timelineMap[a.action_type]
+      const isAuth    = authorizedServices.has(a.action_type)
+      const urgencyClass = 'urgency-' + (a.urgency || 'normal').toLowerCase()
+      const badgeClass   = 'badge-' + (a.urgency || 'normal').toLowerCase()
+      const cardId       = 'card-' + a.id
+
+      // Find matching explanation (by finding type keyword)
+      const explKey = Object.keys(explMap).find(k => k.toLowerCase().includes((a.action_type || '').toLowerCase().replace(/_/g, ' ').split('_')[0]))
+      const expl = explKey ? explMap[explKey] : null
+
+      // Get required docs for this action's finding_id
+      const docs = docsMap[a.finding_id] || []
+      const requiredDocs = docs.filter(d => d.required_for_processing)
+      const uploadedCount = docs.filter(d => d.is_uploaded).length
+
+      return `
+        <div class="action-card ${urgencyClass}" id="${cardId}">
+          <div class="action-top">
+            <div class="action-title">${esc(a.action_title)}</div>
+            <div class="action-badges">
+              <span class="badge ${badgeClass}">${esc(a.urgency)}</span>
+              ${isAuth ? '<span class="badge badge-authorized">Authorized</span>' : ''}
+            </div>
+          </div>
+
+          ${timeline ? `<div class="timeline-tag"><span class="clock">⏱</span> Est. ${timeline.estimated_min_days}–${timeline.estimated_max_days} days · ${esc(timeline.dependency_status)}</div>` : ''}
+
+          <div class="action-body">${esc(a.action_body || '')}</div>
+
+          ${a.estimated_impact ? `<div class="action-impact"><strong>Impact:</strong> ${esc(a.estimated_impact)}</div>` : ''}
+
+          ${expl ? `
+            <div class="why-flagged">
+              <button class="why-flagged-toggle" onclick="toggleWhy('why-${a.id}', this)">
+                <span class="arrow">▶</span> Why MusiGod flagged this
+              </button>
+              <div class="why-flagged-body" id="why-${a.id}">
+                ${esc(expl.explanation_body)}
+                ${expl.evidence_source ? `<div class="why-flagged-source">Evidence source: ${esc(expl.evidence_source)}</div>` : ''}
+              </div>
+            </div>` : ''}
+
+          ${docs.length ? `
+            <div class="required-docs">
+              <button class="required-docs-toggle" onclick="toggleDocs('docs-${a.id}', this)">
+                <span class="arrow">▶</span> Required documents (${uploadedCount}/${docs.length} uploaded)
+              </button>
+              <div class="docs-list" id="docs-${a.id}">
+                ${docs.map(d => `
+                  <div class="doc-item">
+                    <span class="doc-check ${d.is_uploaded ? 'uploaded' : 'missing'}">${d.is_uploaded ? '✓' : '○'}</span>
+                    <span>${esc(d.document_type.replace(/_/g,' '))}</span>
+                    <span style="font-size:0.68rem;color:var(--text-muted);flex:1;margin-left:0.5rem">${esc(d.requirement_reason)}</span>
+                    ${d.required_for_processing ? '<span class="doc-required-tag">Required</span>' : ''}
+                    ${!d.is_uploaded ? `<a href="/upload-documents.html?${ctx}&document_type=${encodeURIComponent(d.document_type)}" style="font-size:0.68rem;color:var(--red);margin-left:0.5rem">Upload →</a>` : ''}
+                  </div>`).join('')}
+              </div>
+            </div>` : ''}
+
+          <div class="action-footer">
+            <div class="action-recovery">$${fmt(a.estimated_recovery_value)} <span>estimated recovery</span></div>
+            ${isAuth
+              ? '<button class="btn btn-authorized" disabled>✓ Authorized</button>'
+              : `<button class="btn btn-authorize" onclick="openModal('${esc(a.action_type)}','${esc(a.action_title)}',${a.estimated_recovery_value || 0})">
+                   Authorize Recovery Service
+                 </button>`
+            }
+          </div>
+        </div>`
+    }).join('')
   }
 
-  // Engagements history
+  // Engagements
   if (engagements?.length) {
     document.getElementById('engagements-section').style.display = 'block'
     document.getElementById('engagements-list').innerHTML = engagements.map(e => `
@@ -326,72 +472,110 @@ function renderPage(data) {
   }
 }
 
-function renderAction(a) {
-  const urgencyClass = 'urgency-' + (a.urgency || 'normal').toLowerCase()
-  const badgeClass   = 'badge-' + (a.urgency || 'normal').toLowerCase()
-  const isAuth       = authorizedServices.has(a.action_type)
+// ---------------------------------------------------------------------------
+// Authorization modal
+// ---------------------------------------------------------------------------
+async function openModal(serviceType, serviceTitle, recoveryValue) {
+  pendingServiceType  = serviceType
+  pendingServiceTitle = serviceTitle
 
-  return `
-    <div class="action-card ${urgencyClass}">
-      <div class="action-top">
-        <div class="action-title">${esc(a.action_title)}</div>
-        <div class="action-badges">
-          <span class="badge ${badgeClass}">${esc(a.urgency)}</span>
-          ${isAuth ? '<span class="badge badge-authorized">Authorized</span>' : ''}
-        </div>
-      </div>
-      <div class="action-body">${esc(a.action_body || '')}</div>
-      ${a.estimated_impact ? `<div class="action-impact"><strong>Impact:</strong> ${esc(a.estimated_impact)}</div>` : ''}
-      <div class="action-footer">
-        <div class="action-recovery">$${fmt(a.estimated_recovery_value)} <span>estimated recovery</span></div>
-        ${isAuth
-          ? '<button class="btn btn-authorized" disabled>✓ Authorized</button>'
-          : `<button class="btn btn-authorize" onclick="authorizeService('${esc(a.action_type)}', '${esc(a.action_title)}', this)">
-               Authorize Recovery Service
-             </button>`
-        }
-      </div>
-    </div>`
+  document.getElementById('modal-title').textContent = serviceTitle
+  document.getElementById('modal-sub').textContent   = 'Review terms and confirm authorization'
+  document.getElementById('modal-consent').checked   = false
+  document.getElementById('modal-confirm-btn').disabled = true
+
+  const est  = conversionData.estimate
+  const prob = conversionData.probability
+  document.getElementById('modal-metrics').innerHTML = `
+    <div class="metric-row"><span class="metric-label">Estimated Recovery</span><span class="metric-val" style="color:var(--green)">$${fmt(est?.estimate_low || 0)}–$${fmt(est?.estimate_high || 0)}</span></div>
+    <div class="metric-row"><span class="metric-label">Recovery Probability</span><span class="metric-val">${prob?.recovery_probability || 0}%</span></div>
+    <div class="metric-row"><span class="metric-label">MusiGod Fee</span><span class="metric-val">15% of successful recovery only</span></div>
+    <div class="metric-row"><span class="metric-label">Upfront Cost</span><span class="metric-val" style="color:var(--green)">$0</span></div>
+    <div class="metric-row"><span class="metric-label">Ownership Transfer</span><span class="metric-val" style="color:var(--green)">None — you retain 100%</span></div>
+  `
+
+  // Fetch agreement text
+  try {
+    const r = await fetch(`https://uykzkrnoetcldeuxzqyy.supabase.co/rest/v1/recovery_agreements_v1?service_type=eq.${encodeURIComponent(serviceType)}&is_active=eq.true&limit=1`, {
+      headers: {
+        apikey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDYxOSwiZXhwIjoyMDkzMTA2NjE5fQ.jmBLX9VwFvFT4rc3lzqSJS9hFjis2QxRkmWpFizQtKk',
+        Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDYxOSwiZXhwIjoyMDkzMTA2NjE5fQ.jmBLX9VwFvFT4rc3lzqSJS9hFjis2QxRkmWpFizQtKk',
+        'Accept-Profile': 'registrations',
+      }
+    })
+    const agreements = await r.json()
+    pendingAgreementText = agreements?.[0]?.full_text || 'Standard MusiGod recovery service agreement. Artists retain 100% ownership. MusiGod fee: 15% of successful recovery only.'
+  } catch {
+    pendingAgreementText = 'Standard MusiGod recovery service agreement. Artists retain 100% ownership. MusiGod fee: 15% of successful recovery only.'
+  }
+  document.getElementById('modal-agreement-text').textContent = pendingAgreementText
+
+  document.getElementById('auth-modal').style.display = 'flex'
+  document.body.style.overflow = 'hidden'
 }
 
-async function authorizeService(serviceType, serviceTitle, btn) {
+function closeModal() {
+  document.getElementById('auth-modal').style.display = 'none'
+  document.body.style.overflow = ''
+  pendingServiceType  = null
+  pendingServiceTitle = null
+}
+
+function checkConsent() {
+  document.getElementById('modal-confirm-btn').disabled = !document.getElementById('modal-consent').checked
+}
+
+async function confirmAuthorization() {
+  if (!pendingServiceType) return
+  const btn = document.getElementById('modal-confirm-btn')
   btn.disabled = true
   btn.textContent = 'Authorizing…'
   clearMessages()
 
   try {
-    const res = await fetch('/api/authorize-recovery-engagement', {
+    const res = await fetch('/api/authorize-recovery-service', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        artist_email: EMAIL,
-        artist_id:    ARTIST_ID || null,
-        audit_id:     AUDIT_ID  || null,
-        service_type: serviceType,
-        service_title: serviceTitle,
+        artist_email:             EMAIL,
+        artist_id:                ARTIST_ID || null,
+        audit_id:                 AUDIT_ID  || null,
+        service_type:             pendingServiceType,
+        service_title:            pendingServiceTitle,
+        disclosure_acknowledged:  true,
       }),
     })
     const data = await res.json()
     if (!res.ok || !data.ok) throw new Error(data.error || 'Authorization failed')
 
-    authorizedServices.add(serviceType)
+    authorizedServices.add(pendingServiceType)
+    closeModal()
 
     showMsg('success',
-      `Recovery service authorized. Engagement ref: ${data.engagement_ref}. ` +
-      'MusiGod will begin operational steps within 1 business day. Check your email for confirmation.')
+      `Recovery service authorized. Authorization ref: ${data.authorization_ref}. ` +
+      'MusiGod will begin within 1 business day. Check your email for confirmation.')
 
-    btn.className = 'btn btn-authorized'
-    btn.textContent = '✓ Authorized'
-    btn.disabled = true
-
-    // Reload engagements after short delay
-    setTimeout(() => loadConversionData(), 1500)
+    setTimeout(() => loadAll(), 1000)
 
   } catch (err) {
     showMsg('error', err.message)
-    btn.disabled = false
-    btn.textContent = 'Authorize Recovery Service'
+    btn.disabled  = false
+    btn.textContent = 'CONFIRM AUTHORIZATION'
   }
+}
+
+function toggleWhy(id, btn) {
+  const el = document.getElementById(id)
+  el.classList.toggle('show')
+  btn.classList.toggle('open')
+}
+
+function toggleDocs(id, btn) {
+  const el = document.getElementById(id)
+  el.classList.toggle('show')
+  btn.classList.toggle('open')
+  const arrow = btn.querySelector('.arrow')
+  if (arrow) arrow.style.transform = el.classList.contains('show') ? 'rotate(90deg)' : ''
 }
 
 function showMsg(type, msg) {
@@ -401,14 +585,12 @@ function showMsg(type, msg) {
   el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
 }
 function clearMessages() {
-  ['msg-success','msg-error'].forEach(id => {
-    const el = document.getElementById(id); el.textContent=''; el.classList.remove('show')
-  })
+  ['msg-success','msg-error'].forEach(id => { const el = document.getElementById(id); el.textContent=''; el.classList.remove('show') })
 }
 function fmt(v){const n=parseFloat(v)||0;if(n>=1000000)return(n/1000000).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(0)+'K';return n.toFixed(0);}
 function esc(v){return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
-loadConversionData()
+loadAll()
 </script>
 </body>
 </html>
