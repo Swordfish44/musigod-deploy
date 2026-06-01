@@ -640,10 +640,17 @@ DECLARE
   v_conf     registrations.audit_confidence_v1;
   v_actions  integer;
 BEGIN
-  SELECT registrations.fn_generate_recovery_estimate_v1(p_artist_email, p_audit_id, p_artist_id) INTO v_est;
-  SELECT registrations.fn_generate_recovery_probability_v1(p_artist_email, p_audit_id, p_artist_id) INTO v_prob;
-  SELECT registrations.fn_build_audit_confidence_v1(p_artist_email, p_audit_id, p_artist_id) INTO v_conf;
+  PERFORM registrations.fn_generate_recovery_estimate_v1(p_artist_email, p_audit_id, p_artist_id);
+  PERFORM registrations.fn_generate_recovery_probability_v1(p_artist_email, p_audit_id, p_artist_id);
+  PERFORM registrations.fn_build_audit_confidence_v1(p_artist_email, p_audit_id, p_artist_id);
   SELECT registrations.fn_generate_recommended_actions_v1(p_artist_email, p_audit_id, p_artist_id) INTO v_actions;
+
+  SELECT estimate_low, estimate_high, estimate_confidence INTO v_est.estimate_low, v_est.estimate_high, v_est.estimate_confidence
+  FROM registrations.recovery_estimates_v1 WHERE artist_email = p_artist_email ORDER BY created_at DESC LIMIT 1;
+  SELECT recovery_probability INTO v_prob.recovery_probability
+  FROM registrations.recovery_probability_scores_v1 WHERE artist_email = p_artist_email ORDER BY created_at DESC LIMIT 1;
+  SELECT audit_confidence_level, composite_confidence INTO v_conf.audit_confidence_level, v_conf.composite_confidence
+  FROM registrations.audit_confidence_v1 WHERE artist_email = p_artist_email ORDER BY created_at DESC LIMIT 1;
 
   RETURN jsonb_build_object(
     'estimate_low',          v_est.estimate_low,
@@ -705,16 +712,14 @@ CREATE POLICY srole_engagements ON registrations.recovery_engagements_v1        
 -- ============================================================
 
 DO $$
-DECLARE
-  v_result jsonb;
 BEGIN
-  SELECT registrations.fn_run_conversion_pipeline_v1(
+  PERFORM registrations.fn_run_conversion_pipeline_v1(
     'swordfishlp44@proton.me',
     NULL,
     '3d4788b6-2a86-4ed5-8f27-ab95b3a230d3'::uuid
-  ) INTO v_result;
+  );
 
-  RAISE NOTICE 'Conversion pipeline: %', v_result;
+  RAISE NOTICE 'Conversion pipeline complete for test artist.';
 
   -- Seed a proposed engagement
   PERFORM registrations.fn_create_recovery_engagement_v1(
