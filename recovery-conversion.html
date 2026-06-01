@@ -294,12 +294,19 @@ function renderPage(data) {
     if (e.status === 'AUTHORIZED') authorizedServices.add(e.service_type)
   })
 
-  // Actions
-  document.getElementById('actions-count').textContent = actions.length + ' service' + (actions.length !== 1 ? 's' : '') + ' available'
-  if (!actions.length) {
+  // Deduplicate actions by action_type — keep highest estimated_recovery_value per type
+  const seenTypes = new Set()
+  const uniqueActions = (actions || []).filter(a => {
+    if (seenTypes.has(a.action_type)) return false
+    seenTypes.add(a.action_type)
+    return true
+  })
+
+  document.getElementById('actions-count').textContent = uniqueActions.length + ' service' + (uniqueActions.length !== 1 ? 's' : '') + ' available'
+  if (!uniqueActions.length) {
     document.getElementById('actions-list').innerHTML = '<div class="loading-state" style="padding:2rem;color:var(--text-muted)">No recommended actions at this time. Upload documents to trigger analysis.</div>'
   } else {
-    document.getElementById('actions-list').innerHTML = actions.map(a => renderAction(a)).join('')
+    document.getElementById('actions-list').innerHTML = uniqueActions.map(a => renderAction(a)).join('')
   }
 
   // Engagements history
