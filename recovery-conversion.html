@@ -215,7 +215,7 @@ async function loadConversionData() {
   }
 
   try {
-    const qs = new URLSearchParams({ email: EMAIL, run_pipeline: '1' })
+    const qs = new URLSearchParams({ email: EMAIL })
     if (AUDIT_ID)  qs.set('audit_id', AUDIT_ID)
     if (ARTIST_ID) qs.set('artist_id', ARTIST_ID)
 

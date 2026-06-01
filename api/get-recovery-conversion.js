@@ -15,11 +15,16 @@ module.exports = withSentry(async function handler(req, res) {
   try {
     // Optionally run the pipeline first to ensure fresh data
     if (run_pipeline === '1') {
-      await sbRpc('fn_run_conversion_pipeline_v1', 'registrations', {
-        p_artist_email: email,
-        p_audit_id:     audit_id || null,
-        p_artist_id:    artist_id || null,
-      })
+      try {
+        await sbRpc('fn_run_conversion_pipeline_v1', 'registrations', {
+          p_artist_email: email,
+          p_audit_id:     audit_id || null,
+          p_artist_id:    artist_id || null,
+        })
+      } catch (pipelineErr) {
+        // Non-fatal — log and continue to fetch existing data
+        console.warn('Pipeline run failed (non-fatal):', pipelineErr.message)
+      }
     }
 
     const [
