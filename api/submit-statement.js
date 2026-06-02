@@ -2,18 +2,17 @@
 // MusiGod — Royalty Statement Ingestion API
 // POST /api/submit-statement
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-const baseHeaders = {
-  'Content-Type': 'application/json',
-  'apikey': SUPABASE_SERVICE_KEY,
-  'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-  'Accept-Profile': 'royalties',
-  'Content-Profile': 'royalties',
-};
-
 export default async function handler(req, res) {
+  const SUPABASE_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co';
+  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+
+  const baseHeaders = {
+    'Content-Type': 'application/json',
+    'apikey': SUPABASE_SERVICE_KEY,
+    'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+    'Accept-Profile': 'royalties',
+    'Content-Profile': 'royalties',
+  };
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
