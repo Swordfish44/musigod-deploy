@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Data Retention Policy — MusiGod</title>
+  <style>
+    :root {
+      --navy: #0a1628; --navy-mid: #0d1f3c; --gold: #c9a84c; --gold-light: #e8c96e;
+      --white: #ffffff; --off-white: #f5f5f0; --text-primary: #1a1a2e;
+      --text-secondary: #4a4a6a; --border: #e0ddd5;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Georgia', serif; background: var(--off-white); color: var(--text-primary); line-height: 1.75; }
+    header { background: var(--navy); padding: 20px 40px; display: flex; align-items: center; justify-content: space-between; }
+    header a { color: var(--gold); text-decoration: none; font-family: 'Arial', sans-serif; font-size: 14px; }
+    header .wordmark { font-family: 'Arial', sans-serif; font-size: 22px; font-weight: 700; color: var(--white); letter-spacing: 2px; }
+    header .wordmark span { color: var(--gold); }
+    .hero { background: var(--navy-mid); border-bottom: 3px solid var(--gold); padding: 48px 40px 36px; text-align: center; }
+    .hero h1 { font-family: 'Arial', sans-serif; font-size: 32px; color: var(--white); font-weight: 700; letter-spacing: 1px; margin-bottom: 10px; }
+    .hero .meta { font-family: 'Arial', sans-serif; font-size: 13px; color: var(--gold-light); }
+    .container { max-width: 860px; margin: 0 auto; padding: 48px 40px 80px; }
+    h2 { font-family: 'Arial', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--navy); margin-top: 44px; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    p { margin-bottom: 14px; font-size: 15px; }
+    ul { margin: 0 0 14px 24px; font-size: 15px; }
+    ul li { margin-bottom: 6px; }
+    .section-number { color: var(--gold); font-family: 'Arial', sans-serif; font-weight: 700; margin-right: 6px; }
+    .retention-table { width: 100%; border-collapse: collapse; margin: 20px 0; font-family: 'Arial', sans-serif; font-size: 13px; }
+    .retention-table th { background: var(--navy); color: var(--gold); text-align: left; padding: 10px 14px; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
+    .retention-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-secondary); vertical-align: top; }
+    .retention-table tr:nth-child(even) td { background: #f9f8f5; }
+    .pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 3px; font-family: 'Arial', sans-serif; }
+    .pill.no { background: #fdecea; color: #c0392b; }
+    .pill.yes { background: #e8f8f0; color: #27ae60; }
+    footer { background: var(--navy); border-top: 3px solid var(--gold); padding: 32px 40px; font-family: 'Arial', sans-serif; }
+    .footer-inner { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+    .footer-links { display: flex; flex-wrap: wrap; gap: 24px; align-items: center; }
+    .footer-links a { color: var(--gold-light); text-decoration: none; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
+    .footer-copy { font-size: 11px; color: #5a6a7a; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="wordmark">MUSI<span>GOD</span></div>
+  <a href="portal.html">← Back to Portal</a>
+</header>
+
+<div class="hero">
+  <h1>Data Retention Policy</h1>
+  <div class="meta">Document Retention Schedule &amp; Legal Hold Framework &nbsp;·&nbsp; MusiGod Publishing Administration Platform</div>
+</div>
+
+<div class="container">
+
+  <h2><span class="section-number">1.</span> Overview</h2>
+  <p>MusiGod retains data for the minimum period necessary to fulfill legal, contractual, and operational obligations. Retention periods are determined by applicable law, contractual commitments, and the operational necessity of maintaining accurate recovery records.</p>
+  <p>Deletion requests cannot override legal retention requirements, active legal holds, or open recovery case obligations. We will inform you of any applicable restrictions when processing a deletion request.</p>
+
+  <h2><span class="section-number">2.</span> Retention Schedule</h2>
+
+  <table class="retention-table">
+    <thead>
+      <tr>
+        <th>Document Category</th>
+        <th>Retention Period</th>
+        <th>Legal Basis</th>
+        <th>Deletable on Request</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Signed Publishing Agreements</strong></td>
+        <td>7 years</td>
+        <td>Michigan contract statute of limitations (6 yr) + 1-year margin</td>
+        <td><span class="pill no">No</span></td>
+      </tr>
+      <tr>
+        <td><strong>Recovery Authorization Documents</strong></td>
+        <td>7 years</td>
+        <td>Legal requirement — financial obligation record</td>
+        <td><span class="pill no">No</span></td>
+      </tr>
+      <tr>
+        <td><strong>Uploaded Royalty Statements</strong></td>
+        <td>5 years</td>
+        <td>Operational — dispute resolution support</td>
+        <td><span class="pill yes">Yes*</span></td>
+      </tr>
+      <tr>
+        <td><strong>Audit Findings &amp; Reports</strong></td>
+        <td>7 years</td>
+        <td>Contractual — supports recovery claims</td>
+        <td><span class="pill no">No</span></td>
+      </tr>
+      <tr>
+        <td><strong>Recovery Operations Logs</strong></td>
+        <td>Indefinite</td>
+        <td>Operational necessity — immutable audit trail</td>
+        <td><span class="pill no">No</span></td>
+      </tr>
+      <tr>
+        <td><strong>Legal Audit Event Logs</strong></td>
+        <td>Indefinite</td>
+        <td>Compliance — immutable legal record</td>
+        <td><span class="pill no">No</span></td>
+      </tr>
+      <tr>
+        <td><strong>Artist Profile Data</strong></td>
+        <td>3 years after inactivity</td>
+        <td>Contractual — subject to legal hold if open cases</td>
+        <td><span class="pill yes">Yes*</span></td>
+      </tr>
+      <tr>
+        <td><strong>IP Addresses / Session Logs</strong></td>
+        <td>1 year</td>
+        <td>Security and fraud prevention</td>
+        <td><span class="pill yes">Yes</span></td>
+      </tr>
+      <tr>
+        <td><strong>Affiliate Commission Records</strong></td>
+        <td>7 years</td>
+        <td>IRS record-keeping requirements</td>
+        <td><span class="pill no">No</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p style="font-size:13px; color: var(--text-secondary);">* Deletion eligible subject to legal hold review. Deletion blocked if active recovery case exists or legal hold is in place.</p>
+
+  <h2><span class="section-number">3.</span> Legal Holds</h2>
+  <p>MusiGod may place a legal hold on any data category where litigation, regulatory inquiry, or active dispute makes deletion inadvisable. Legal holds override standard retention schedules and deletion requests. We will notify affected artists when a legal hold is placed or lifted on their data where required by applicable law.</p>
+
+  <h2><span class="section-number">4.</span> Immutable Records</h2>
+  <p>The following records are immutable and cannot be modified or deleted by any party, including MusiGod staff:</p>
+  <ul>
+    <li>Legal audit event logs (signature events, authorization grants, terms acceptances)</li>
+    <li>Recovery operations logs</li>
+    <li>Agreement signature snapshots</li>
+  </ul>
+  <p>Immutability is enforced at the infrastructure level and exists to protect both artists and MusiGod in the event of disputes.</p>
+
+  <h2><span class="section-number">5.</span> Deletion Requests</h2>
+  <p>To request deletion of eligible data, contact us at <a href="mailto:support@musigod.com">support@musigod.com</a> with subject line: <strong>DATA DELETION REQUEST — [Your Name]</strong></p>
+  <p>We will review your request within 30 days and inform you of the outcome, including any portions of your request that cannot be fulfilled due to legal retention requirements.</p>
+
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-links">
+      <a href="terms.html">Terms of Service</a>
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="disclosures.html">Recovery Disclosures</a>
+      <a href="retention.html">Data Retention</a>
+      <a href="mailto:support@musigod.com">Contact</a>
+    </div>
+    <div class="footer-copy">
+      &copy; 2026 MusiGod. Publishing Administration Platform. Artists retain 100% ownership. &nbsp;|&nbsp;
+      Recovered royalties. Verified rights. Artists keep ownership.
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
