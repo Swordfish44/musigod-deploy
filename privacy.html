@@ -1,69 +1,461 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Privacy Policy — MusiGod</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500&display=swap" rel="stylesheet">
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --black: #0A0A0A; --dark: #161616; --card: #1A1A1A;
-    --border: rgba(255,255,255,0.08); --red: #C8102E;
-    --white: #FFFFFF; --gray: #888888; --light-gray: #CCCCCC;
-    --font-display: 'Bebas Neue', sans-serif;
-    --font-body: 'DM Sans', sans-serif;
-  }
-  body { background: var(--black); color: var(--white); font-family: var(--font-body); font-size: 16px; line-height: 1.7; -webkit-font-smoothing: antialiased; }
-  nav { display: flex; align-items: center; padding: 0 2rem; height: 64px; border-bottom: 0.5px solid var(--border); }
-  .nav-logo { font-family: var(--font-display); font-size: 28px; color: var(--white); text-decoration: none; }
-  .nav-logo span { color: var(--red); }
-  main { max-width: 720px; margin: 0 auto; padding: 80px 2rem; }
-  h1 { font-family: var(--font-display); font-size: 64px; margin-bottom: 8px; }
-  .updated { font-size: 13px; color: var(--gray); margin-bottom: 48px; }
-  h2 { font-size: 20px; font-weight: 500; margin: 40px 0 12px; }
-  p { color: var(--light-gray); margin-bottom: 16px; font-weight: 300; }
-  a { color: var(--red); }
-  footer { border-top: 0.5px solid var(--border); padding: 32px 2rem; text-align: center; font-size: 13px; color: var(--gray); }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — MusiGod</title>
+  <style>
+    :root {
+      --navy: #0a1628;
+      --navy-mid: #0d1f3c;
+      --gold: #c9a84c;
+      --gold-light: #e8c96e;
+      --white: #ffffff;
+      --off-white: #f5f5f0;
+      --text-primary: #1a1a2e;
+      --text-secondary: #4a4a6a;
+      --border: #e0ddd5;
+      --warning-bg: #fffbf0;
+      --warning-border: #c9a84c;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Georgia', serif;
+      background: var(--off-white);
+      color: var(--text-primary);
+      line-height: 1.75;
+    }
+    header {
+      background: var(--navy);
+      padding: 20px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header a { color: var(--gold); text-decoration: none; font-family: 'Arial', sans-serif; font-size: 14px; }
+    header .wordmark {
+      font-family: 'Arial', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--white);
+      letter-spacing: 2px;
+    }
+    header .wordmark span { color: var(--gold); }
+    .hero {
+      background: var(--navy-mid);
+      border-bottom: 3px solid var(--gold);
+      padding: 48px 40px 36px;
+      text-align: center;
+    }
+    .hero h1 {
+      font-family: 'Arial', sans-serif;
+      font-size: 32px;
+      color: var(--white);
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+    .hero .meta {
+      font-family: 'Arial', sans-serif;
+      font-size: 13px;
+      color: var(--gold-light);
+      letter-spacing: 0.5px;
+    }
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 48px 40px 80px;
+    }
+    .version-badge {
+      display: inline-block;
+      background: var(--navy);
+      color: var(--gold);
+      font-family: 'Arial', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      padding: 4px 12px;
+      border-radius: 3px;
+      margin-bottom: 32px;
+      text-transform: uppercase;
+    }
+    .notice {
+      background: var(--warning-bg);
+      border-left: 4px solid var(--warning-border);
+      padding: 16px 20px;
+      margin-bottom: 40px;
+      font-family: 'Arial', sans-serif;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+    .notice strong { color: var(--text-primary); }
+    h2 {
+      font-family: 'Arial', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--navy);
+      margin-top: 44px;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    p { margin-bottom: 14px; font-size: 15px; color: var(--text-primary); }
+    ul, ol {
+      margin: 0 0 14px 24px;
+      font-size: 15px;
+      color: var(--text-primary);
+    }
+    ul li, ol li { margin-bottom: 6px; }
+    .section-number {
+      color: var(--gold);
+      font-family: 'Arial', sans-serif;
+      font-weight: 700;
+      margin-right: 6px;
+    }
+    .processor-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-family: 'Arial', sans-serif;
+      font-size: 13px;
+    }
+    .processor-table th {
+      background: var(--navy);
+      color: var(--gold);
+      text-align: left;
+      padding: 10px 14px;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .processor-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-secondary);
+      vertical-align: top;
+    }
+    .processor-table tr:last-child td { border-bottom: none; }
+    .processor-table tr:nth-child(even) td { background: #f9f8f5; }
+    .highlight-box {
+      background: #eef4fb;
+      border: 1px solid #ccdcee;
+      border-radius: 4px;
+      padding: 16px 20px;
+      margin: 20px 0;
+      font-size: 14px;
+      font-family: 'Arial', sans-serif;
+      color: var(--text-secondary);
+    }
+    .contact-block {
+      background: var(--navy);
+      color: var(--white);
+      padding: 32px 40px;
+      border-radius: 6px;
+      margin-top: 48px;
+      font-family: 'Arial', sans-serif;
+    }
+    .contact-block h3 { color: var(--gold); font-size: 14px; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
+    .contact-block p { color: #b0bec5; font-size: 13px; margin-bottom: 4px; }
+    .contact-block a { color: var(--gold-light); }
+    footer {
+      background: var(--navy);
+      border-top: 3px solid var(--gold);
+      padding: 32px 40px;
+      font-family: 'Arial', sans-serif;
+    }
+    .footer-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      align-items: center;
+    }
+    .footer-links a {
+      color: var(--gold-light);
+      text-decoration: none;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      transition: color 0.2s;
+    }
+    .footer-links a:hover { color: var(--white); }
+    .footer-copy { font-size: 11px; color: #5a6a7a; }
+  </style>
 </head>
 <body>
-<nav><a href="/" class="nav-logo">MUSI<span>GOD</span></a></nav>
-<main>
+
+<header>
+  <div class="wordmark">MUSI<span>GOD</span></div>
+  <a href="portal.html">← Back to Portal</a>
+</header>
+
+<div class="hero">
   <h1>Privacy Policy</h1>
-  <p class="updated">Last updated: April 30, 2026</p>
+  <div class="meta">Effective June 1, 2026 &nbsp;·&nbsp; Version 1.0 &nbsp;·&nbsp; MusiGod Publishing Administration Platform</div>
+</div>
 
-  <p>MusiGod Royalties ("MusiGod," "we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our platform and services.</p>
+<div class="container">
 
-  <h2>Information We Collect</h2>
-  <p>We collect information you provide directly to us, including your name, email address, legal identity information, tax identification numbers, banking details for royalty remittance, and catalog metadata (song titles, recording information, split percentages).</p>
-  <p>We also collect information automatically when you use our platform, including usage data, log data, and device information.</p>
+  <div class="version-badge">Version 1.0 — Effective June 1, 2026</div>
 
-  <h2>How We Use Your Information</h2>
-  <p>We use the information we collect to provide, maintain, and improve our services — including registering your catalog with PROs, DSPs, and international collecting societies; collecting and remitting royalties on your behalf; detecting underpayments and initiating recovery; and communicating with you about your account and registrations.</p>
-  <p>We use your tax identification information solely for legally required tax reporting and compliance purposes.</p>
+  <div class="notice">
+    <strong>Your data is used only to administer your publishing rights and recover your royalties.</strong> MusiGod does not sell personal data. We do not use your catalog information for any purpose other than the services you have authorized.
+  </div>
 
-  <h2>Information Sharing</h2>
-  <p>We share your information with third-party services as necessary to provide our services, including performing rights organizations (ASCAP, BMI, SoundExchange, etc.), digital service providers (Spotify, Apple Music, YouTube, etc.), international collecting societies, payment processors (Stripe, Tipalti), and neighboring rights collection agencies.</p>
-  <p>We do not sell your personal information to third parties. We do not share your information with advertisers.</p>
+  <h2><span class="section-number">1.</span> Who We Are</h2>
+  <p>MusiGod is a publishing administration platform operated from Detroit, Michigan. We provide royalty recovery, rights registration, and catalog administration services for independent artists and rights holders.</p>
+  <p>This Privacy Policy applies to all data collected through musigod.com, the artist portal, the rights audit flow, the registration process, and all associated administrative workflows.</p>
 
-  <h2>Data Security</h2>
-  <p>We implement cryptographic audit trails on all royalty events and use industry-standard encryption for data in transit and at rest. All sensitive financial data is stored with row-level security controls. However, no method of transmission over the internet is 100% secure.</p>
+  <h2><span class="section-number">2.</span> Data We Collect</h2>
+  <p>We collect the following categories of information to provide publishing administration services:</p>
 
-  <h2>Data Retention</h2>
-  <p>We retain your information for as long as your account is active and for a period thereafter as required by law, or as necessary to provide our services and resolve disputes.</p>
+  <p><strong>Identity and Contact Data</strong></p>
+  <ul>
+    <li>Legal name, stage name, email address, phone number</li>
+    <li>Business entity information (LLC name, EIN if provided)</li>
+    <li>PRO membership IDs (ASCAP, BMI, SESAC, SoundExchange, etc.)</li>
+  </ul>
 
-  <h2>Your Rights</h2>
-  <p>You have the right to access, correct, or delete your personal information. You may also request that we restrict processing of your information. To exercise these rights, contact us at privacy@musigod.com.</p>
+  <p><strong>Catalog and Rights Data</strong></p>
+  <ul>
+    <li>Song titles, ISRC codes, ISWC codes, release dates</li>
+    <li>Publisher credits, co-writer splits, catalog metadata</li>
+    <li>Copyright registration numbers</li>
+    <li>Streaming and distribution data provided by you</li>
+  </ul>
 
-  <h2>Cookies</h2>
-  <p>We use cookies and similar tracking technologies to track activity on our platform and to hold certain information. You can instruct your browser to refuse all cookies or to indicate when a cookie is being sent.</p>
+  <p><strong>Financial and Recovery Data</strong></p>
+  <ul>
+    <li>Royalty statements and payment history you upload</li>
+    <li>Recovery estimates and audit findings generated by our systems</li>
+    <li>Stripe payment records (processed by Stripe; MusiGod does not store card details)</li>
+    <li>Recovery case status and disbursement records</li>
+  </ul>
 
-  <h2>Contact Us</h2>
-  <p>If you have questions about this Privacy Policy, contact us at: privacy@musigod.com</p>
-  <p>MusiGod Royalties<br>Detroit, Michigan</p>
-</main>
-<footer>© 2026 MusiGod Royalties. All rights reserved.</footer>
+  <p><strong>Uploaded Documents</strong></p>
+  <ul>
+    <li>Publishing agreements, split sheets, copyright certificates</li>
+    <li>Royalty statements and distribution reports</li>
+    <li>Identification documents (if required for entity formation)</li>
+    <li>Any other documents you submit through the platform</li>
+  </ul>
+
+  <p><strong>Operational and Technical Data</strong></p>
+  <ul>
+    <li>IP addresses at registration, login, and agreement signing</li>
+    <li>Browser and device information (user agent)</li>
+    <li>Timestamps of key platform actions</li>
+    <li>Audit findings, operational logs, and administrative notes</li>
+    <li>Agreement acceptance and signature events</li>
+  </ul>
+
+  <h2><span class="section-number">3.</span> How We Use Your Data</h2>
+  <p>We use your data exclusively to:</p>
+  <ul>
+    <li>Administer your publishing catalog and rights registrations</li>
+    <li>Identify uncollected and under-collected royalties</li>
+    <li>Conduct recovery operations with collection societies on your behalf</li>
+    <li>Generate audit reports, recovery estimates, and operational status updates</li>
+    <li>Fulfill agreements you have signed with MusiGod</li>
+    <li>Communicate with you about your account, recovery status, and required actions</li>
+    <li>Comply with legal obligations, including document retention requirements</li>
+    <li>Maintain security, fraud prevention, and operational integrity</li>
+  </ul>
+  <p>We do not use your catalog data for advertising. We do not sell, license, or share your personal or catalog data with third parties except as described in this policy.</p>
+
+  <h2><span class="section-number">4.</span> Third-Party Data Processors</h2>
+  <p>MusiGod uses the following third-party services to operate the platform. Each processes your data only as necessary to provide their service:</p>
+
+  <table class="processor-table">
+    <thead>
+      <tr>
+        <th>Processor</th>
+        <th>Purpose</th>
+        <th>Data Processed</th>
+        <th>Privacy Reference</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Supabase</strong></td>
+        <td>Database and authentication infrastructure</td>
+        <td>All platform data (encrypted at rest)</td>
+        <td>supabase.com/privacy</td>
+      </tr>
+      <tr>
+        <td><strong>Vercel</strong></td>
+        <td>Frontend hosting and edge delivery</td>
+        <td>IP addresses, request logs</td>
+        <td>vercel.com/legal/privacy-policy</td>
+      </tr>
+      <tr>
+        <td><strong>Stripe</strong></td>
+        <td>Payment processing</td>
+        <td>Payment card data, billing information</td>
+        <td>stripe.com/privacy</td>
+      </tr>
+      <tr>
+        <td><strong>Resend</strong></td>
+        <td>Transactional email delivery</td>
+        <td>Email address, email content</td>
+        <td>resend.com/legal/privacy-policy</td>
+      </tr>
+      <tr>
+        <td><strong>n8n (self-hosted)</strong></td>
+        <td>Workflow automation</td>
+        <td>Artist ID, status events, email triggers</td>
+        <td>Self-hosted on MusiGod infrastructure</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2><span class="section-number">5.</span> Uploaded Documents and Statements</h2>
+  <p>Documents you upload are stored in our secure database (Supabase) and are accessible only to MusiGod staff authorized to work on your account. Documents are used exclusively to:</p>
+  <ul>
+    <li>Verify catalog ownership and rights</li>
+    <li>Support recovery case analysis and society submissions</li>
+    <li>Fulfill legal and contractual obligations</li>
+  </ul>
+  <p>Documents are retained per our Document Retention Policy. Royalty statements are retained for a minimum of 5 years. Signed agreements are retained for 7 years. See Section 8 for full retention schedules.</p>
+
+  <h2><span class="section-number">6.</span> Signatures and Agreement Records</h2>
+  <p>When you sign an agreement or accept terms through the platform, we record:</p>
+  <ul>
+    <li>The version of the document you signed</li>
+    <li>The timestamp and method of signature</li>
+    <li>Your IP address and device information at the time of signing</li>
+    <li>A hash of the rendered agreement for integrity verification</li>
+  </ul>
+  <p>These records constitute the binding signature event and are retained as part of our immutable legal audit trail. They are not deletable under standard deletion requests.</p>
+
+  <h2><span class="section-number">7.</span> Audit Findings and Recovery Intelligence</h2>
+  <p>MusiGod generates analytical outputs including audit scores, royalty leakage estimates, recovery probability scores, and recommended actions. These outputs are derived from your catalog data using our internal algorithms. They are:</p>
+  <ul>
+    <li>Used solely to conduct recovery operations on your behalf</li>
+    <li>Not shared with third parties except collection societies as necessary for recovery</li>
+    <li>Retained as part of your operational record for dispute resolution and audit defense</li>
+  </ul>
+  <div class="highlight-box">
+    Audit findings, recovery estimates, and intelligence outputs are analytical projections. They do not represent guaranteed outcomes and are not shared outside MusiGod's operational systems without your authorization.
+  </div>
+
+  <h2><span class="section-number">8.</span> Data Retention Periods</h2>
+  <p>We retain data for the following periods:</p>
+  <table class="processor-table">
+    <thead>
+      <tr>
+        <th>Data Category</th>
+        <th>Retention Period</th>
+        <th>Basis</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Signed Agreements</td>
+        <td>7 years</td>
+        <td>Michigan contract law (6-year statute + 1-year margin)</td>
+      </tr>
+      <tr>
+        <td>Recovery Authorization Documents</td>
+        <td>7 years</td>
+        <td>Legal requirement — financial obligation</td>
+      </tr>
+      <tr>
+        <td>Uploaded Royalty Statements</td>
+        <td>5 years</td>
+        <td>Operational necessity — dispute resolution</td>
+      </tr>
+      <tr>
+        <td>Recovery Operations Logs</td>
+        <td>Indefinite</td>
+        <td>Operational necessity — immutable audit trail</td>
+      </tr>
+      <tr>
+        <td>Legal Audit Events</td>
+        <td>Indefinite</td>
+        <td>Compliance requirement — immutable record</td>
+      </tr>
+      <tr>
+        <td>Artist Profile Data</td>
+        <td>3 years after inactivity</td>
+        <td>Contractual — subject to legal hold if open cases</td>
+      </tr>
+      <tr>
+        <td>IP Addresses / Session Logs</td>
+        <td>1 year</td>
+        <td>Security and fraud prevention</td>
+      </tr>
+      <tr>
+        <td>Commission Records</td>
+        <td>7 years</td>
+        <td>IRS record-keeping requirements</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2><span class="section-number">9.</span> Your Rights</h2>
+  <p>Subject to our document retention requirements and legal hold obligations, you have the right to:</p>
+  <ul>
+    <li><strong>Access</strong> — Request a copy of the personal data we hold about you</li>
+    <li><strong>Correction</strong> — Request correction of inaccurate data</li>
+    <li><strong>Deletion</strong> — Request deletion of data not subject to legal retention requirements</li>
+    <li><strong>Portability</strong> — Request export of your catalog metadata in a structured format</li>
+    <li><strong>Restriction</strong> — Request restriction of processing in certain circumstances</li>
+  </ul>
+  <p>Note: Deletion requests cannot remove data subject to legal holds, active recovery cases, or statutory retention requirements. We will inform you of any applicable restrictions when processing your request.</p>
+
+  <h2><span class="section-number">10.</span> Operational Audit Logs</h2>
+  <p>MusiGod maintains an immutable operational audit log of key platform events including agreement signatures, authorization grants, terms acceptances, and administrative actions. These logs exist to protect both you and MusiGod in the event of disputes and cannot be modified or deleted by any party.</p>
+
+  <h2><span class="section-number">11.</span> IP Address Collection</h2>
+  <p>IP addresses are collected at the following events: registration, login, agreement signing, terms acceptance, and payment initiation. IP data is retained for 1 year for security purposes. At agreement signing, IP data is included in the signature record and retained for the duration of the agreement retention period.</p>
+
+  <h2><span class="section-number">12.</span> Security</h2>
+  <p>MusiGod employs industry-standard security practices including encrypted data storage (Supabase encryption at rest), HTTPS-only data transmission, API key authentication, and role-based access controls. We conduct periodic security reviews of our infrastructure.</p>
+  <p>No system is perfectly secure. In the event of a data breach affecting your personal information, we will notify you as required by applicable law.</p>
+
+  <h2><span class="section-number">13.</span> Children's Privacy</h2>
+  <p>MusiGod is not directed to individuals under 18 years of age. We do not knowingly collect data from minors. If you believe we have inadvertently collected data from a minor, please contact us immediately.</p>
+
+  <h2><span class="section-number">14.</span> Changes to This Policy</h2>
+  <p>We may update this Privacy Policy periodically. Material changes will be communicated via email and posted on this page with an updated effective date. Continued use of the platform after the effective date constitutes acceptance of the updated policy.</p>
+
+  <h2><span class="section-number">15.</span> Contact and Data Requests</h2>
+  <div class="contact-block">
+    <h3>Privacy and Data Requests</h3>
+    <p>MusiGod Publishing Administration</p>
+    <p>Detroit, Michigan</p>
+    <p>Email: <a href="mailto:support@musigod.com">support@musigod.com</a></p>
+    <p>For deletion, access, or legal hold requests, use subject line: <strong>PRIVACY REQUEST — [Your Name]</strong></p>
+    <p style="margin-top:12px; font-size:12px; color:#78909c;">We respond to privacy requests within 30 days of receipt.</p>
+  </div>
+
+</div>
+
+<!-- MUSIGOD GLOBAL FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-links">
+      <a href="terms.html">Terms of Service</a>
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="disclosures.html">Recovery Disclosures</a>
+      <a href="retention.html">Data Retention</a>
+      <a href="mailto:support@musigod.com">Contact</a>
+    </div>
+    <div class="footer-copy">
+      &copy; 2026 MusiGod. Publishing Administration Platform. Artists retain 100% ownership. &nbsp;|&nbsp;
+      Recovered royalties. Verified rights. Artists keep ownership.
+    </div>
+  </div>
+</footer>
+
 </body>
 </html>
