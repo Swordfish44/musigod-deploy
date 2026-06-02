@@ -47,10 +47,7 @@
       "source": "/catalog-intake",
       "destination": "/catalog-intake.html"
     },
-    {
-      "source": "/api/submit-statement",
-      "destination": "/api/submit-statement.js"
-    }
+
   ],
   "crons": [
     {
