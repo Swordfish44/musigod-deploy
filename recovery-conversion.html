@@ -494,17 +494,11 @@ async function openModal(serviceType, serviceTitle, recoveryValue) {
     <div class="metric-row"><span class="metric-label">Ownership Transfer</span><span class="metric-val" style="color:var(--green)">None — you retain 100%</span></div>
   `
 
-  // Fetch agreement text
+  // Fetch agreement text from API
   try {
-    const r = await fetch(`https://uykzkrnoetcldeuxzqyy.supabase.co/rest/v1/recovery_agreements_v1?service_type=eq.${encodeURIComponent(serviceType)}&is_active=eq.true&limit=1`, {
-      headers: {
-        apikey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDYxOSwiZXhwIjoyMDkzMTA2NjE5fQ.jmBLX9VwFvFT4rc3lzqSJS9hFjis2QxRkmWpFizQtKk',
-        Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDYxOSwiZXhwIjoyMDkzMTA2NjE5fQ.jmBLX9VwFvFT4rc3lzqSJS9hFjis2QxRkmWpFizQtKk',
-        'Accept-Profile': 'registrations',
-      }
-    })
-    const agreements = await r.json()
-    pendingAgreementText = agreements?.[0]?.full_text || 'Standard MusiGod recovery service agreement. Artists retain 100% ownership. MusiGod fee: 15% of successful recovery only.'
+    const r = await fetch(`/api/render-agreement?service_type=${encodeURIComponent(serviceType)}`)
+    const agr = await r.json()
+    pendingAgreementText = agr.body_text || 'Standard MusiGod recovery service agreement. Artists retain 100% ownership. MusiGod fee: 15% of successful recovery only.'
   } catch {
     pendingAgreementText = 'Standard MusiGod recovery service agreement. Artists retain 100% ownership. MusiGod fee: 15% of successful recovery only.'
   }
@@ -552,7 +546,7 @@ async function confirmAuthorization() {
     closeModal()
 
     showMsg('success',
-      `Recovery service authorized. Authorization ref: ${data.authorization_ref}. ` +
+      `Recovery service authorized. Authorization ref: ${data.authorization_ref || ''}. ` +
       'MusiGod will begin within 1 business day. Check your email for confirmation.')
 
     setTimeout(() => loadAll(), 1000)

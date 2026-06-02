@@ -49,6 +49,16 @@ module.exports = withSentry(async function handler(req, res) {
       p_user_agent:    user_agent,
     })
 
+    // Run full onboarding: sign + stage + assign + readiness
+    await sbRpc('fn_complete_authorization_onboarding_v1', 'registrations', {
+      p_artist_email:  artist_email,
+      p_service_type:  service_type,
+      p_engagement_id: engagement_id || null,
+      p_artist_id:     artist_id || null,
+      p_ip_address:    ip_address,
+      p_user_agent:    user_agent,
+    }).catch(err => console.warn('Onboarding pipeline non-fatal:', err.message))
+
     // Also create/update engagement record
     await sbRpc('fn_create_recovery_engagement_v1', 'registrations', {
       p_artist_email:  artist_email,
