@@ -24,9 +24,14 @@ try {
     $response = Invoke-RestMethod -Uri $url -Method POST -ContentType "application/json" -Body $body
     $response | ConvertTo-Json -Depth 5
 } catch {
-    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
-    if ($_.Exception.Response) {
-        $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
-        Write-Host $reader.ReadToEnd() -ForegroundColor Red
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Write-Host "ERROR $statusCode" -ForegroundColor Red
+    try {
+        $stream = $_.Exception.Response.GetResponseStream()
+        $reader = New-Object System.IO.StreamReader($stream)
+        $errorBody = $reader.ReadToEnd()
+        Write-Host "Response body: $errorBody" -ForegroundColor Yellow
+    } catch {
+        Write-Host "Could not read response body" -ForegroundColor Red
     }
 }
