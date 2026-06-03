@@ -122,7 +122,7 @@ module.exports = async function handler(req, res) {
       body: JSON.stringify({
         artist_id,
         source: source_code,
-        source_category: 'PRO',
+        source_category: 'US_PRO',
         period_start: statement_period_start,
         period_end: statement_period_end,
         statement_date: received_date || new Date().toISOString().split('T')[0],
