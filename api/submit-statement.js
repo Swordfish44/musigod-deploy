@@ -163,7 +163,7 @@ module.exports = async function handler(req, res) {
         gross_amount_usd: total_gross,
         mgs_fee_usd: total_recovery_fee,
         net_to_artist_usd: net_to_artist,
-        status: 'RECEIVED',
+        status: 'PENDING',
       })
     })
     if (!disbRes.ok) {
