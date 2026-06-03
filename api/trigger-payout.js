@@ -77,14 +77,23 @@ module.exports = async function handler(req, res) {
 
     for (const disb of disbursements) {
       // 2. Get artist's Stripe account ID
-      const artistRes = await sbGet(`artists_v1?id=eq.${disb.artist_id}&select=id,stripe_account_id,full_name`, 'artists')
-      const artists = await artistRes.json()
-      const artist = artists?.[0]
+      // Try artists schema, fallback to public
+      let artist = null
+      for (const schema of ['artists', 'public']) {
+        const artistRes = await sbGet(`artists_v1?id=eq.${disb.artist_id}&select=id,stripe_account_id,full_name`, schema)
+        const artistBody = await artistRes.text()
+        console.log('[trigger-payout] artist lookup schema:', schema, 'status:', artistRes.status, 'body:', artistBody.slice(0, 200))
+        try {
+          const artists = JSON.parse(artistBody)
+          if (Array.isArray(artists) && artists.length) { artist = artists[0]; break }
+        } catch(e) {}
+      }
 
       if (!artist?.stripe_account_id) {
-        results.push({ disbursement_id: disb.id, status: 'FAILED', reason: 'Artist has no Stripe Connect account' })
+        console.error('[trigger-payout] no stripe_account_id for artist:', disb.artist_id, 'artist:', JSON.stringify(artist))
+        results.push({ disbursement_id: disb.id, status: 'HELD', reason: 'Artist has no Stripe Connect account — onboarding required' })
         await sbPatch(`disbursement_queue_v1?id=eq.${disb.id}`, 'royalties', {
-          status: 'FAILED',
+          status: 'HELD',
           notes: 'Artist has no Stripe Connect account',
           updated_at: new Date().toISOString(),
         })
