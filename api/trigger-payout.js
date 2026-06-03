@@ -80,7 +80,7 @@ module.exports = async function handler(req, res) {
       // Try artists schema, fallback to public
       let artist = null
       for (const schema of ['artists', 'public']) {
-        const artistRes = await sbGet(`artists_v1?id=eq.${disb.artist_id}&select=id,stripe_account_id,full_name`, schema)
+        const artistRes = await sbGet(`artists_v1?id=eq.${disb.artist_id}&select=id,stripe_account_id`, schema)
         const artistBody = await artistRes.text()
         console.log('[trigger-payout] artist lookup schema:', schema, 'status:', artistRes.status, 'body:', artistBody.slice(0, 200))
         try {
