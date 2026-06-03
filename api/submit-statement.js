@@ -15,14 +15,17 @@ function getRawBody(req) {
   })
 }
 
-function sbHeaders(schema) {
-  return {
-    'Content-Type': 'application/json',
+function sbHeaders(schema, withBody = false) {
+  const h = {
     'apikey': SB_KEY,
     'Authorization': `Bearer ${SB_KEY}`,
     'Accept-Profile': schema,
-    'Content-Profile': schema,
   }
+  if (withBody) {
+    h['Content-Type'] = 'application/json'
+    h['Content-Profile'] = schema
+  }
+  return h
 }
 
 module.exports = async function handler(req, res) {
@@ -115,7 +118,7 @@ module.exports = async function handler(req, res) {
     // 3. Insert statement
     const stmtRes = await fetch(`${SB_URL}/rest/v1/statements_v1`, {
       method: 'POST',
-      headers: { ...sbHeaders('royalties'), 'Prefer': 'return=representation' },
+      headers: { ...sbHeaders('royalties', true), 'Prefer': 'return=representation' },
       body: JSON.stringify({
         artist_id, source_id, statement_period_start, statement_period_end,
         received_date: received_date || new Date().toISOString().split('T')[0],
@@ -137,7 +140,7 @@ module.exports = async function handler(req, res) {
     // 4. Insert line items
     const lineRes = await fetch(`${SB_URL}/rest/v1/statement_line_items_v1`, {
       method: 'POST',
-      headers: { ...sbHeaders('royalties'), 'Prefer': 'return=minimal' },
+      headers: { ...sbHeaders('royalties', true), 'Prefer': 'return=minimal' },
       body: JSON.stringify(enrichedItems.map(item => ({ ...item, statement_id })))
     })
     if (!lineRes.ok) {
@@ -147,7 +150,7 @@ module.exports = async function handler(req, res) {
     // 5. Queue disbursement
     const disbRes = await fetch(`${SB_URL}/rest/v1/disbursement_queue_v1`, {
       method: 'POST',
-      headers: { ...sbHeaders('royalties'), 'Prefer': 'return=minimal' },
+      headers: { ...sbHeaders('royalties', true), 'Prefer': 'return=minimal' },
       body: JSON.stringify({
         artist_id, statement_id,
         period_label: `${statement_period_start} to ${statement_period_end}`,
