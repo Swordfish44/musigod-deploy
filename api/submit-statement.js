@@ -132,7 +132,7 @@ module.exports = async function handler(req, res) {
         currency: 'USD',
         usd_equivalent: total_gross,
         statement_file_url: file_url || null,
-        status: 'PENDING',
+        status: 'RECEIVED',
         meta: { file_type: file_type || 'MANUAL', notes: notes || null, total_songs: line_items.length }
       })
     })
@@ -163,7 +163,7 @@ module.exports = async function handler(req, res) {
         gross_amount_usd: total_gross,
         mgs_fee_usd: total_recovery_fee,
         net_to_artist_usd: net_to_artist,
-        status: 'PENDING',
+        status: 'RECEIVED',
       })
     })
     if (!disbRes.ok) {
