@@ -25,10 +25,17 @@ $url = "$base/$Endpoint"
 $body = Get-Content $fixturePath -Raw -Encoding UTF8
 
 Write-Host "POST $url" -ForegroundColor Cyan
-Write-Host "Payload: $body" -ForegroundColor Gray
+
+$headers = @{
+    "Content-Type" = "application/json; charset=utf-8"
+    "User-Agent"   = "Mozilla/5.0 (MusiGod-Test/1.0)"
+    "Accept"       = "application/json"
+    "Origin"       = "https://musigod.com"
+    "Referer"      = "https://musigod.com/admin"
+}
 
 try {
-    $response = Invoke-RestMethod -Uri $url -Method POST -ContentType "application/json; charset=utf-8" -Body $body
+    $response = Invoke-RestMethod -Uri $url -Method POST -Headers $headers -Body $body
     $response | ConvertTo-Json -Depth 5
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
