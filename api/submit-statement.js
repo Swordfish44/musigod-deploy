@@ -120,14 +120,20 @@ module.exports = async function handler(req, res) {
       method: 'POST',
       headers: { ...sbHeaders('royalties', true), 'Prefer': 'return=representation' },
       body: JSON.stringify({
-        artist_id, source_id, statement_period_start, statement_period_end,
-        received_date: received_date || new Date().toISOString().split('T')[0],
-        total_gross_usd: total_gross,
-        total_songs: line_items.length,
-        file_url: file_url || null,
-        file_type: file_type || 'MANUAL',
-        notes: notes || null,
+        artist_id,
+        source: source_code,
+        source_category: 'PRO',
+        period_start: statement_period_start,
+        period_end: statement_period_end,
+        statement_date: received_date || new Date().toISOString().split('T')[0],
+        gross_amount: total_gross,
+        fees_deducted: total_recovery_fee,
+        net_amount: net_to_artist,
+        currency: 'USD',
+        usd_equivalent: total_gross,
+        statement_file_url: file_url || null,
         status: 'PENDING',
+        meta: { file_type: file_type || 'MANUAL', notes: notes || null, total_songs: line_items.length }
       })
     })
 
