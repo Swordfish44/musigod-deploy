@@ -5,23 +5,30 @@ param([string]$Endpoint = "submit-statement")
 
 $base = "https://musigod.com/api"
 
-$payloads = @{
-    "submit-statement" = '{"artist_id":"3d4788b6-2a86-4ed5-8f27-ab95b3a230d3","source_code":"ASCAP","statement_period_start":"2024-01-01","statement_period_end":"2024-03-31","file_type":"MANUAL","notes":"Q1 2024 test ingestion","line_items":[{"song_title":"Test Track 001","isrc":"USRC12400001","royalty_type":"PERFORMANCE","gross_amount_usd":250,"is_recovery":true},{"song_title":"Test Track 002","isrc":"USRC12400002","royalty_type":"PERFORMANCE","gross_amount_usd":180,"is_recovery":false}]}'
+$fixtureMap = @{
+    "submit-statement" = "scripts\test-submit-statement.json"
 }
 
-if (-not $payloads.ContainsKey($Endpoint)) {
+if (-not $fixtureMap.ContainsKey($Endpoint)) {
     Write-Host "Unknown endpoint: $Endpoint" -ForegroundColor Red
-    Write-Host "Available: $($payloads.Keys -join ', ')" -ForegroundColor Yellow
+    Write-Host "Available: $($fixtureMap.Keys -join ', ')" -ForegroundColor Yellow
+    exit 1
+}
+
+$fixturePath = $fixtureMap[$Endpoint]
+if (-not (Test-Path $fixturePath)) {
+    Write-Host "Fixture not found: $fixturePath" -ForegroundColor Red
     exit 1
 }
 
 $url = "$base/$Endpoint"
-$body = $payloads[$Endpoint]
+$body = Get-Content $fixturePath -Raw -Encoding UTF8
 
 Write-Host "POST $url" -ForegroundColor Cyan
+Write-Host "Payload: $body" -ForegroundColor Gray
 
 try {
-    $response = Invoke-RestMethod -Uri $url -Method POST -ContentType "application/json" -Body $body
+    $response = Invoke-RestMethod -Uri $url -Method POST -ContentType "application/json; charset=utf-8" -Body $body
     $response | ConvertTo-Json -Depth 5
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
