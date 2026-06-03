@@ -72,9 +72,12 @@ module.exports = async function handler(req, res) {
       `${SB_URL}/rest/v1/statement_sources_v1?source_code=eq.${encodeURIComponent(source_code)}&select=id`,
       { headers: sbHeaders('royalties') }
     )
-    const sources = await sourceRes.json()
-    if (!sources?.length) {
-      return res.status(400).json({ error: `Unknown source_code: ${source_code}` })
+    const sourceRaw = await sourceRes.text()
+    console.log('[submit-statement] source lookup status:', sourceRes.status, 'body:', sourceRaw)
+    let sources
+    try { sources = JSON.parse(sourceRaw) } catch(e) { sources = [] }
+    if (!Array.isArray(sources) || !sources.length) {
+      return res.status(400).json({ error: `Unknown source_code: ${source_code}`, supabase_response: sourceRaw })
     }
     const source_id = sources[0].id
 
