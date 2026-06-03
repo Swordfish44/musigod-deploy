@@ -4,7 +4,6 @@
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
-
 const MGS_FEE_RATE = 0.15
 
 function getRawBody(req) {
@@ -29,33 +28,41 @@ function sbHeaders(schema) {
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Headers', '*')
+
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
-  if (!SB_KEY) return res.status(500).json({ error: 'Supabase service key not configured' })
+
+  if (!SB_KEY) {
+    console.error('[submit-statement] FATAL: SB_KEY not set')
+    return res.status(500).json({ error: 'Supabase service key not configured' })
+  }
 
   let body
   try {
-    body = JSON.parse((await getRawBody(req)).toString())
+    const raw = (await getRawBody(req)).toString('utf8')
+    console.log('[submit-statement] body length:', raw.length, 'first100:', raw.slice(0, 100))
+    body = JSON.parse(raw)
   } catch (e) {
-    return res.status(400).json({ error: 'Invalid JSON body' })
+    console.error('[submit-statement] parse error:', e.message)
+    return res.status(400).json({ error: 'Invalid JSON body', detail: e.message })
   }
 
-  const {
-    artist_id,
-    source_code,
-    statement_period_start,
-    statement_period_end,
-    received_date,
-    file_url,
-    file_type,
-    notes,
-    line_items,
-  } = body
+  const { artist_id, source_code, statement_period_start, statement_period_end,
+          received_date, file_url, file_type, notes, line_items } = body
 
-  if (!artist_id || !source_code || !statement_period_start || !statement_period_end || !Array.isArray(line_items) || !line_items.length) {
+  console.log('[submit-statement] fields:', { artist_id, source_code, statement_period_start,
+    statement_period_end, line_items_count: Array.isArray(line_items) ? line_items.length : typeof line_items })
+
+  if (!artist_id || !source_code || !statement_period_start || !statement_period_end ||
+      !Array.isArray(line_items) || !line_items.length) {
     return res.status(400).json({
-      error: 'Missing required fields: artist_id, source_code, statement_period_start, statement_period_end, line_items'
+      error: 'Missing required fields',
+      received: { artist_id: !!artist_id, source_code: !!source_code,
+        statement_period_start: !!statement_period_start,
+        statement_period_end: !!statement_period_end,
+        line_items_is_array: Array.isArray(line_items),
+        line_items_length: Array.isArray(line_items) ? line_items.length : 0 }
     })
   }
 
@@ -71,7 +78,7 @@ module.exports = async function handler(req, res) {
     }
     const source_id = sources[0].id
 
-    // 2. Enrich line items — 15% fee on recovery items only
+    // 2. Enrich line items
     let total_gross = 0
     let total_recovery_fee = 0
 
@@ -102,15 +109,12 @@ module.exports = async function handler(req, res) {
     total_recovery_fee = parseFloat(total_recovery_fee.toFixed(4))
     const net_to_artist = parseFloat((total_gross - total_recovery_fee).toFixed(4))
 
-    // 3. Insert statement batch
+    // 3. Insert statement
     const stmtRes = await fetch(`${SB_URL}/rest/v1/statements_v1`, {
       method: 'POST',
       headers: { ...sbHeaders('royalties'), 'Prefer': 'return=representation' },
       body: JSON.stringify({
-        artist_id,
-        source_id,
-        statement_period_start,
-        statement_period_end,
+        artist_id, source_id, statement_period_start, statement_period_end,
         received_date: received_date || new Date().toISOString().split('T')[0],
         total_gross_usd: total_gross,
         total_songs: line_items.length,
@@ -133,10 +137,8 @@ module.exports = async function handler(req, res) {
       headers: { ...sbHeaders('royalties'), 'Prefer': 'return=minimal' },
       body: JSON.stringify(enrichedItems.map(item => ({ ...item, statement_id })))
     })
-
     if (!lineRes.ok) {
-      const err = await lineRes.text()
-      return res.status(500).json({ error: 'Failed to insert line items', detail: err })
+      return res.status(500).json({ error: 'Failed to insert line items', detail: await lineRes.text() })
     }
 
     // 5. Queue disbursement
@@ -144,19 +146,16 @@ module.exports = async function handler(req, res) {
       method: 'POST',
       headers: { ...sbHeaders('royalties'), 'Prefer': 'return=minimal' },
       body: JSON.stringify({
-        artist_id,
-        statement_id,
-        period_label: `${statement_period_start} → ${statement_period_end}`,
+        artist_id, statement_id,
+        period_label: `${statement_period_start} to ${statement_period_end}`,
         gross_amount_usd: total_gross,
         mgs_fee_usd: total_recovery_fee,
         net_to_artist_usd: net_to_artist,
         status: 'PENDING',
       })
     })
-
     if (!disbRes.ok) {
-      const err = await disbRes.text()
-      return res.status(500).json({ error: 'Failed to queue disbursement', detail: err })
+      return res.status(500).json({ error: 'Failed to queue disbursement', detail: await disbRes.text() })
     }
 
     return res.status(200).json({
