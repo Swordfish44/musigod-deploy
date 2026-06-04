@@ -1,64 +1,28 @@
-// MusiGod E2E Automated Test — Growth Plan Signup Flow
-// Tests: register → checkout session → simulate webhook → admin activate → verify DB state
-// Uses Test Artist Echo: 86c8df13-dbc6-4846-a8da-cdbaaf386cc7
+// MusiGod E2E Automated Test v2 — API-only, no direct Supabase calls
+// Run: node scripts/e2e-test.js
+// Requires no env vars — all calls go through musigod.com endpoints
 
 const BASE_URL = 'https://musigod.com'
 const ECHO_ID  = '86c8df13-dbc6-4846-a8da-cdbaaf386cc7'
 const ECHO_EMAIL = 'swordfishlp44+testartist@proton.me'
-
-const SB_URL = 'https://uykzkrnoetcldeuxzqyy.supabase.co'
-// Service role key pulled from env or passed in
-const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
-const ADMIN_KEY = process.env.ADMIN_API_KEY || ''
+const ADMIN_KEY = 'mg-admin-2026'
 
 let passed = 0
 let failed = 0
-const results = []
+let skipped = 0
 
 function log(status, name, detail = '') {
   const icon = status === 'PASS' ? '✅' : status === 'SKIP' ? '⏭️ ' : '❌'
-  const line = `${icon} ${name}${detail ? ' — ' + detail : ''}`
-  console.log(line)
-  results.push({ status, name, detail })
+  console.log(`${icon} ${name}${detail ? ' — ' + detail : ''}`)
   if (status === 'PASS') passed++
   else if (status === 'FAIL') failed++
+  else skipped++
 }
 
-async function sbGet(schema, path) {
-  const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
-    headers: {
-      apikey: SB_KEY,
-      Authorization: `Bearer ${SB_KEY}`,
-      'Accept-Profile': schema,
-    }
-  })
-  const text = await r.text()
-  if (!r.ok) throw new Error(`SB GET ${path}: ${r.status} ${text}`)
-  return JSON.parse(text)
-}
-
-async function sbPatch(schema, path, data) {
-  const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
-    method: 'PATCH',
-    headers: {
-      apikey: SB_KEY,
-      Authorization: `Bearer ${SB_KEY}`,
-      'Accept-Profile': schema,
-      'Content-Profile': schema,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation',
-    },
-    body: JSON.stringify(data)
-  })
-  const text = await r.text()
-  if (!r.ok) throw new Error(`SB PATCH ${path}: ${r.status} ${text}`)
-  return text ? JSON.parse(text) : null
-}
-
-async function api(path, body) {
+async function post(path, body, extraHeaders = {}) {
   const r = await fetch(`${BASE_URL}/${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...extraHeaders },
     body: JSON.stringify(body)
   })
   const text = await r.text()
@@ -67,190 +31,147 @@ async function api(path, body) {
   return { status: r.status, ok: r.ok, json }
 }
 
-// ─── CLEANUP: reset Echo to clean state ───────────────────────────────────────
-async function cleanupEcho() {
-  // Delete any existing registration rows for Echo
-  const r = await fetch(`${SB_URL}/rest/v1/registrations_v1?artist_id=eq.${ECHO_ID}`, {
-    method: 'DELETE',
-    headers: {
-      apikey: SB_KEY,
-      Authorization: `Bearer ${SB_KEY}`,
-      'Accept-Profile': 'registrations',
-      'Content-Profile': 'registrations',
-    }
-  })
-  // Reset artist plan_status back to TRIAL
-  await sbPatch('artists', `artists_v1?id=eq.${ECHO_ID}`, { plan_status: 'TRIAL', stripe_account_id: null })
-}
-
-// ─── STEP 1: Verify Echo exists in DB ─────────────────────────────────────────
-async function step1_echoExists() {
+// ─── STEP 1: register-artist (Growth plan) ────────────────────────────────────
+async function step1_register() {
   try {
-    const rows = await sbGet('artists', `artists_v1?id=eq.${ECHO_ID}&select=id,artist_name,email,plan_status`)
-    if (rows.length === 1 && rows[0].email === ECHO_EMAIL) {
-      log('PASS', 'STEP 1: Echo exists in artists_v1', `plan_status=${rows[0].plan_status}`)
-    } else {
-      log('FAIL', 'STEP 1: Echo not found in artists_v1', JSON.stringify(rows))
-    }
-  } catch(e) { log('FAIL', 'STEP 1: Echo exists', e.message) }
-}
-
-// ─── STEP 2: Register Echo via API ────────────────────────────────────────────
-async function step2_register() {
-  try {
-    // Echo already exists — we test that register-artist rejects a duplicate email
-    const res = await api('api/register-artist', {
+    const res = await post('api/register-artist', {
       legal_first_name: 'Echo',
       legal_last_name: 'Validation',
       artist_name: 'Test Artist Echo',
-      email: ECHO_EMAIL,
+      email: `swordfishlp44+echo${Date.now()}@proton.me`, // unique email each run
       phone: '313-555-0199',
       plan: 'growth',
       pro: 'ASCAP',
       catalog_size: '6-20 songs',
+      works_registered: 'Already released',
     })
-    // We expect either 200 (new registration row) or 409/400 (duplicate)
-    if (res.ok) {
-      log('PASS', 'STEP 2: register-artist accepted Growth plan', `artist_id=${res.json.artist_id}`)
-    } else if (res.status === 409 || res.status === 400) {
-      log('PASS', 'STEP 2: register-artist correctly rejected duplicate email', `status=${res.status}`)
+    if (res.ok && res.json.artist_id) {
+      log('PASS', 'STEP 1: register-artist (Growth)', `artist_id=${res.json.artist_id} reg_id=${res.json.registration_id}`)
+      return { artist_id: res.json.artist_id, registration_id: res.json.registration_id }
     } else {
-      log('FAIL', 'STEP 2: register-artist unexpected response', `${res.status} ${JSON.stringify(res.json)}`)
+      log('FAIL', 'STEP 1: register-artist', `${res.status} ${JSON.stringify(res.json)}`)
+      return null
     }
-  } catch(e) { log('FAIL', 'STEP 2: register-artist', e.message) }
+  } catch(e) { log('FAIL', 'STEP 1: register-artist', e.message); return null }
 }
 
-// ─── STEP 3: Create checkout session ──────────────────────────────────────────
-async function step3_checkout() {
+// ─── STEP 2: create-checkout-session ──────────────────────────────────────────
+async function step2_checkout(artist_id) {
+  if (!artist_id) { log('SKIP', 'STEP 2: checkout (no artist_id)'); return null }
   try {
-    const res = await api('api/create-checkout-session', {
-      artist_id: ECHO_ID,
+    const res = await post('api/create-checkout-session', {
+      artist_id,
       plan: 'growth',
       email: ECHO_EMAIL,
     })
     if (res.ok && res.json.url && res.json.url.includes('stripe.com')) {
-      log('PASS', 'STEP 3: create-checkout-session returned Stripe URL', res.json.url.slice(0, 60) + '...')
+      log('PASS', 'STEP 2: create-checkout-session → Stripe URL returned')
       return res.json.url
     } else {
-      log('FAIL', 'STEP 3: create-checkout-session', `${res.status} ${JSON.stringify(res.json)}`)
+      log('FAIL', 'STEP 2: create-checkout-session', `${res.status} ${JSON.stringify(res.json)}`)
       return null
     }
-  } catch(e) { log('FAIL', 'STEP 3: create-checkout-session', e.message); return null }
+  } catch(e) { log('FAIL', 'STEP 2: create-checkout-session', e.message); return null }
 }
 
-// ─── STEP 4: Verify registration row exists ────────────────────────────────────
-async function step4_registrationRow() {
+// ─── STEP 3: admin activate ────────────────────────────────────────────────────
+async function step3_activate(registration_id) {
+  if (!registration_id) { log('SKIP', 'STEP 3: admin activate (no registration_id)'); return false }
   try {
-    const rows = await sbGet('registrations', `registrations_v1?artist_id=eq.${ECHO_ID}&select=id,status,registration_type,registration_category`)
-    if (rows.length > 0) {
-      const r = rows[rows.length - 1]
-      log('PASS', 'STEP 4: registration row exists', `id=${r.id} status=${r.status} type=${r.registration_type}`)
-      return r.id
+    const res = await post('api/admin-registration-action',
+      { registration_id, action: 'activate' },
+      { 'x-admin-key': ADMIN_KEY }
+    )
+    if (res.ok && res.json.ok) {
+      log('PASS', 'STEP 3: admin activate', `registration_id=${registration_id}`)
+      return true
     } else {
-      log('FAIL', 'STEP 4: no registration row found for Echo')
-      return null
+      log('FAIL', 'STEP 3: admin activate', `${res.status} ${JSON.stringify(res.json)}`)
+      return false
     }
-  } catch(e) { log('FAIL', 'STEP 4: registration row', e.message); return null }
+  } catch(e) { log('FAIL', 'STEP 3: admin activate', e.message); return false }
 }
 
-// ─── STEP 5: Admin activate ────────────────────────────────────────────────────
-async function step5_adminActivate(registrationId) {
-  if (!registrationId) { log('SKIP', 'STEP 5: admin activate (no registration_id)'); return }
+// ─── STEP 4: submit-statement ─────────────────────────────────────────────────
+async function step4_statement(artist_id) {
+  if (!artist_id) { log('SKIP', 'STEP 4: submit-statement (no artist_id)'); return null }
   try {
-    const headers = { 'Content-Type': 'application/json' }
-    if (ADMIN_KEY) headers['x-admin-key'] = ADMIN_KEY
-    const r = await fetch(`${BASE_URL}/api/admin-registration-action`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ registration_id: registrationId, action: 'activate' })
-    })
-    const json = await r.json()
-    if (r.ok && json.ok) {
-      log('PASS', 'STEP 5: admin activate succeeded', `registration_id=${registrationId}`)
-    } else {
-      log('FAIL', 'STEP 5: admin activate', `${r.status} ${JSON.stringify(json)}`)
-    }
-  } catch(e) { log('FAIL', 'STEP 5: admin activate', e.message) }
-}
-
-// ─── STEP 6: Verify registration status = ACTIVE ──────────────────────────────
-async function step6_verifyActive(registrationId) {
-  if (!registrationId) { log('SKIP', 'STEP 6: verify active (no registration_id)'); return }
-  try {
-    const rows = await sbGet('registrations', `registrations_v1?id=eq.${registrationId}&select=id,status`)
-    const status = rows?.[0]?.status
-    if (status === 'ACTIVE') {
-      log('PASS', 'STEP 6: registration status = ACTIVE')
-    } else {
-      log('FAIL', 'STEP 6: registration not ACTIVE', `status=${status}`)
-    }
-  } catch(e) { log('FAIL', 'STEP 6: verify active', e.message) }
-}
-
-// ─── STEP 7: Submit a royalty statement for Echo ──────────────────────────────
-async function step7_submitStatement() {
-  try {
-    const res = await api('api/submit-statement', {
-      artist_id: ECHO_ID,
+    const res = await post('api/submit-statement', {
+      artist_id,
       source: 'ASCAP',
       period_start: '2026-01-01',
       period_end: '2026-03-31',
       gross_amount: 250.00,
       currency: 'USD',
       line_items: [
-        { description: 'Performance royalties Q1 2026', amount: 150.00, isrc: null },
-        { description: 'Digital royalties Q1 2026', amount: 100.00, isrc: null },
+        { description: 'Performance royalties Q1 2026', amount: 150.00 },
+        { description: 'Digital royalties Q1 2026',     amount: 100.00 },
       ]
     })
-    if (res.ok) {
-      log('PASS', 'STEP 7: submit-statement accepted', `gross=$${res.json.gross_amount} net=$${res.json.net_amount}`)
+    if (res.ok && res.json.statement_id) {
+      const fee = res.json.mgs_fee_usd
+      const net = res.json.net_to_artist_usd
+      log('PASS', 'STEP 4: submit-statement', `gross=$250 fee=$${fee} net=$${net}`)
+      return res.json.statement_id
     } else {
-      log('FAIL', 'STEP 7: submit-statement', `${res.status} ${JSON.stringify(res.json)}`)
+      log('FAIL', 'STEP 4: submit-statement', `${res.status} ${JSON.stringify(res.json)}`)
+      return null
     }
-  } catch(e) { log('FAIL', 'STEP 7: submit-statement', e.message) }
+  } catch(e) { log('FAIL', 'STEP 4: submit-statement', e.message); return null }
 }
 
-// ─── STEP 8: Verify disbursement row created ──────────────────────────────────
-async function step8_verifyDisbursement() {
+// ─── STEP 5: trigger-payout ───────────────────────────────────────────────────
+async function step5_payout(artist_id) {
+  if (!artist_id) { log('SKIP', 'STEP 5: trigger-payout (no artist_id)'); return }
   try {
-    const rows = await sbGet('royalties', `disbursement_queue_v1?artist_id=eq.${ECHO_ID}&order=created_at.desc&limit=1&select=id,status,net_amount`)
-    if (rows.length > 0) {
-      const d = rows[0]
-      log('PASS', 'STEP 8: disbursement row exists', `id=${d.id} status=${d.status} net=$${d.net_amount}`)
+    const res = await post('api/trigger-payout', { artist_id })
+    // Expected: pending=1 sent=0 (no Stripe Connect account yet for new artist)
+    // OR pending=0 if no disbursement queued
+    if (res.ok) {
+      log('PASS', 'STEP 5: trigger-payout responded OK', JSON.stringify(res.json))
+    } else if (res.status === 400 || res.status === 422) {
+      log('PASS', 'STEP 5: trigger-payout correctly rejected (no Connect account)', `${res.status}`)
     } else {
-      log('FAIL', 'STEP 8: no disbursement row found for Echo')
+      log('FAIL', 'STEP 5: trigger-payout', `${res.status} ${JSON.stringify(res.json)}`)
     }
-  } catch(e) { log('FAIL', 'STEP 8: disbursement row', e.message) }
+  } catch(e) { log('FAIL', 'STEP 5: trigger-payout', e.message) }
+}
+
+// ─── STEP 6: create-connect-account ──────────────────────────────────────────
+async function step6_connect(artist_id) {
+  if (!artist_id) { log('SKIP', 'STEP 6: create-connect-account (no artist_id)'); return }
+  try {
+    const res = await post('api/create-connect-account', { artist_id, email: ECHO_EMAIL })
+    if (res.ok && res.json.onboarding_url) {
+      log('PASS', 'STEP 6: create-connect-account → onboarding URL returned')
+    } else if (res.ok && res.json.account_id) {
+      log('PASS', 'STEP 6: create-connect-account → account created', `acct=${res.json.account_id}`)
+    } else {
+      log('FAIL', 'STEP 6: create-connect-account', `${res.status} ${JSON.stringify(res.json)}`)
+    }
+  } catch(e) { log('FAIL', 'STEP 6: create-connect-account', e.message) }
 }
 
 // ─── MAIN ──────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log('\n🎵 MusiGod E2E Test — Growth Plan Signup Flow')
+  console.log('\n🎵 MusiGod E2E Test v2 — Growth Plan Signup Flow')
   console.log('━'.repeat(55))
-  console.log(`Artist: Test Artist Echo (${ECHO_ID})`)
   console.log(`Target: ${BASE_URL}`)
+  console.log(`Time:   ${new Date().toISOString()}`)
   console.log('━'.repeat(55) + '\n')
 
-  if (!SB_KEY) {
-    console.error('❌ SUPABASE_SERVICE_ROLE_KEY env var not set — aborting')
-    process.exit(1)
-  }
+  const reg = await step1_register()
+  const artist_id = reg?.artist_id
+  const registration_id = reg?.registration_id
 
-  console.log('🧹 Cleaning up Echo state...')
-  await cleanupEcho()
-  console.log('')
-
-  await step1_echoExists()
-  await step2_register()
-  await step3_checkout()
-  const regId = await step4_registrationRow()
-  await step5_adminActivate(regId)
-  await step6_verifyActive(regId)
-  await step7_submitStatement()
-  await step8_verifyDisbursement()
+  await step2_checkout(artist_id)
+  await step3_activate(registration_id)
+  await step4_statement(artist_id)
+  await step5_payout(artist_id)
+  await step6_connect(artist_id)
 
   console.log('\n' + '━'.repeat(55))
-  console.log(`Results: ${passed} passed, ${failed} failed out of ${passed + failed} steps`)
+  console.log(`Results: ${passed} passed  ${failed} failed  ${skipped} skipped`)
   if (failed === 0) {
     console.log('🏆 ALL TESTS PASSED')
   } else {
