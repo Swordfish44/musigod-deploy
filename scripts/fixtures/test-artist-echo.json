@@ -1,10 +1,11 @@
 {
   "meta": {
     "description": "Permanent QA fixture for Test Artist Echo. Never use in production customer flows.",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "qa_artist": true
   },
   "profile": {
+    "artist_id": "86c8df13-dbc6-4846-a8da-cdbaaf386cc7",
     "artist_name": "Test Artist Echo",
     "legal_name": "Echo Validation",
     "email": "swordfishlp44+testartist@proton.me",
