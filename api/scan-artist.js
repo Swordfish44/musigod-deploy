@@ -1,39 +1,31 @@
 // api/scan-artist.js
-// Vercel serverless function
-// Deploy to musigod.com as /api/scan-artist
-// POST { "artistName": "Esham" }
-// Returns full royalty gap scan results
-
 const { runFullScan } = require('../lib/scanner');
 
-// Simple in-memory cache to avoid hammering APIs on repeated lookups
 const cache = new Map();
-const CACHE_TTL = 1000 * 60 * 60; // 1 hour
+const CACHE_TTL = 1000 * 60 * 60;
 
-export default async function handler(req, res) {
-  // CORS for musigod.com frontend
-  res.setHeader('Access-Control-Allow-Origin', 'https://musigod.com');
+module.exports = async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-admin-key');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  // Auth check — simple admin key for internal tool
+  // Auth check
   const adminKey = req.headers['x-admin-key'];
-  if (adminKey !== process.env.AUDIT_ADMIN_KEY) {
+  const expectedKey = process.env.AUDIT_ADMIN_KEY;
+  if (expectedKey && adminKey !== expectedKey) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { artistName } = req.body;
-  if (!artistName || typeof artistName !== 'string' || artistName.trim().length < 2) {
-    return res.status(400).json({ error: 'artistName required (min 2 chars)' });
+  const { artistName } = req.body || {};
+  if (!artistName || artistName.trim().length < 2) {
+    return res.status(400).json({ error: 'artistName required' });
   }
 
   const name = artistName.trim();
   const cacheKey = name.toLowerCase();
-
-  // Return cached result if fresh
   const cached = cache.get(cacheKey);
   if (cached && Date.now() - cached.ts < CACHE_TTL) {
     return res.status(200).json({ ...cached.data, cached: true });
@@ -47,4 +39,4 @@ export default async function handler(req, res) {
     console.error('Scan error:', err);
     return res.status(500).json({ error: 'Scan failed', message: err.message });
   }
-}
+};
