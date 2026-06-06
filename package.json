@@ -2,7 +2,8 @@
   "private": true,
   "dependencies": {
     "@sentry/browser": "^8.55.0",
-    "@sentry/node": "^8.55.0"
+    "@sentry/node": "^8.55.0",
+    "csv-stringify": "^6.7.0"
   },
   "scripts": {
     "dns:check": "node scripts/check-dns-state.js",

@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod — Catalog Enrichment & Registration Engine</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap');
+:root{
+  --navy:#0A1628;--navy2:#0d1e35;--dim:#111f33;--dim2:#162840;
+  --gold:#C9A84C;--gold2:#e8c76a;--gold-dim:rgba(201,168,76,0.1);
+  --border:#1e3556;--border2:#253f63;
+  --text:#dce6f5;--muted:#5a7a9e;--muted2:#8aa4c0;
+  --green:#2ecc8a;--red:#e05c5c;--orange:#e09a3c;--blue:#4a9eff;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--navy);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(201,168,76,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(201,168,76,0.03) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0;}
+.app{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:36px 22px 100px;}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:44px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.logo{font-family:'Space Mono',monospace;font-size:19px;font-weight:700;color:var(--gold);letter-spacing:3px;}
+.logo-sub{color:var(--muted);font-size:10px;letter-spacing:2px;margin-top:3px;}
+.badge{background:var(--dim);border:1px solid var(--border2);color:var(--gold);font-family:'Space Mono',monospace;font-size:10px;padding:5px 12px;border-radius:3px;letter-spacing:2px;}
+.sec-lbl{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--gold);text-transform:uppercase;margin-bottom:12px;margin-top:28px;display:flex;align-items:center;gap:10px;}
+.sec-lbl::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* FORM */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+@media(max-width:600px){.form-grid{grid-template-columns:1fr;}}
+.field{display:flex;flex-direction:column;gap:6px;}
+.field.full{grid-column:1/-1;}
+.field-lbl{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;}
+.field-inp{background:var(--dim);border:1px solid var(--border2);color:var(--text);font-family:'Syne',sans-serif;font-size:15px;font-weight:600;padding:12px 16px;border-radius:5px;outline:none;transition:border-color .2s;}
+.field-inp:focus{border-color:var(--gold);}
+.field-inp::placeholder{color:var(--muted);font-weight:400;font-size:13px;}
+.field-inp.sm{font-size:13px;font-weight:400;}
+.run-btn{width:100%;background:var(--gold);color:var(--navy);border:none;font-family:'Space Mono',monospace;font-size:12px;font-weight:700;letter-spacing:2px;padding:15px;border-radius:6px;cursor:pointer;transition:background .2s;margin-top:4px;}
+.run-btn:hover{background:var(--gold2);}
+.run-btn:disabled{background:var(--dim);color:var(--muted);cursor:not-allowed;}
+
+/* STATUS */
+.status{font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);min-height:22px;margin-bottom:20px;letter-spacing:.5px;}
+.status .hi{color:var(--gold);}
+.status .ok{color:var(--green);}
+.status .err{color:var(--red);}
+
+/* GAPS SUMMARY */
+.gaps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px;}
+@media(max-width:600px){.gaps-grid{grid-template-columns:1fr 1fr;}}
+.gap-card{background:var(--dim);border:1px solid var(--border);border-radius:7px;padding:14px 16px;}
+.gap-card.warn{border-color:var(--orange);}
+.gap-card.ok{border-color:var(--green);}
+.gc-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:6px;}
+.gc-val{font-size:22px;font-weight:800;}
+.gc-val.warn{color:var(--orange);}
+.gc-val.ok{color:var(--green);}
+.gc-val.gold{color:var(--gold);}
+
+/* DOWNLOAD CARDS */
+.dl-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+@media(max-width:600px){.dl-grid{grid-template-columns:1fr;}}
+.dl-card{background:var(--dim);border:1px solid var(--border2);border-radius:8px;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.dl-info{}
+.dl-name{font-weight:700;font-size:15px;margin-bottom:4px;}
+.dl-desc{font-size:12px;color:var(--muted);}
+.dl-btn{background:var(--gold);color:var(--navy);border:none;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 16px;border-radius:4px;cursor:pointer;white-space:nowrap;transition:background .2s;flex-shrink:0;}
+.dl-btn:hover{background:var(--gold2);}
+.dl-btn.outline{background:transparent;color:var(--gold);border:1px solid var(--gold);}
+.dl-btn.outline:hover{background:var(--gold-dim);}
+
+/* TRACK TABLE */
+.tbl-wrap{background:var(--dim);border:1px solid var(--border);border-radius:8px;overflow:hidden;max-height:420px;overflow-y:auto;}
+.tbl{width:100%;border-collapse:collapse;}
+.tbl th{background:var(--navy2);font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;padding:9px 12px;text-align:left;border-bottom:1px solid var(--border);position:sticky;top:0;}
+.tbl td{padding:8px 12px;font-size:12px;border-bottom:1px solid rgba(30,53,86,.35);vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:rgba(255,255,255,.015);}
+.tag{font-family:'Space Mono',monospace;font-size:9px;padding:2px 6px;border-radius:3px;white-space:nowrap;}
+.tag-ok{background:rgba(46,204,138,.12);color:var(--green);border:1px solid var(--green);}
+.tag-warn{background:rgba(224,154,60,.12);color:var(--orange);border:1px solid var(--orange);}
+.tag-err{background:rgba(224,80,80,.12);color:var(--red);border:1px solid var(--red);}
+
+/* SPINNER */
+.spin{display:inline-block;width:11px;height:11px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:rot .6s linear infinite;margin-right:6px;vertical-align:middle;}
+@keyframes rot{to{transform:rotate(360deg);}}
+.hidden{display:none!important;}
+::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--navy);}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+
+.idle{text-align:center;padding:60px 20px;color:var(--muted);}
+.idle-icon{font-size:40px;margin-bottom:12px;opacity:.25;}
+.idle-txt{font-size:13px;line-height:1.8;}
+.prog-bar-bg{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:8px;}
+.prog-bar{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:2px;transition:width .4s ease;width:0%;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hdr">
+    <div><div class="logo">MUSIGOD</div><div class="logo-sub">CATALOG ENRICHMENT & REGISTRATION ENGINE</div></div>
+    <div class="badge">⬡ ADMIN</div>
+  </div>
+
+  <!-- FORM -->
+  <div class="sec-lbl">Artist & Publisher Info</div>
+  <div class="form-grid">
+    <div class="field">
+      <label class="field-lbl">Admin Key</label>
+      <input class="field-inp sm" id="adminKey" type="password" placeholder="AUDIT_ADMIN_KEY"/>
+    </div>
+    <div class="field">
+      <label class="field-lbl">Artist Stage Name</label>
+      <input class="field-inp" id="artistName" type="text" placeholder="e.g. Esham" autocomplete="off"/>
+    </div>
+    <div class="field">
+      <label class="field-lbl">Publisher Entity Name</label>
+      <input class="field-inp sm" id="publisherName" type="text" placeholder="e.g. Reel Life Music Publishing"/>
+    </div>
+    <div class="field">
+      <label class="field-lbl">Publisher IPI (if known)</label>
+      <input class="field-inp sm" id="publisherIPI" type="text" placeholder="Leave blank if not yet registered"/>
+    </div>
+    <div class="field full">
+      <label class="field-lbl">Max Releases to Process</label>
+      <input class="field-inp sm" id="maxReleases" type="number" value="30" min="1" max="100"/>
+    </div>
+  </div>
+  <button class="run-btn" id="runBtn" onclick="runEnrichment()">⬡ ENRICH CATALOG & GENERATE REGISTRATION FILES</button>
+
+  <div style="margin-top:12px;">
+    <div class="prog-bar-bg"><div class="prog-bar" id="progBar"></div></div>
+    <div class="status" id="status">Enter artist info and click Enrich. MusicBrainz pulls real songwriter credits per track.</div>
+  </div>
+
+  <!-- IDLE -->
+  <div class="idle" id="idle">
+    <div class="idle-icon">◈</div>
+    <div class="idle-txt">
+      Pulls track-level songwriter credits from MusicBrainz.<br>
+      Generates ASCAP, BMI, and MLC bulk registration CSV files.<br>
+      One click → upload to PRO portal → done.
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results" class="hidden">
+
+    <div class="sec-lbl">Catalog Gaps Summary</div>
+    <div class="gaps-grid" id="gapsGrid"></div>
+
+    <div class="sec-lbl">Download Registration Files</div>
+    <div class="dl-grid" id="dlGrid"></div>
+
+    <div class="sec-lbl">Track-Level Catalog Preview</div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Track</th>
+            <th>Release</th>
+            <th>Year</th>
+            <th>Writers</th>
+            <th>ISRC</th>
+            <th>ISWC</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="trackBody"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let lastResult = null;
+
+async function runEnrichment() {
+  const artistName   = document.getElementById('artistName').value.trim();
+  const adminKey     = document.getElementById('adminKey').value.trim();
+  const publisherName = document.getElementById('publisherName').value.trim() || 'MusiGod Publishing Administration';
+  const publisherIPI  = document.getElementById('publisherIPI').value.trim();
+  const maxReleases   = parseInt(document.getElementById('maxReleases').value) || 30;
+
+  if (!artistName) return;
+
+  document.getElementById('idle').classList.add('hidden');
+  document.getElementById('results').classList.add('hidden');
+  document.getElementById('runBtn').disabled = true;
+  setStatus(`<span class="spin"></span><span class="hi">Enriching catalog for ${artistName} — pulling MusicBrainz songwriter data...</span>`);
+  setProgress(10);
+
+  // Simulate progress while waiting
+  let prog = 10;
+  const progInterval = setInterval(() => {
+    prog = Math.min(prog + 2, 85);
+    setProgress(prog);
+  }, 800);
+
+  try {
+    const res = await fetch('/api/enrich-artist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+      body: JSON.stringify({ artistName, publisherName, publisherIPI, maxReleases })
+    });
+
+    clearInterval(progInterval);
+    setProgress(95);
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    lastResult = data;
+    setProgress(100);
+
+    renderResults(data);
+    setStatus(`<span class="ok">✓ Done — ${data.totalTracks} tracks enriched across ${data.processedReleases} releases · ${data.gapsReport.readyToRegister} ready to register</span>`);
+    document.getElementById('results').classList.remove('hidden');
+  } catch (err) {
+    clearInterval(progInterval);
+    setStatus(`<span class="err">Error: ${err.message}</span>`);
+    document.getElementById('idle').classList.remove('hidden');
+  }
+
+  document.getElementById('runBtn').disabled = false;
+}
+
+function renderResults(d) {
+  const g = d.gapsReport;
+
+  // Gaps grid
+  document.getElementById('gapsGrid').innerHTML = `
+    <div class="gap-card ok">
+      <div class="gc-label">Ready to Register</div>
+      <div class="gc-val ok">${g.readyToRegister}</div>
+    </div>
+    <div class="gap-card ${g.missingWriters > 0 ? 'warn' : 'ok'}">
+      <div class="gc-label">Missing Writers</div>
+      <div class="gc-val ${g.missingWriters > 0 ? 'warn' : 'ok'}">${g.missingWriters}</div>
+    </div>
+    <div class="gap-card ${g.missingISRC > 0 ? 'warn' : 'ok'}">
+      <div class="gc-label">Missing ISRC</div>
+      <div class="gc-val ${g.missingISRC > 0 ? 'warn' : 'ok'}">${g.missingISRC}</div>
+    </div>
+    <div class="gap-card ${g.missingISWC > 0 ? 'warn' : 'ok'}">
+      <div class="gc-label">Missing ISWC</div>
+      <div class="gc-val ${g.missingISWC > 0 ? 'warn' : 'ok'}">${g.missingISWC}</div>
+    </div>
+    <div class="gap-card">
+      <div class="gc-label">Total Tracks</div>
+      <div class="gc-val gold">${g.totalTracks}</div>
+    </div>
+    <div class="gap-card ${g.needsVerification > 0 ? 'warn' : 'ok'}">
+      <div class="gc-label">Needs VA Review</div>
+      <div class="gc-val ${g.needsVerification > 0 ? 'warn' : 'ok'}">${g.needsVerification}</div>
+    </div>
+  `;
+
+  // Download cards
+  const files = d.files;
+  document.getElementById('dlGrid').innerHTML = Object.entries(files).map(([key, f]) => {
+    const descs = {
+      ascap:  'Upload directly to ASCAP ACE bulk registration portal',
+      bmi:    'Upload directly to BMI Title Registration system',
+      mlc:    'Upload directly to The MLC work registration portal',
+      master: 'Full catalog with gaps flagged for VA review',
+    };
+    const labels = { ascap:'ASCAP CSV', bmi:'BMI CSV', mlc:'MLC CSV', master:'Master Catalog' };
+    return `<div class="dl-card">
+      <div class="dl-info">
+        <div class="dl-name">${labels[key]}</div>
+        <div class="dl-desc">${descs[key]}</div>
+      </div>
+      <button class="dl-btn" onclick="downloadFile('${key}')">⬇ DOWNLOAD</button>
+    </div>`;
+  }).join('');
+
+  // Track table
+  const tbody = document.getElementById('trackBody');
+  const tracks = d.files.master.content ? [] : [];
+  // Parse from enriched data directly
+  renderTrackTable(d);
+}
+
+function renderTrackTable(d) {
+  // Re-request enriched tracks from server isn't ideal
+  // So we parse the master CSV back for display
+  const lines = d.files.master.content.split('\n').slice(1).filter(Boolean);
+  const tbody = document.getElementById('trackBody');
+  tbody.innerHTML = lines.slice(0, 100).map(line => {
+    const cols = parseCSVLine(line);
+    const trackTitle   = cols[0] || '';
+    const releaseTitle = cols[1] || '';
+    const year         = cols[2] || '';
+    const writers      = cols[8] || '';
+    const isrc         = cols[6] || '';
+    const iswc         = cols[7] || '';
+    const issues       = cols[14] || '';
+    const hasIssues    = issues.length > 0;
+    const hasWriters   = writers && writers !== '';
+    return `<tr>
+      <td style="font-weight:700;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(trackTitle)}</td>
+      <td style="color:var(--muted2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(releaseTitle)}</td>
+      <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted2)">${year}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:${hasWriters?'var(--text)':'var(--red)'}">${esc(writers)||'—'}</td>
+      <td style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted)">${isrc||'—'}</td>
+      <td style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted)">${iswc||'—'}</td>
+      <td><span class="tag ${hasIssues?'tag-warn':'tag-ok'}">${hasIssues?'REVIEW':'READY'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function downloadFile(key) {
+  if (!lastResult?.files?.[key]) return;
+  const f = lastResult.files[key];
+  const blob = new Blob([f.content], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = f.filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function parseCSVLine(line) {
+  const cols = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { cols.push(cur); cur = ''; }
+    else { cur += c; }
+  }
+  cols.push(cur);
+  return cols;
+}
+
+function setProgress(pct) { document.getElementById('progBar').style.width = pct + '%'; }
+function setStatus(html) { document.getElementById('status').innerHTML = html; }
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.activeElement.id === 'artistName') runEnrichment();
+});
+</script>
+</body>
+</html>

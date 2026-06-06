@@ -1,31 +1,65 @@
 {
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
+    "headers": [
         {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' https://*.supabase.co https://*.n8n.cloud https://musigod-n8n.onrender.com https://cdn.jsdelivr.net https://api.stripe.com https://musigod.com https://api.discogs.com https://www.googleapis.com https://accounts.spotify.com https://api.spotify.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com;"
+            "source": "/(.*)",
+            "headers": [
+                {
+                    "key": "Content-Security-Policy",
+                    "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' https://*.supabase.co https://*.n8n.cloud https://musigod-n8n.onrender.com https://cdn.jsdelivr.net https://api.stripe.com https://musigod.com https://api.discogs.com https://www.googleapis.com https://accounts.spotify.com https://api.spotify.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com;"
+                }
+            ]
         }
-      ]
-    }
-  ],
-  "rewrites": [
-    { "source": "/admin", "destination": "/admin.html" },
-    { "source": "/portal", "destination": "/portal.html" },
-    { "source": "/earnings", "destination": "/earnings.html" },
-    { "source": "/registration/:path*", "destination": "/registration-detail.html" },
-    { "source": "/success", "destination": "/success.html" },
-    { "source": "/rights-audit", "destination": "/rights-audit.html" },
-    { "source": "/affiliates", "destination": "/affiliate-dashboard.html" },
-    { "source": "/audit-status", "destination": "/audit-status.html" },
-    { "source": "/catalog-intake", "destination": "/catalog-intake.html" },
-    { "source": "/audit-admin", "destination": "/audit-admin.html" }
-  ],
-  "crons": [
-    {
-      "path": "/api/send-audit-drip",
-      "schedule": "0 14 * * *"
-    }
-  ]
+    ],
+    "rewrites": [
+        {
+            "source": "/admin",
+            "destination": "/admin.html"
+        },
+        {
+            "source": "/portal",
+            "destination": "/portal.html"
+        },
+        {
+            "source": "/earnings",
+            "destination": "/earnings.html"
+        },
+        {
+            "source": "/registration/:path*",
+            "destination": "/registration-detail.html"
+        },
+        {
+            "source": "/success",
+            "destination": "/success.html"
+        },
+        {
+            "source": "/rights-audit",
+            "destination": "/rights-audit.html"
+        },
+        {
+            "source": "/affiliates",
+            "destination": "/affiliate-dashboard.html"
+        },
+        {
+            "source": "/audit-status",
+            "destination": "/audit-status.html"
+        },
+        {
+            "source": "/catalog-intake",
+            "destination": "/catalog-intake.html"
+        },
+        {
+            "source": "/audit-admin",
+            "destination": "/audit-admin.html"
+        },
+        {
+            "source": "/catalog-enrichment",
+            "destination": "/catalog-enrichment.html"
+        }
+    ],
+    "crons": [
+        {
+            "path": "/api/send-audit-drip",
+            "schedule": "0 14 * * *"
+        }
+    ]
 }
