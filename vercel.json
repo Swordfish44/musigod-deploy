@@ -65,6 +65,9 @@
     "functions": {
         "api/run-enrichment-job.js": {
             "maxDuration": 300
+        },
+        "api/enrich-artist.js": {
+            "maxDuration": 300
         }
     }
 }

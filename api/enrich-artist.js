@@ -1,35 +1,45 @@
 // api/enrich-artist.js
-// TRIGGER — inserts job row, fires n8n webhook (or falls back to direct call).
-// Returns { job_id } immediately. Browser polls /api/get-enrichment-status.
+// Single-function enrichment — no self-call, no n8n required.
+// Runs the full MusicBrainz + Discogs enrichment synchronously,
+// writing progress to Supabase so the browser can poll.
+// maxDuration: 300s (vercel.json)
+
+const { enrichArtistCatalog } = require('../lib/enrich-catalog');
+const {
+  generateASCAPCSV, generateBMICSV, generateMLCCSV,
+  generateMasterCatalogCSV, generateGapsReport,
+} = require('../lib/generate-registration-files');
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-
-// N8N_ENRICH_WEBHOOK: set this in Vercel env to your n8n webhook URL.
-// If not set, falls back to calling /api/run-enrichment-job directly
-// (works fine for manual/admin use; n8n gives you async progress).
-const N8N_ENRICH_WEBHOOK = process.env.N8N_ENRICH_WEBHOOK;
-// Always use the canonical domain — VERCEL_URL points to preview deployments
-const SELF_BASE = 'https://musigod.com';
 
 async function sbPost(body) {
   const res = await fetch(`${SB_URL}/rest/v1/catalog_enrichments_v1`, {
     method: 'POST',
     headers: {
-      'Content-Type':    'application/json',
-      
-      
-      'apikey':          SB_KEY,
-      'Authorization':   `Bearer ${SB_KEY}`,
-      'Prefer':          'return=representation',
+      'Content-Type':  'application/json',
+      'apikey':        SB_KEY,
+      'Authorization': `Bearer ${SB_KEY}`,
+      'Prefer':        'return=representation',
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Supabase insert failed: ${res.status} — ${text}`);
-  }
+  if (!res.ok) throw new Error(`DB insert: ${res.status} — ${await res.text()}`);
   return res.json();
+}
+
+async function sbPatch(job_id, body) {
+  const res = await fetch(`${SB_URL}/rest/v1/catalog_enrichments_v1?id=eq.${job_id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type':  'application/json',
+      'apikey':        SB_KEY,
+      'Authorization': `Bearer ${SB_KEY}`,
+      'Prefer':        'return=minimal',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) console.error(`[enrich] sbPatch ${res.status}: ${await res.text().catch(()=>'')}`);
 }
 
 module.exports = async function handler(req, res) {
@@ -54,50 +64,84 @@ module.exports = async function handler(req, res) {
 
   if (!artistName) return res.status(400).json({ error: 'artistName required' });
 
-  // 1. Insert job row
-  let rows;
+  // 1. Create job row — return job_id immediately to the browser
+  let job_id;
   try {
-    rows = await sbPost({
+    const rows = await sbPost({
       artist_name:    artistName,
       publisher_name: publisherName,
       publisher_ipi:  publisherIPI || null,
       max_releases:   maxReleases,
-      status:         'PENDING',
+      status:         'RUNNING',
+      progress_pct:   2,
+      progress_label: 'Starting enrichment…',
     });
+    job_id = rows[0]?.id;
+    if (!job_id) throw new Error('No id returned from insert');
   } catch (err) {
-    console.error('[enrich-trigger] DB insert failed:', err.message);
+    console.error('[enrich] DB insert failed:', err.message);
     return res.status(500).json({ error: err.message });
   }
 
-  const job_id = rows[0]?.id;
-  if (!job_id) return res.status(500).json({ error: 'Job insert returned no id' });
+  // 2. Return job_id to browser immediately — browser starts polling
+  res.status(202).json({ job_id, status: 'RUNNING' });
 
-  // 2. Fire worker — n8n webhook if configured, otherwise direct self-call
-  const workerPayload = JSON.stringify({ job_id, artistName, publisherName, publisherIPI, maxReleases });
+  // 3. Run enrichment synchronously in THIS function invocation.
+  // Vercel keeps the function alive until the handler resolves,
+  // even after res.json() — as long as we're in the same async call stack.
+  // We use setImmediate to yield, then run the work.
+  await new Promise(resolve => setImmediate(resolve));
 
-  if (N8N_ENRICH_WEBHOOK) {
-    // Fire-and-forget to n8n — n8n calls /api/run-enrichment-job synchronously
-    fetch(N8N_ENRICH_WEBHOOK, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    workerPayload,
-    }).catch(err => console.error('[enrich-trigger] n8n fire failed:', err.message));
-    console.log(`[enrich-trigger] job_id=${job_id} fired to n8n`);
-  } else {
-    // No n8n — call run-enrichment-job on the same deployment directly.
-    // This is still async from the browser's perspective (browser polls).
-    // Note: Vercel will kill this after 300s; fine for up to ~10 releases.
-    const adminKeyHeader = process.env.AUDIT_ADMIN_KEY || '';
-    fetch(`${SELF_BASE}/api/run-enrichment-job`, {
-      method:  'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-admin-key':  adminKeyHeader,
+  try {
+    await sbPatch(job_id, { progress_pct: 5, progress_label: 'Looking up artist in MusicBrainz…' });
+
+    const catalog = await enrichArtistCatalog(artistName, {
+      maxReleases,
+      onProgress: async ({ current, total, title }) => {
+        const pct = Math.round(5 + (current / total) * 80);
+        await sbPatch(job_id, {
+          progress_pct:   pct,
+          progress_label: `Processing release ${current}/${total}: ${title}`,
+        });
       },
-      body: workerPayload,
-    }).catch(err => console.error('[enrich-trigger] direct worker call failed:', err.message));
-    console.log(`[enrich-trigger] job_id=${job_id} fired direct (no n8n configured)`);
-  }
+    });
 
-  return res.status(202).json({ job_id, status: 'PENDING' });
+    await sbPatch(job_id, { progress_pct: 88, progress_label: 'Generating registration CSVs…' });
+
+    const ascapCSV   = generateASCAPCSV(catalog.enrichedTracks, publisherName, publisherIPI);
+    const bmiCSV     = generateBMICSV(catalog.enrichedTracks, publisherName, publisherIPI);
+    const mlcCSV     = generateMLCCSV(catalog.enrichedTracks, publisherName, publisherIPI);
+    const masterCSV  = generateMasterCatalogCSV(catalog.enrichedTracks);
+    const gapsReport = generateGapsReport(catalog.enrichedTracks);
+
+    await sbPatch(job_id, {
+      status:         'DONE',
+      progress_pct:   100,
+      progress_label: `Done — ${catalog.totalTracks} tracks enriched`,
+      result: {
+        artistName,
+        mbid:              catalog.mbid,
+        totalReleases:     catalog.totalReleases,
+        processedReleases: catalog.processedReleases,
+        totalTracks:       catalog.totalTracks,
+        gapsReport,
+        files: {
+          ascap:  { filename: `${artistName}_ASCAP_Registration.csv`,  content: ascapCSV },
+          bmi:    { filename: `${artistName}_BMI_Registration.csv`,    content: bmiCSV },
+          mlc:    { filename: `${artistName}_MLC_Registration.csv`,    content: mlcCSV },
+          master: { filename: `${artistName}_Master_Catalog.csv`,      content: masterCSV },
+        },
+        generatedAt: catalog.generatedAt,
+      },
+    });
+
+    console.log(`[enrich] DONE job_id=${job_id} tracks=${catalog.totalTracks}`);
+  } catch (err) {
+    console.error(`[enrich] ERROR job_id=${job_id}:`, err.message);
+    await sbPatch(job_id, {
+      status:         'ERROR',
+      error_message:  err.message,
+      progress_label: 'Enrichment failed',
+    });
+  }
 };
