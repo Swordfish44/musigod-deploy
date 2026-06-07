@@ -18,8 +18,8 @@ async function sbPost(body) {
     method: 'POST',
     headers: {
       'Content-Type':    'application/json',
-      'Accept-Profile':  'catalog',
-      'Content-Profile': 'catalog',
+      
+      
       'apikey':          SB_KEY,
       'Authorization':   `Bearer ${SB_KEY}`,
       'Prefer':          'return=representation',

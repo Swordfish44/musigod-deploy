@@ -20,8 +20,8 @@ async function sbPatch(job_id, body) {
     method: 'PATCH',
     headers: {
       'Content-Type':    'application/json',
-      'Accept-Profile':  'catalog',
-      'Content-Profile': 'catalog',
+      
+      
       'apikey':          SB_KEY,
       'Authorization':   `Bearer ${SB_KEY}`,
       'Prefer':          'return=minimal',

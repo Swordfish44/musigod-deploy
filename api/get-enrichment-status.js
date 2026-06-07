@@ -1,21 +1,19 @@
 // api/get-enrichment-status.js
 // GET /api/get-enrichment-status?job_id=<uuid>
-// Returns job status + result payload when DONE.
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
-async function sbGet(table, schema, query) {
-  const res = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
+async function sbGet(query) {
+  const res = await fetch(`${SB_URL}/rest/v1/catalog_enrichments_v1?${query}`, {
     headers: {
-      'Accept-Profile': schema,
-      'apikey': SB_KEY,
+      'apikey':        SB_KEY,
       'Authorization': `Bearer ${SB_KEY}`,
     },
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Supabase GET ${table}: ${res.status} — ${text}`);
+    throw new Error(`Supabase GET: ${res.status} — ${text}`);
   }
   return res.json();
 }
@@ -38,8 +36,6 @@ module.exports = async function handler(req, res) {
 
   try {
     const rows = await sbGet(
-      'catalog_enrichments_v1',
-      'catalog',
       `id=eq.${encodeURIComponent(job_id)}&select=id,status,progress_pct,progress_label,result,error_message,created_at,updated_at&limit=1`
     );
 
