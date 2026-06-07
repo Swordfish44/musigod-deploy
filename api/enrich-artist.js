@@ -9,9 +9,8 @@ const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SER
 // If not set, falls back to calling /api/run-enrichment-job directly
 // (works fine for manual/admin use; n8n gives you async progress).
 const N8N_ENRICH_WEBHOOK = process.env.N8N_ENRICH_WEBHOOK;
-const SELF_BASE          = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : 'https://musigod.com';
+// Always use the canonical domain — VERCEL_URL points to preview deployments
+const SELF_BASE = 'https://musigod.com';
 
 async function sbPost(body) {
   const res = await fetch(`${SB_URL}/rest/v1/catalog_enrichments_v1`, {
