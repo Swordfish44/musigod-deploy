@@ -1,7 +1,6 @@
 // api/enrich-artist.js
-// Single-function enrichment — no self-call, no n8n required.
-// Runs the full MusicBrainz + Discogs enrichment synchronously,
-// writing progress to Supabase so the browser can poll.
+// Runs full enrichment synchronously. Returns AFTER work is done.
+// Browser polls /api/get-enrichment-status for live progress while waiting.
 // maxDuration: 300s (vercel.json)
 
 const { enrichArtistCatalog } = require('../lib/enrich-catalog');
@@ -39,7 +38,7 @@ async function sbPatch(job_id, body) {
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) console.error(`[enrich] sbPatch ${res.status}: ${await res.text().catch(()=>'')}`);
+  if (!res.ok) console.error(`[enrich] sbPatch ${res.status}: ${await res.text().catch(() => '')}`);
 }
 
 module.exports = async function handler(req, res) {
@@ -64,7 +63,7 @@ module.exports = async function handler(req, res) {
 
   if (!artistName) return res.status(400).json({ error: 'artistName required' });
 
-  // 1. Create job row — return job_id immediately to the browser
+  // 1. Insert job row — RUNNING from the start so poll sees it immediately
   let job_id;
   try {
     const rows = await sbPost({
@@ -83,15 +82,9 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 
-  // 2. Return job_id to browser immediately — browser starts polling
-  res.status(202).json({ job_id, status: 'RUNNING' });
-
-  // 3. Run enrichment synchronously in THIS function invocation.
-  // Vercel keeps the function alive until the handler resolves,
-  // even after res.json() — as long as we're in the same async call stack.
-  // We use setImmediate to yield, then run the work.
-  await new Promise(resolve => setImmediate(resolve));
-
+  // 2. Run enrichment — response is NOT sent until this completes.
+  //    The browser already has the job_id from the trigger call and polls
+  //    Supabase for progress. This function runs for up to 300s.
   try {
     await sbPatch(job_id, { progress_pct: 5, progress_label: 'Looking up artist in MusicBrainz…' });
 
@@ -108,10 +101,6 @@ module.exports = async function handler(req, res) {
 
     await sbPatch(job_id, { progress_pct: 88, progress_label: 'Generating registration CSVs…' });
 
-    const ascapCSV   = generateASCAPCSV(catalog.enrichedTracks, publisherName, publisherIPI);
-    const bmiCSV     = generateBMICSV(catalog.enrichedTracks, publisherName, publisherIPI);
-    const mlcCSV     = generateMLCCSV(catalog.enrichedTracks, publisherName, publisherIPI);
-    const masterCSV  = generateMasterCatalogCSV(catalog.enrichedTracks);
     const gapsReport = generateGapsReport(catalog.enrichedTracks);
 
     await sbPatch(job_id, {
@@ -126,16 +115,18 @@ module.exports = async function handler(req, res) {
         totalTracks:       catalog.totalTracks,
         gapsReport,
         files: {
-          ascap:  { filename: `${artistName}_ASCAP_Registration.csv`,  content: ascapCSV },
-          bmi:    { filename: `${artistName}_BMI_Registration.csv`,    content: bmiCSV },
-          mlc:    { filename: `${artistName}_MLC_Registration.csv`,    content: mlcCSV },
-          master: { filename: `${artistName}_Master_Catalog.csv`,      content: masterCSV },
+          ascap:  { filename: `${artistName}_ASCAP_Registration.csv`,  content: generateASCAPCSV(catalog.enrichedTracks, publisherName, publisherIPI) },
+          bmi:    { filename: `${artistName}_BMI_Registration.csv`,    content: generateBMICSV(catalog.enrichedTracks, publisherName, publisherIPI) },
+          mlc:    { filename: `${artistName}_MLC_Registration.csv`,    content: generateMLCCSV(catalog.enrichedTracks, publisherName, publisherIPI) },
+          master: { filename: `${artistName}_Master_Catalog.csv`,      content: generateMasterCatalogCSV(catalog.enrichedTracks) },
         },
         generatedAt: catalog.generatedAt,
       },
     });
 
     console.log(`[enrich] DONE job_id=${job_id} tracks=${catalog.totalTracks}`);
+    return res.status(200).json({ job_id, status: 'DONE', totalTracks: catalog.totalTracks });
+
   } catch (err) {
     console.error(`[enrich] ERROR job_id=${job_id}:`, err.message);
     await sbPatch(job_id, {
@@ -143,5 +134,6 @@ module.exports = async function handler(req, res) {
       error_message:  err.message,
       progress_label: 'Enrichment failed',
     });
+    return res.status(500).json({ job_id, status: 'ERROR', error: err.message });
   }
 };

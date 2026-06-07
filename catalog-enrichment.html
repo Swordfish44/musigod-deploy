@@ -196,23 +196,60 @@ async function runEnrichment() {
   setProgress(3);
 
   let job_id;
+
+  // Trigger the enrichment — this fetch() call stays open for the full job duration
+  // (up to 300s). We kick off polling immediately using the job_id from the DB insert,
+  // which the server writes before starting the heavy work.
+  // We race the fetch against a short "job_id probe" so polling starts right away.
+  const controller = new AbortController();
+  const triggerPromise = fetch('/api/enrich-artist', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+    body:    JSON.stringify({ artistName, publisherName, publisherIPI, maxReleases }),
+    signal:  controller.signal,
+  });
+
+  // Poll Supabase for the latest RUNNING job for this artist while trigger is in-flight
+  // Start polling 2s after trigger fires — by then the job row is in the DB
+  await new Promise(r => setTimeout(r, 2000));
+
+  // Find the job_id by looking up the most recent RUNNING job for this artist
   try {
-    const res = await fetch('/api/enrich-artist', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
-      body:    JSON.stringify({ artistName, publisherName, publisherIPI, maxReleases }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    job_id = data.job_id;
-  } catch (err) {
-    setStatus(`<span class="err">Failed to queue job: ${err.message}</span>`);
+    const probe = await fetch(
+      `/api/get-enrichment-status?artist=${encodeURIComponent(artistName)}&latest=1`,
+      { headers: { 'x-admin-key': adminKey } }
+    );
+    if (probe.ok) {
+      const pd = await probe.json();
+      if (pd.job_id) job_id = pd.job_id;
+    }
+  } catch (_) {}
+
+  // If probe didn't work, wait for the trigger response to get the job_id
+  if (!job_id) {
+    try {
+      const res = await triggerPromise;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      job_id = data.job_id;
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        setStatus(`<span class="err">Failed to start job: ${err.message}</span>`);
+        document.getElementById('idle').classList.remove('hidden');
+        document.getElementById('runBtn').disabled = false;
+        return;
+      }
+    }
+  }
+
+  if (!job_id) {
+    setStatus(`<span class="err">Could not get job ID — check Vercel logs</span>`);
     document.getElementById('idle').classList.remove('hidden');
     document.getElementById('runBtn').disabled = false;
     return;
   }
 
-  setStatus(`<span class="spin"></span><span class="hi">Job queued — running enrichment in background… (job ${job_id.slice(0,8)})</span>`);
+  setStatus(`<span class="spin"></span><span class="hi">Enrichment running… (job ${job_id.slice(0,8)})</span>`);
   setProgress(5);
 
   // Poll every 4 seconds
