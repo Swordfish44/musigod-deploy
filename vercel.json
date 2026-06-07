@@ -63,7 +63,7 @@
         }
     ],
     "functions": {
-        "api/enrich-artist.js": {
+        "api/run-enrichment-job.js": {
             "maxDuration": 300
         }
     }
