@@ -61,5 +61,10 @@
             "path": "/api/send-audit-drip",
             "schedule": "0 14 * * *"
         }
-    ]
+    ],
+    "functions": {
+        "api/enrich-artist.js": {
+            "maxDuration": 300
+        }
+    }
 }
