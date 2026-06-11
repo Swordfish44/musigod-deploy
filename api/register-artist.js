@@ -54,7 +54,8 @@ module.exports = withSentry(async function handler(req, res) {
       statusCode: 500,
       plan: normalized.plan,
     })
-    return res.status(500).json({ error: 'Registration failed' })
+    // DEBUG: expose detail so we can see the real Supabase error — remove after fix
+    return res.status(500).json({ error: 'Registration failed', detail: err.message })
   }
 }, 'register-artist')
 
