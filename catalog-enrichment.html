@@ -86,6 +86,14 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .hidden{display:none!important;}
 ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--navy);}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
 
+/* OVERRIDE INPUTS */
+.ov-inp{background:var(--dim);border:1px solid var(--border2);color:var(--text);font-family:'Syne',sans-serif;font-size:12px;padding:6px 10px;border-radius:4px;outline:none;width:100%;}
+.ov-inp:focus{border-color:var(--gold);}
+.ov-role{width:90px;}
+.save-btn{background:transparent;color:var(--gold);border:1px solid var(--gold);font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;padding:6px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;transition:all .2s;}
+.save-btn:hover{background:var(--gold);color:var(--navy);}
+.save-btn.saved{border-color:var(--green);color:var(--green);}
+.save-btn:disabled{opacity:.4;cursor:not-allowed;}
 .idle{text-align:center;padding:60px 20px;color:var(--muted);}
 .idle-icon{font-size:40px;margin-bottom:12px;opacity:.25;}
 .idle-txt{font-size:13px;line-height:1.8;}
@@ -149,6 +157,28 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 
     <div class="sec-lbl">Download Registration Files</div>
     <div class="dl-grid" id="dlGrid"></div>
+
+    <!-- MANUAL OVERRIDES -->
+    <div id="overrideSection" class="hidden">
+      <div class="sec-lbl">Manual Writer Entry</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">
+        These tracks couldn't be enriched automatically. Enter writer name(s) separated by commas, then save each row. Re-run enrichment after saving to generate updated CSVs.
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>Track</th>
+              <th>Release</th>
+              <th style="min-width:220px">Writer(s) — comma separated</th>
+              <th>Role</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="overrideBody"></tbody>
+        </table>
+      </div>
+    </div>
 
     <div class="sec-lbl">Track-Level Catalog Preview</div>
     <div class="tbl-wrap">
@@ -337,10 +367,7 @@ function renderResults(d) {
     </div>`;
   }).join('');
 
-  // Track table
-  const tbody = document.getElementById('trackBody');
-  const tracks = d.files.master.content ? [] : [];
-  // Parse from enriched data directly
+  renderOverrides(d);
   renderTrackTable(d);
 }
 
@@ -397,6 +424,58 @@ function parseCSVLine(line) {
 function setProgress(pct) { document.getElementById('progBar').style.width = pct + '%'; }
 function setStatus(html) { document.getElementById('status').innerHTML = html; }
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderOverrides(result) {
+  const missing = result.gapsReport?.missingWriterTracks || [];
+  const sec = document.getElementById('overrideSection');
+  const tbody = document.getElementById('overrideBody');
+  if (!missing.length) { sec.classList.add('hidden'); return; }
+
+  sec.classList.remove('hidden');
+  tbody.innerHTML = missing.map((t, i) => {
+    const rel   = typeof t === 'string' ? t.split(' — ')[0] : (t.releaseTitle || '');
+    const track = typeof t === 'string' ? t.split(' — ')[1] : (t.trackTitle || '');
+    return `<tr id="ovrow-${i}">
+      <td style="font-weight:700;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(track)}</td>
+      <td style="color:var(--muted2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc(rel)}</td>
+      <td><input class="ov-inp" id="ov-names-${i}" placeholder="e.g. Esham, DJ Trauma" /></td>
+      <td><input class="ov-inp ov-role" id="ov-role-${i}" value="writer" /></td>
+      <td><button class="save-btn" id="ov-btn-${i}" onclick="saveOverride(${i},'${esc(track).replace(/'/g,"\\'")}','${esc(rel).replace(/'/g,"\\'")}')">SAVE</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function saveOverride(i, trackTitle, releaseTitle) {
+  const namesVal = document.getElementById(`ov-names-${i}`).value.trim();
+  const roleVal  = document.getElementById(`ov-role-${i}`).value.trim() || 'writer';
+  const btn      = document.getElementById(`ov-btn-${i}`);
+  if (!namesVal) { document.getElementById(`ov-names-${i}`).focus(); return; }
+
+  const writers = namesVal.split(',').map(n => n.trim()).filter(Boolean).map(name => ({ name, role: roleVal }));
+  const artistName = document.getElementById('artistName').value.trim();
+  const adminKey   = getAdminKey();
+
+  btn.disabled = true;
+  btn.textContent = 'SAVING…';
+
+  try {
+    const res = await fetch('/api/save-writer-override', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+      body:    JSON.stringify({ artistName, trackTitle, writers }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    btn.textContent = '✓ SAVED';
+    btn.classList.add('saved');
+    document.getElementById(`ov-names-${i}`).disabled = true;
+    document.getElementById(`ov-role-${i}`).disabled  = true;
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'SAVE';
+    alert(`Save failed: ${err.message}`);
+  }
+}
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && document.activeElement.id === 'artistName') runEnrichment();

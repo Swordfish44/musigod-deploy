@@ -68,6 +68,9 @@
         },
         "api/enrich-artist.js": {
             "maxDuration": 300
+        },
+        "api/save-writer-override.js": {
+            "maxDuration": 10
         }
     }
 }
