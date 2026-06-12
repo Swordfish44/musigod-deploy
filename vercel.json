@@ -54,6 +54,10 @@
         {
             "source": "/catalog-enrichment",
             "destination": "/catalog-enrichment.html"
+        },
+        {
+            "source": "/catalog-splits",
+            "destination": "/catalog-splits.html"
         }
     ],
     "crons": [
@@ -71,6 +75,15 @@
         },
         "api/save-writer-override.js": {
             "maxDuration": 10
+        },
+        "api/save-writer-splits.js": {
+            "maxDuration": 10
+        },
+        "api/get-writer-splits.js": {
+            "maxDuration": 10
+        },
+        "api/download-registration-csv.js": {
+            "maxDuration": 30
         }
     }
 }

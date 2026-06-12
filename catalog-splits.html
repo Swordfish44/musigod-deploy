@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod — Co-Writer Splits</title>
+<style>
+  :root {
+    --red: #E8262A; --red-dark: #B81E22;
+    --black: #0A0A0A; --surface: #111111; --surface-2: #1A1A1A; --surface-3: #252525;
+    --border: rgba(255,255,255,0.08); --border-mid: rgba(255,255,255,0.14);
+    --text: #FFFFFF; --text-dim: #999999; --text-muted: #555555;
+    --green: #22C55E; --amber: #F59E0B; --blue: #3B82F6;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--black); color: var(--text); font-family: 'system-ui', sans-serif; font-size: 14px; }
+  header { background: rgba(10,10,10,0.96); border-bottom: 1px solid var(--border); padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between; height: 56px; position: sticky; top: 0; z-index: 100; }
+  .logo { font-size: 1.2rem; font-weight: 800; text-decoration: none; }
+  .logo-musi { color: #fff; } .logo-god { color: var(--red); }
+  .hdr-nav { display: flex; gap: 0.5rem; align-items: center; }
+  .hdr-nav a { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); text-decoration: none; padding: 0.4rem 0.8rem; border-radius: 4px; }
+  .hdr-nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+
+  main { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+
+  .top-bar { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .top-bar h1 { font-size: 1.1rem; font-weight: 700; }
+  .input-row { display: flex; gap: 0.5rem; align-items: center; }
+  input[type=text] { background: var(--surface-2); border: 1px solid var(--border-mid); border-radius: 5px; padding: 0.5rem 0.75rem; color: var(--text); font-size: 0.82rem; outline: none; width: 280px; }
+  input[type=text]:focus { border-color: var(--red); }
+  .btn { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; border: none; border-radius: 4px; padding: 0.55rem 1.1rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; transition: all 0.15s; white-space: nowrap; }
+  .btn-red { background: var(--red); color: #fff; }
+  .btn-red:hover { background: var(--red-dark); transform: translateY(-1px); }
+  .btn-ghost { background: var(--surface-2); border: 1px solid var(--border-mid); color: var(--text-dim); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--border); }
+  .btn-green { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); color: var(--green); }
+  .btn-green:hover { background: rgba(34,197,94,0.25); }
+
+  .stats-bar { display: flex; gap: 1.5rem; padding: 0.75rem 1rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 1.25rem; font-size: 0.75rem; color: var(--text-dim); }
+  .stats-bar span { color: var(--text); font-weight: 600; }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid rgba(255,255,255,0.03); }
+  tbody tr:hover { background: var(--surface-2); }
+  td { padding: 0.55rem 0.75rem; vertical-align: middle; }
+  .td-track { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+  .td-release { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); font-size: 0.78rem; }
+
+  .writer-row { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.25rem; }
+  .writer-name { min-width: 160px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); font-size: 0.78rem; }
+  .split-input { width: 64px; background: var(--surface-3); border: 1px solid var(--border-mid); border-radius: 4px; padding: 0.25rem 0.5rem; color: var(--text); font-size: 0.82rem; text-align: right; outline: none; }
+  .split-input:focus { border-color: var(--red); }
+  .split-pct-label { font-size: 0.7rem; color: var(--text-muted); }
+  .split-sum { font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 3px; }
+  .split-sum.ok  { color: var(--green); background: rgba(34,197,94,0.1); }
+  .split-sum.bad { color: var(--red);   background: rgba(232,38,42,0.1); }
+
+  .save-btn { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; border: none; border-radius: 3px; padding: 0.3rem 0.7rem; cursor: pointer; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); color: var(--blue); }
+  .save-btn:hover { background: rgba(59,130,246,0.25); }
+  .save-btn.saved { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.3); color: var(--green); }
+
+  .status-badge { font-size: 0.58rem; font-weight: 700; padding: 0.18rem 0.45rem; border-radius: 3px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .badge-custom  { background: rgba(59,130,246,0.15); color: var(--blue); }
+  .badge-equal   { background: rgba(85,85,85,0.3); color: var(--text-muted); }
+  .badge-missing { background: rgba(232,38,42,0.12); color: var(--red); }
+
+  .dl-section { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.25rem; align-items: center; }
+  .dl-section label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-right: 0.25rem; }
+
+  .msg { padding: 0.75rem 1rem; border-radius: 5px; font-size: 0.8rem; margin-bottom: 1rem; }
+  .msg-info  { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); color: #93C5FD; }
+  .msg-error { background: rgba(232,38,42,0.1);  border: 1px solid rgba(232,38,42,0.25);  color: #FCA5A5; }
+
+  #empty-state { text-align: center; padding: 3rem; color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="logo"><span class="logo-musi">MUSI</span><span class="logo-god">GOD</span></a>
+  <nav class="hdr-nav">
+    <a href="/catalog-enrichment">Enrichment</a>
+    <a href="/portal">Portal</a>
+  </nav>
+</header>
+
+<main>
+  <div class="top-bar">
+    <h1>Co-Writer Splits</h1>
+    <div class="input-row">
+      <input type="text" id="artist-id-input" placeholder="Artist ID (UUID)" />
+      <button class="btn btn-red" onclick="loadArtist()">Load</button>
+    </div>
+  </div>
+
+  <div id="msg-area"></div>
+
+  <div id="dl-section" class="dl-section" style="display:none">
+    <label>Download split-aware CSV:</label>
+    <button class="btn btn-ghost" onclick="downloadCSV('ascap')">ASCAP</button>
+    <button class="btn btn-ghost" onclick="downloadCSV('bmi')">BMI</button>
+    <button class="btn btn-ghost" onclick="downloadCSV('mlc')">MLC</button>
+  </div>
+
+  <div id="stats-bar" class="stats-bar" style="display:none">
+    <div>Tracks: <span id="st-total">—</span></div>
+    <div>Custom splits: <span id="st-custom">—</span></div>
+    <div>Equal splits: <span id="st-equal">—</span></div>
+    <div>Missing writers: <span id="st-missing">—</span></div>
+  </div>
+
+  <div id="table-wrap">
+    <div id="empty-state">Enter an Artist ID and click Load to manage co-writer splits.</div>
+  </div>
+</main>
+
+<script>
+const SB_URL  = 'https://uykzkrnoetcldeuxzqyy.supabase.co';
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MzA2MTksImV4cCI6MjA5MzEwNjYxOX0.r4Dx_Jkgje2kYNGh9PQtuyuJgBGJwVAviHM9QmAJcrs';
+const ADMIN_KEY = 'mg-admin-2026';
+
+let currentArtistId   = null;
+let currentArtistName = null;
+let allTracks         = [];   // parsed from master CSV
+let savedSplits       = new Map(); // track_title_lower → writers[]
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function showMsg(text, type = 'info') {
+  document.getElementById('msg-area').innerHTML =
+    `<div class="msg msg-${type}">${text}</div>`;
+}
+function clearMsg() { document.getElementById('msg-area').innerHTML = ''; }
+
+function parseCSVRow(row) {
+  const fields = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < row.length; i++) {
+    const ch = row[i];
+    if (ch === '"') { if (inQ && row[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+    else if (ch === ',' && !inQ) { fields.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  fields.push(cur);
+  return fields;
+}
+
+function parseMasterCSV(csv) {
+  const lines = csv.split('\n').filter(l => l.trim());
+  if (lines.length < 2) return [];
+  return lines.slice(1).map(row => {
+    const f = parseCSVRow(row);
+    const writerNames = f[8] ? f[8].split('; ').filter(Boolean) : [];
+    const writerRoles = f[9] ? f[9].split('; ') : [];
+    return {
+      trackTitle:   f[0] || '',
+      releaseTitle: f[1] || '',
+      writers: writerNames.map((name, i) => ({ name, role: writerRoles[i] || 'writer' })),
+      enriched: f[13] === 'Yes',
+    };
+  }).filter(t => t.trackTitle);
+}
+
+// ── load ─────────────────────────────────────────────────────────────────────
+
+async function loadArtist() {
+  const id = document.getElementById('artist-id-input').value.trim();
+  if (!id) { showMsg('Enter an Artist ID', 'error'); return; }
+  currentArtistId = id;
+  clearMsg();
+  showMsg('Loading enrichment data…');
+
+  try {
+    // 1. Look up artist name
+    const aRes = await fetch(
+      `${SB_URL}/rest/v1/artists_v1?id=eq.${id}&select=artist_name,legal_first_name,legal_last_name`,
+      { headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}`, 'Accept-Profile': 'artists' } }
+    );
+    const artists = await aRes.json();
+    if (!artists?.[0]) { showMsg('Artist not found', 'error'); return; }
+    const a = artists[0];
+    currentArtistName = a.artist_name || `${a.legal_first_name} ${a.legal_last_name}`.trim();
+
+    // 2. Fetch latest DONE enrichment
+    const eRes = await fetch(
+      `${SB_URL}/rest/v1/catalog_enrichments_v1?artist_name=eq.${encodeURIComponent(currentArtistName)}&status=eq.DONE&order=created_at.desc&limit=1&select=result`,
+      { headers: { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` } }
+    );
+    const enrichRows = await eRes.json();
+    if (!enrichRows?.[0]?.result?.files?.master?.content) {
+      showMsg('No completed enrichment found — run enrichment first', 'error'); return;
+    }
+
+    allTracks = parseMasterCSV(enrichRows[0].result.files.master.content);
+
+    // 3. Load existing splits
+    const sRes = await fetch(`/api/get-writer-splits?artist_id=${id}`, {
+      headers: { 'x-admin-key': ADMIN_KEY }
+    });
+    const splitsRows = sRes.ok ? await sRes.json() : [];
+    savedSplits = new Map();
+    for (const s of splitsRows) savedSplits.set(s.track_title, s.writers);
+
+    clearMsg();
+    renderTable();
+  } catch (err) {
+    showMsg(`Error: ${err.message}`, 'error');
+  }
+}
+
+// ── render ────────────────────────────────────────────────────────────────────
+
+function renderTable() {
+  const total   = allTracks.length;
+  const custom  = allTracks.filter(t => savedSplits.has(t.trackTitle.toLowerCase().trim())).length;
+  const missing = allTracks.filter(t => !t.writers.length).length;
+
+  document.getElementById('st-total').textContent   = total;
+  document.getElementById('st-custom').textContent  = custom;
+  document.getElementById('st-equal').textContent   = total - custom - missing;
+  document.getElementById('st-missing').textContent = missing;
+  document.getElementById('stats-bar').style.display = 'flex';
+  document.getElementById('dl-section').style.display = 'flex';
+
+  const wrap = document.getElementById('table-wrap');
+  if (!allTracks.length) {
+    wrap.innerHTML = '<div id="empty-state">No tracks found in enrichment result.</div>';
+    return;
+  }
+
+  const table = document.createElement('table');
+  table.innerHTML = `<thead><tr>
+    <th>Track</th><th>Release</th><th>Writers &amp; Splits</th><th>Status</th><th></th>
+  </tr></thead>`;
+  const tbody = document.createElement('tbody');
+
+  allTracks.forEach((track, idx) => {
+    const key       = track.trackTitle.toLowerCase().trim();
+    const stored    = savedSplits.get(key);
+    const writers   = stored || track.writers.map(w => ({ ...w, split_pct: null }));
+    const hasCustom = !!stored;
+    const badgeClass = !track.writers.length ? 'badge-missing' : hasCustom ? 'badge-custom' : 'badge-equal';
+    const badgeText  = !track.writers.length ? 'No writers' : hasCustom ? 'Custom' : 'Equal';
+
+    const tr = document.createElement('tr');
+    tr.dataset.idx = idx;
+
+    const tdTrack   = `<td class="td-track" title="${esc(track.trackTitle)}">${esc(track.trackTitle)}</td>`;
+    const tdRelease = `<td class="td-release" title="${esc(track.releaseTitle)}">${esc(track.releaseTitle)}</td>`;
+
+    const writersHTML = writers.length
+      ? writers.map((w, wi) => {
+          const pct = w.split_pct != null ? w.split_pct : (writers.length ? parseFloat((100 / writers.length).toFixed(2)) : 100);
+          return `<div class="writer-row">
+            <span class="writer-name" title="${esc(w.name)}">${esc(w.name)}</span>
+            <input class="split-input" type="number" min="0" max="100" step="0.01"
+              data-track="${idx}" data-writer="${wi}"
+              value="${pct}" oninput="onSplitChange(${idx})">
+            <span class="split-pct-label">%</span>
+          </div>`;
+        }).join('')
+      : '<span style="color:var(--text-muted);font-size:0.75rem">No writers — use manual override</span>';
+
+    const sumId = `sum-${idx}`;
+    const tdWriters = `<td><div id="writers-${idx}">${writersHTML}</div>
+      ${writers.length ? `<div class="split-sum ok" id="${sumId}">∑ 100%</div>` : ''}
+    </td>`;
+
+    const tdStatus  = `<td><span class="status-badge ${badgeClass}">${badgeText}</span></td>`;
+    const tdAction  = `<td>${writers.length ? `<button class="save-btn" id="save-${idx}" onclick="saveSplits(${idx})">Save</button>` : ''}</td>`;
+
+    tr.innerHTML = tdTrack + tdRelease + tdWriters + tdStatus + tdAction;
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+  wrap.innerHTML = '';
+  wrap.appendChild(table);
+
+  // init sums
+  allTracks.forEach((_, idx) => onSplitChange(idx));
+}
+
+function esc(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function onSplitChange(idx) {
+  const inputs = document.querySelectorAll(`input[data-track="${idx}"]`);
+  if (!inputs.length) return;
+  const sum = Array.from(inputs).reduce((s, i) => s + (parseFloat(i.value) || 0), 0);
+  const el  = document.getElementById(`sum-${idx}`);
+  if (!el) return;
+  const ok  = Math.abs(sum - 100) < 0.1;
+  el.textContent = `∑ ${sum.toFixed(2)}%`;
+  el.className   = `split-sum ${ok ? 'ok' : 'bad'}`;
+}
+
+// ── save ──────────────────────────────────────────────────────────────────────
+
+async function saveSplits(idx) {
+  const track   = allTracks[idx];
+  const inputs  = document.querySelectorAll(`input[data-track="${idx}"]`);
+  const writers = [];
+
+  const key     = track.trackTitle.toLowerCase().trim();
+  const stored  = savedSplits.get(key) || track.writers;
+
+  inputs.forEach((input, wi) => {
+    const w = stored[wi] || track.writers[wi] || {};
+    writers.push({
+      name:      w.name || '',
+      split_pct: parseFloat(input.value) || 0,
+      role:      w.role || 'writer',
+      ipi:       w.ipi || null,
+    });
+  });
+
+  const sum = writers.reduce((s, w) => s + w.split_pct, 0);
+  if (Math.abs(sum - 100) > 0.1) {
+    showMsg(`Splits for "${track.trackTitle}" must sum to 100 (got ${sum.toFixed(2)})`, 'error');
+    return;
+  }
+
+  const btn = document.getElementById(`save-${idx}`);
+  if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
+
+  try {
+    const res = await fetch('/api/save-writer-splits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY },
+      body: JSON.stringify({
+        artist_id:    currentArtistId,
+        track_title:  track.trackTitle,
+        release_title: track.releaseTitle,
+        writers,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Save failed');
+
+    savedSplits.set(key, writers);
+    if (btn) { btn.textContent = 'Saved ✓'; btn.className = 'save-btn saved'; btn.disabled = false; }
+    clearMsg();
+  } catch (err) {
+    showMsg(`Save failed: ${err.message}`, 'error');
+    if (btn) { btn.textContent = 'Save'; btn.disabled = false; }
+  }
+}
+
+// ── download ──────────────────────────────────────────────────────────────────
+
+async function downloadCSV(format) {
+  if (!currentArtistId) { showMsg('Load an artist first', 'error'); return; }
+  const url = `/api/download-registration-csv?artist_id=${currentArtistId}&format=${format}`;
+  const a   = document.createElement('a');
+  a.href    = url;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// Prefill artist_id from URL
+const urlParams = new URLSearchParams(window.location.search);
+const urlArtistId = urlParams.get('artist_id');
+if (urlArtistId) {
+  document.getElementById('artist-id-input').value = urlArtistId;
+  loadArtist();
+}
+</script>
+</body>
+</html>
