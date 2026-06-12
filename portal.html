@@ -165,7 +165,7 @@
 <div class="hero">
   <div class="hero-inner">
     <p class="hero-eyebrow">Artist Dashboard</p>
-    <h1>Welcome back, Naim Salaam</h1>
+    <h1>Welcome back, <span id="portal-name">…</span></h1>
     <p class="hero-sub" id="hero-sub">Loading your registrations&hellip;</p>
 
     <div class="stats-row" id="stats-row" style="display:none">
@@ -178,7 +178,7 @@
     <div class="earnings-promo">
       <div>
         <h3>Your Royalty Earnings</h3>
-        <p>YTD: <span class="g">$63,470.59</span> &nbsp;·&nbsp; Pending payout: <span class="a">$33,169.48</span></p>
+        <p>YTD: <span class="g" id="promo-ytd">—</span> &nbsp;·&nbsp; Pending payout: <span class="a" id="promo-pending">—</span></p>
       </div>
       <a href="earnings.html" class="btn-red">View Earnings →</a>
     </div>
@@ -225,6 +225,33 @@ const SUPABASE_URL = 'https://uykzkrnoetcldeuxzqyy.supabase.co';
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MzA2MTksImV4cCI6MjA5MzEwNjYxOX0.r4Dx_Jkgje2kYNGh9PQtuyuJgBGJwVAviHM9QmAJcrs';
 const ARTIST_ID = getArtistId();
 let allRegs = [], currentFilter = 'ALL';
+
+async function loadArtistMeta() {
+  if (!ARTIST_ID) { document.getElementById('portal-name').textContent = 'Artist'; return; }
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/artists_v1?id=eq.${ARTIST_ID}&select=legal_first_name,legal_last_name,artist_name`, {
+      headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}`, 'Accept-Profile': 'artists' }
+    });
+    const [a] = await res.json();
+    if (a) {
+      const name = a.artist_name || `${a.legal_first_name} ${a.legal_last_name}`.trim();
+      document.getElementById('portal-name').textContent = name || 'Artist';
+    }
+  } catch(_) { document.getElementById('portal-name').textContent = 'Artist'; }
+  try {
+    const fmt = n => '$' + Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const [stmts, disb] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/statements_v1?artist_id=eq.${ARTIST_ID}&select=net_amount&status=eq.RECEIVED`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}`, 'Accept-Profile': 'royalties' } }).then(r => r.json()).catch(() => []),
+      fetch(`${SUPABASE_URL}/rest/v1/disbursement_queue_v1?artist_id=eq.${ARTIST_ID}&status=eq.PENDING&select=net_to_artist_usd`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}`, 'Accept-Profile': 'royalties' } }).then(r => r.json()).catch(() => []),
+    ]);
+    const ytd = Array.isArray(stmts) ? stmts.reduce((s, x) => s + (+x.net_amount||0), 0) : 0;
+    const pending = Array.isArray(disb) ? disb.reduce((s, x) => s + (+x.net_to_artist_usd||0), 0) : 0;
+    if (ytd > 0 || pending > 0) {
+      document.getElementById('promo-ytd').textContent = fmt(ytd);
+      document.getElementById('promo-pending').textContent = fmt(pending);
+    }
+  } catch(_) {}
+}
 
 function getArtistId() {
   const params = new URLSearchParams(window.location.search);
@@ -295,6 +322,7 @@ function filterRegs(status, btn) {
   btn.classList.add('active');
   renderAll();
 }
+loadArtistMeta();
 fetchRegistrations();
 </script>
 </body>
