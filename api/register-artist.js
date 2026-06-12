@@ -54,8 +54,7 @@ module.exports = withSentry(async function handler(req, res) {
       statusCode: 500,
       plan: normalized.plan,
     })
-    // DEBUG: expose detail so we can see the real Supabase error — remove after fix
-    return res.status(500).json({ error: 'Registration failed', detail: err.message })
+    return res.status(500).json({ error: 'Registration failed' })
   }
 }, 'register-artist')
 
@@ -135,10 +134,10 @@ async function createRegistration(artistId, payload) {
     },
   }
 
-  const rows = await sbFetch('registrations_v1', 'registrations', {
+  const rows = await sbFetch('registrations_v1?on_conflict=artist_id,registration_type', 'registrations', {
     method: 'POST',
     body: regPayload,
-    prefer: 'return=representation',
+    prefer: 'resolution=merge-duplicates,return=representation',
   })
   return rows?.[0] || null
 }
