@@ -58,6 +58,10 @@
         {
             "source": "/catalog-splits",
             "destination": "/catalog-splits.html"
+        },
+        {
+            "source": "/recovery-tracker",
+            "destination": "/recovery-tracker.html"
         }
     ],
     "crons": [
@@ -84,6 +88,15 @@
         },
         "api/download-registration-csv.js": {
             "maxDuration": 30
+        },
+        "api/get-admin-queue.js": {
+            "maxDuration": 10
+        },
+        "api/update-admin-queue-task.js": {
+            "maxDuration": 10
+        },
+        "api/get-recovery-cases.js": {
+            "maxDuration": 10
         }
     }
 }
