@@ -1,4 +1,4 @@
-// api/get-recovery-cases.js
+// api/get-recovery-cases.js v2
 // GET /api/get-recovery-cases?audit_id=<uuid>&email=<email>
 // Artist-facing. Returns recovery cases for a paid audit (no admin key required).
 // email is used as a lightweight ownership check (matches rights_audits_v1.email).
