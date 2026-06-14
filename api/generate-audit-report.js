@@ -136,6 +136,8 @@ async function sendReportEmail({ report, artist_email, audit_id }) {
   if (!emailRes.ok) {
     const t = await emailRes.text()
     console.warn('Report email failed:', emailRes.status, t)
+  } else {
+    console.info(JSON.stringify({ ts: new Date().toISOString(), event: 'REPORT_EMAIL_SENT', to: artist_email, subject: `tracker ready` }))
   }
 }
 
