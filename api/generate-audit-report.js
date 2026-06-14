@@ -59,9 +59,11 @@ module.exports = withSentry(async function handler(req, res) {
     const report = reports?.[0]
 
     // Step 4: Optionally send email
-    if (send_email && report && RESEND_API_KEY) {
-      await sendReportEmail({ report, artist_email, audit_id })
-    }
+    let email_status = 'skipped'
+    if (!RESEND_API_KEY)  email_status = 'no_api_key'
+    else if (!report)     email_status = 'no_report'
+    else if (!send_email) email_status = 'disabled'
+    else                  email_status = await sendReportEmail({ report, artist_email, audit_id })
 
     // Step 5: Create admin queue task
     await sbRpc('fn_create_admin_queue_task_v1', 'registrations', {
@@ -90,6 +92,7 @@ module.exports = withSentry(async function handler(req, res) {
       findings_created,
       total_estimated_recovery: report?.total_estimated_recovery,
       status: report?.status,
+      email_status,
     })
 
   } catch (err) {
@@ -136,9 +139,10 @@ async function sendReportEmail({ report, artist_email, audit_id }) {
   if (!emailRes.ok) {
     const t = await emailRes.text()
     console.warn('Report email failed:', emailRes.status, t)
-  } else {
-    console.info(JSON.stringify({ ts: new Date().toISOString(), event: 'REPORT_EMAIL_SENT', to: artist_email, subject: `tracker ready` }))
+    return `resend_error:${emailRes.status}`
   }
+  console.info(JSON.stringify({ ts: new Date().toISOString(), event: 'REPORT_EMAIL_SENT', to: artist_email }))
+  return 'sent'
 }
 
 async function sbFetch(path, schema, options = {}) {
