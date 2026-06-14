@@ -84,7 +84,7 @@
       <div><div class="panel-title">REQUEST AUDIT</div><div class="panel-sub">Complete every required field for a usable review.</div></div>
     </div>
     <div class="panel-b">
-      <div class="success" id="unlock-success">Your full MusiGod Rights Audit has been unlocked. Check your email for next steps.</div>
+      <div class="success" id="unlock-success">Payment received. Redirecting to your audit status page.</div>
       <div class="unlocked-view" id="unlocked-view"></div>
       <div class="error" id="unlock-status-error"></div>
       <div class="notice">This is not legal advice. The audit identifies operational gaps in registrations, claims, royalty collection, and account setup so MusiGod can prioritize recovery and administration work.</div>
@@ -134,11 +134,6 @@
         <div class="actions"><button type="button" class="btn btn-ghost" onclick="resetForm()">CLEAR</button><button class="btn btn-red" id="submit-btn" type="submit">START RIGHTS AUDIT</button></div>
       </form>
       <div class="result" id="result"></div>
-      <div class="unlock-card" id="unlock">
-        <h3>Potential royalty leaks detected.</h3>
-        <p>Potential royalty leaks detected. Unlock the full MusiGod Rights Audit to view missing registrations, DSP claim issues, publishing gaps, neighboring rights problems, recovery opportunities, and your action plan.</p>
-        <button class="btn btn-red" id="unlock-btn" onclick="unlockFullAudit()" disabled>UNLOCK FULL AUDIT</button>
-      </div>
       <div class="error" id="error"></div>
     </div>
   </section>
@@ -170,14 +165,26 @@ function checked(id){return [...document.querySelectorAll(`#${id} input:checked`
 function esc(value){return String(value || '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
 function showError(msg){const el=document.getElementById('error');el.textContent=msg;el.classList.add('show')}
 function clearError(){const el=document.getElementById('error');el.textContent='';el.classList.remove('show')}
-function resetForm(){document.getElementById('audit-form').reset();clearError();document.getElementById('result').classList.remove('show');document.getElementById('unlock').classList.remove('show');document.getElementById('unlock-btn').disabled=true}
+function resetForm(){document.getElementById('audit-form').reset();clearError();document.getElementById('result').classList.remove('show')}
+
+// ---------------------------------------------------------------------------
+// Form submit: intake + checkout in one atomic step.
+// start-rights-audit creates the audit AND the Stripe session server-side,
+// then returns checkout_url. We redirect immediately — no second click needed.
+// ---------------------------------------------------------------------------
+let submitInFlight = false
 
 document.getElementById('audit-form').addEventListener('submit', async (event) => {
   event.preventDefault()
+  if(submitInFlight) return          // prevent duplicate submissions
   clearError()
   const btn = document.getElementById('submit-btn')
+  submitInFlight = true
   btn.disabled = true
   btn.textContent = 'SUBMITTING...'
+
+  const email = val('email')
+
   try {
     const res = await fetch('/api/start-rights-audit', {
       method:'POST',
@@ -185,7 +192,7 @@ document.getElementById('audit-form').addEventListener('submit', async (event) =
       body:JSON.stringify({
         artist_name: val('artist_name'),
         legal_name: val('legal_name'),
-        email: val('email'),
+        email,
         phone: val('phone'),
         pro_affiliation: val('pro_affiliation'),
         publisher_name: val('publisher_name'),
@@ -199,24 +206,51 @@ document.getElementById('audit-form').addEventListener('submit', async (event) =
     })
     const body = await res.json().catch(()=>({}))
     if(!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
-    localStorage.setItem('musigod_rights_audit_id', body.audit_id)
-    localStorage.setItem('musigod_rights_audit_email', val('email'))
-    document.getElementById('lookup_id').value = body.audit_id
-    document.getElementById('lookup_email').value = val('email')
-    const result = document.getElementById('result')
-    result.innerHTML = `Audit started.<br><span class="mono">Audit ID: ${body.audit_id}</span><br>Status: ${body.status}. Check your email for confirmation.`
-    result.classList.add('show')
-    document.getElementById('unlock').classList.add('show')
-    document.getElementById('unlock-btn').disabled = false
-    document.getElementById('unlock').scrollIntoView({behavior:'smooth',block:'center'})
+
+    const auditId = body.audit_id
+    localStorage.setItem('musigod_rights_audit_id', auditId)
+    localStorage.setItem('musigod_rights_audit_email', email)
+
+    console.info('RIGHTS_AUDIT_SUBMIT_OK', {
+      audit_id: auditId,
+      artist_email: email,
+      checkout_url_present: Boolean(body.checkout_url),
+      redirect_target: body.checkout_url || body.status_url,
+    })
+
+    if(body.checkout_url){
+      // Happy path: redirect straight to Stripe. Button stays disabled.
+      btn.textContent = 'Opening secure Stripe checkout…'
+      const result = document.getElementById('result')
+      result.innerHTML = `Opening secure Stripe checkout…<br><span class="mono">Audit ID: ${esc(auditId)}</span>`
+      result.classList.add('show')
+      window.location.href = body.checkout_url
+      // Do NOT re-enable the button — we are leaving the page.
+    } else {
+      // Stripe session creation failed server-side. Show a clear fallback.
+      // The intake email already contains a payment link.
+      const result = document.getElementById('result')
+      result.innerHTML = `Audit intake saved. <strong>Secure checkout could not be opened automatically.</strong><br>
+        Audit ID: <span class="mono">${esc(auditId)}</span><br>
+        Check your email — we sent a payment link to <strong>${esc(email)}</strong>.<br>
+        Or <a href="/rights-audit.html?audit_id=${encodeURIComponent(auditId)}&retry_checkout=1">click here to retry checkout</a>.`
+      result.classList.add('show')
+      // Re-enable button so artist can try again
+      submitInFlight = false
+      btn.disabled = false
+      btn.textContent = 'START RIGHTS AUDIT'
+    }
   } catch(err) {
     showError(err.message)
-  } finally {
+    submitInFlight = false
     btn.disabled = false
     btn.textContent = 'START RIGHTS AUDIT'
   }
 })
 
+// ---------------------------------------------------------------------------
+// Lookup panel (existing functionality — untouched)
+// ---------------------------------------------------------------------------
 async function lookupAudit(){
   const auditId = val('lookup_id') || localStorage.getItem('musigod_rights_audit_id') || ''
   const email = val('lookup_email') || localStorage.getItem('musigod_rights_audit_email') || ''
@@ -229,122 +263,54 @@ async function lookupAudit(){
     if(!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
     const a = body.audit
     const paid = a.paid_status === 'PAID'
-    box.innerHTML = `<span class="mono">${a.audit_id}</span><br>Status: ${a.status}<br>Payment: ${paid ? 'PAID' : 'UNPAID'}${paid && a.paid_at ? '<br>Unlocked: '+new Date(a.paid_at).toLocaleDateString() : ''}<br>Artist: ${a.artist_name}<br>Submitted: ${new Date(a.created_at).toLocaleDateString()}`
+    box.innerHTML = `<span class="mono">${esc(a.audit_id)}</span><br>Status: ${esc(a.status)}<br>Payment: ${paid ? 'PAID' : 'UNPAID'}${paid && a.paid_at ? '<br>Unlocked: '+new Date(a.paid_at).toLocaleDateString() : ''}<br>Artist: ${esc(a.artist_name)}<br>Submitted: ${new Date(a.created_at).toLocaleDateString()}`
+    if(paid){
+      box.innerHTML += `<br><br><a class="btn btn-red" href="/audit-status?id=${encodeURIComponent(a.audit_id)}" style="display:inline-block;margin-top:8px;font-size:13px;padding:10px 18px;">View audit status</a>`
+    }
   }catch(err){box.textContent=err.message}
 }
 
-async function loadUnlockedAudit(auditId, email){
-  const statusError = document.getElementById('unlock-status-error')
-  const panel = document.getElementById('unlocked-view')
-  statusError.classList.remove('show')
-  statusError.textContent = ''
-  panel.classList.add('show')
-  panel.innerHTML = '<p>Loading your unlocked audit status...</p>'
-  try{
-    const res = await fetch(`/api/get-rights-audit?audit_id=${encodeURIComponent(auditId)}&email=${encodeURIComponent(email)}`)
-    const body = await res.json().catch(()=>({}))
-    if(!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
-    const a = body.audit
-    const paid = a.paid_status === 'PAID'
-    document.getElementById('lookup_id').value = a.audit_id || auditId
-    document.getElementById('lookup_email').value = a.email || email
-    document.getElementById('status-box').innerHTML = `<span class="mono">${esc(a.audit_id)}</span><br>Status: ${esc(a.status)}<br>Payment: ${paid ? 'PAID' : 'UNPAID'}<br>Artist: ${esc(a.artist_name)}`
-    if(!paid){
-      panel.innerHTML = `
-        <h2>Rights Audit locked</h2>
-        <p>This audit is not marked paid yet. If you just completed checkout, refresh this page in a moment or contact support with your audit ID.</p>
-        <div class="audit-meta">
-          <div><span>Audit ID</span>${esc(a.audit_id)}</div>
-          <div><span>Paid status</span>${esc(a.paid_status || 'UNPAID')}</div>
-        </div>
-      `
-      return
-    }
-    document.getElementById('audit-form').classList.add('form-muted')
-    document.getElementById('unlock').classList.remove('show')
-    document.getElementById('result').classList.remove('show')
-    panel.innerHTML = `
-      <h2>Your MusiGod Rights Audit is unlocked</h2>
-      <p>Your payment is confirmed. MusiGod can now review the rights and royalty gaps attached to this audit.</p>
-      <div class="audit-meta">
-        <div><span>Audit ID</span>${esc(a.audit_id)}</div>
-        <div><span>Artist name</span>${esc(a.artist_name)}</div>
-        <div><span>Paid status</span>${esc(a.paid_status)}</div>
-        <div><span>Submitted</span>${a.created_at ? esc(new Date(a.created_at).toLocaleDateString()) : 'Received'}</div>
-      </div>
-      <p><strong>Next steps:</strong> reply to the email MusiGod sent you with distributor, PRO, publishing admin, SoundExchange, or label-access details.</p>
-      <p><strong>What MusiGod will review:</strong></p>
-      <ul>
-        <li>Missing songwriter, publisher, SoundExchange, and neighboring rights registrations.</li>
-        <li>DSP artist profile claims, YouTube Content ID, metadata, and catalog identifier gaps.</li>
-        <li>Publishing, master-rights, collection, and recovery opportunities for released catalog.</li>
-      </ul>
-      <a class="btn btn-red" href="mailto:support@musigod.com?subject=${encodeURIComponent('Rights Audit details - '+a.audit_id)}">Reply with access details</a>
-    `
-  }catch(err){
-    panel.classList.remove('show')
-    statusError.textContent = err.message || 'Unable to load unlocked audit status.'
-    statusError.classList.add('show')
-  }
-}
-
-function scrollUnlock(event){
-  const card = document.getElementById('unlock')
-  if(card.classList.contains('show')) return
-  event.preventDefault()
-  document.getElementById('audit-form').scrollIntoView({behavior:'smooth',block:'start'})
-}
-
-async function unlockFullAudit(){
-  clearError()
-  const btn = document.getElementById('unlock-btn')
-  const auditId = localStorage.getItem('musigod_rights_audit_id') || val('lookup_id')
-  const email = localStorage.getItem('musigod_rights_audit_email') || val('lookup_email') || val('email')
-  if(!auditId || !email){showError('Submit the audit form first so checkout can attach your audit ID.');return}
-  btn.disabled = true
-  btn.textContent = 'OPENING CHECKOUT...'
-  try{
-    const res = await fetch('/api/create-checkout-session', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        plan:'rights_audit_unlock',
-        audit_id:auditId,
-        email
-      })
-    })
-    const body = await res.json().catch(()=>({}))
-    if(!res.ok || !body.url) throw new Error(body.error || `Checkout failed (${res.status})`)
-    window.location.href = body.url
-  }catch(err){
-    showError(err.message)
-    btn.disabled = false
-    btn.textContent = 'UNLOCK FULL AUDIT'
-  }
-}
-
+// ---------------------------------------------------------------------------
+// URL param handling on page load
+// ---------------------------------------------------------------------------
 const savedId = localStorage.getItem('musigod_rights_audit_id')
 const savedEmail = localStorage.getItem('musigod_rights_audit_email')
-if(savedId) document.getElementById('lookup_id').value = savedId
-if(savedEmail) document.getElementById('lookup_email').value = savedEmail
-const unlockParams = new URLSearchParams(window.location.search)
-if(unlockParams.get('unlock') === 'success'){
-  const auditId = unlockParams.get('audit_id') || savedId || ''
-  const email = unlockParams.get('email') || savedEmail || ''
-  if(auditId) localStorage.setItem('musigod_rights_audit_id', auditId)
-  if(email) localStorage.setItem('musigod_rights_audit_email', email)
-  if(auditId) document.getElementById('lookup_id').value = auditId
-  if(email) document.getElementById('lookup_email').value = email
-  document.getElementById('unlock-success').classList.add('show')
+if(savedId && document.getElementById('lookup_id')) document.getElementById('lookup_id').value = savedId
+if(savedEmail && document.getElementById('lookup_email')) document.getElementById('lookup_email').value = savedEmail
+
+const pageParams = new URLSearchParams(window.location.search)
+
+// checkout_cancelled: artist cancelled out of Stripe — show friendly message, let them retry
+if(pageParams.get('checkout_cancelled') === '1'){
+  const auditId = pageParams.get('audit_id') || savedId || ''
+  showError('Checkout was cancelled. Your audit request was saved. Click "START RIGHTS AUDIT" to retry or check your email for the payment link.')
+  if(auditId && document.getElementById('lookup_id')) document.getElementById('lookup_id').value = auditId
+  console.info('RIGHTS_AUDIT_CHECKOUT_CANCELLED', {
+    audit_id: auditId || null,
+    redirect_target: window.location.pathname + window.location.search,
+  })
+}
+
+// retry_checkout: server-side Stripe failure on first attempt — try standalone checkout
+if(pageParams.get('retry_checkout') === '1'){
+  const auditId = pageParams.get('audit_id') || savedId || ''
+  const email = savedEmail || ''
   if(auditId && email){
-    loadUnlockedAudit(auditId, email)
-  }else{
-    document.getElementById('unlock-status-error').textContent = 'Audit ID and email are required to load the unlocked audit view.'
-    document.getElementById('unlock-status-error').classList.add('show')
+    ;(async () => {
+      try{
+        const res = await fetch('/api/create-checkout-session', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({ plan:'rights_audit_unlock', audit_id:auditId, email })
+        })
+        const body = await res.json().catch(()=>({}))
+        if(!res.ok || !body.url) throw new Error(body.error || 'Checkout failed')
+        window.location.href = body.url
+      }catch(err){
+        showError('Could not open checkout: ' + err.message + '. Check your email for the payment link.')
+      }
+    })()
   }
-  document.getElementById('unlock-success').scrollIntoView({behavior:'smooth',block:'center'})
-}else if(unlockParams.get('unlock') === 'cancelled'){
-  showError('Checkout was cancelled. You can unlock the full audit when you are ready.')
 }
 </script>
 </body>

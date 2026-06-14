@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod — Upload Documents</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #E8262A; --red-dark: #B81E22;
+    --black: #0A0A0A; --surface: #111111; --surface-2: #1A1A1A; --surface-3: #252525;
+    --border: rgba(255,255,255,0.08); --border-mid: rgba(255,255,255,0.14);
+    --text: #FFFFFF; --text-dim: #999999; --text-muted: #555555;
+    --green: #22C55E; --amber: #F59E0B; --blue: #3B82F6;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--black); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+  header { position: sticky; top: 0; z-index: 100; background: rgba(10,10,10,0.96); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .logo { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.01em; text-decoration: none; }
+  .logo-musi { color: #fff; } .logo-god { color: var(--red); }
+  nav { display: flex; align-items: center; gap: 0.25rem; }
+  nav a { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); text-decoration: none; padding: 0.45rem 0.9rem; border-radius: 4px; transition: all 0.15s; }
+  nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+  .hero { border-bottom: 1px solid var(--border); padding: 3rem 2rem 2.5rem; }
+  .hero-inner { max-width: 760px; margin: 0 auto; }
+  .hero-eyebrow { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); margin-bottom: 0.6rem; }
+  .hero h1 { font-size: clamp(1.6rem, 3.5vw, 2.4rem); font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 0.5rem; }
+  .hero-sub { color: var(--text-dim); font-size: 0.88rem; }
+  main { max-width: 760px; margin: 0 auto; padding: 2.5rem 2rem; }
+  .context-bar { background: var(--surface-2); border: 1px solid var(--border); border-left: 3px solid var(--blue); border-radius: 6px; padding: 1rem 1.25rem; margin-bottom: 2rem; font-size: 0.82rem; }
+  .context-bar .label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.25rem; }
+  .context-bar .val { color: var(--text); font-weight: 500; }
+  .upload-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; margin-bottom: 1.5rem; }
+  .upload-card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 1.5rem; }
+  .field { margin-bottom: 1.25rem; }
+  .field label { display: block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; }
+  .field select, .field input[type=file] { width: 100%; background: var(--surface-2); border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 0.88rem; padding: 0.65rem 0.9rem; border-radius: 6px; outline: none; transition: border-color 0.15s; appearance: none; }
+  .field select:focus, .field input[type=file]:focus { border-color: var(--border-mid); }
+  .field select option { background: var(--surface-2); }
+  .drop-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 2.5rem 1.5rem; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--red); background: rgba(232,38,42,0.04); }
+  .drop-zone .drop-icon { font-size: 2rem; margin-bottom: 0.75rem; opacity: 0.5; }
+  .drop-zone .drop-text { font-size: 0.82rem; color: var(--text-dim); }
+  .drop-zone .drop-hint { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.4rem; }
+  .file-selected { background: rgba(34,197,94,0.06); border-color: rgba(34,197,94,0.3) !important; }
+  .file-name { font-size: 0.82rem; color: var(--green); font-weight: 500; margin-top: 0.5rem; }
+  .btn { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; border: none; padding: 0.85rem 2rem; border-radius: 6px; cursor: pointer; transition: background 0.15s, transform 0.15s; }
+  .btn-primary { background: var(--red); color: #fff; width: 100%; margin-top: 0.5rem; }
+  .btn-primary:hover:not(:disabled) { background: var(--red-dark); transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-ghost { background: var(--surface-3); color: var(--text-dim); }
+  .btn-ghost:hover { background: var(--surface-2); color: var(--text); }
+  .msg { padding: 0.9rem 1.1rem; border-radius: 6px; font-size: 0.82rem; margin-bottom: 1.25rem; display: none; }
+  .msg.show { display: block; }
+  .msg-error { background: rgba(232,38,42,0.1); border: 1px solid rgba(232,38,42,0.3); color: #ff6b6b; }
+  .msg-success { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); color: var(--green); }
+  .uploads-history { margin-top: 2rem; }
+  .uploads-history h3 { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+  .upload-item { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.85rem 1rem; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .upload-item-name { font-size: 0.82rem; font-weight: 500; }
+  .upload-item-meta { font-size: 0.7rem; color: var(--text-muted); }
+  .badge { font-size: 0.57rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.22rem 0.55rem; border-radius: 3px; }
+  .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+  footer { margin-top: 4rem; padding: 1.5rem 2rem; border-top: 1px solid var(--border); text-align: center; }
+  footer p { font-size: 0.72rem; color: var(--text-muted); }
+  .progress-bar { height: 3px; background: var(--surface-3); border-radius: 2px; overflow: hidden; margin-top: 0.75rem; display: none; }
+  .progress-bar.show { display: block; }
+  .progress-fill { height: 100%; background: var(--red); border-radius: 2px; width: 0%; transition: width 0.3s; }
+  @media (max-width: 600px) { header { padding: 0 1rem; } main { padding: 1.5rem 1rem; } .hero { padding: 2rem 1rem; } }
+
+  /* MusiGod Legal Footer */
+  .mg-legal-footer { background: #0a1628; border-top: 3px solid #c9a84c; padding: 28px 40px; font-family: Arial, sans-serif; margin-top: auto; }
+  .mg-legal-footer__inner { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  .mg-legal-footer__links { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+  .mg-legal-footer__links a { color: #e8c96e; text-decoration: none; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; transition: color 0.2s; }
+  .mg-legal-footer__links a:hover { color: #fff; }
+  .mg-legal-footer__sep { color: #2a3a4a; font-size: 12px; }
+  .mg-legal-footer__copy { font-size: 11px; color: #4a5a6a; line-height: 1.5; }
+  </style>
+</head>
+<body>
+<header>
+  <a href="/portal.html" class="logo"><span class="logo-musi">MUSI</span><span class="logo-god">GOD</span></a>
+  <nav>
+    <a href="/portal.html">Portal</a>
+    <a href="/activity.html">Activity</a>
+    <a href="/upload-documents.html" class="active">Documents</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">Document Submission</p>
+    <h1>Upload Required Documents</h1>
+    <p class="hero-sub">Securely submit statements, agreements, and registration documents required for royalty recovery.</p>
+  </div>
+</div>
+
+<main>
+  <div class="context-bar" id="context-bar" style="display:none">
+    <div class="label">Submission Context</div>
+    <div class="val" id="context-text"></div>
+  </div>
+
+  <div class="msg msg-error" id="error"></div>
+  <div class="msg msg-success" id="success"></div>
+
+  <div class="upload-card">
+    <h2>Select Document Type and Upload File</h2>
+    <div class="field">
+      <label for="document_type">Document Type</label>
+      <select id="document_type">
+        <option value="">— Select type —</option>
+        <option value="PRO_STATEMENT">PRO Statement (ASCAP / BMI / SESAC)</option>
+        <option value="DISTRIBUTOR_STATEMENT">Distributor Statement</option>
+        <option value="PUBLISHING_AGREEMENT">Publishing Agreement</option>
+        <option value="LABEL_AGREEMENT">Label Agreement</option>
+        <option value="SPLIT_SHEET">Split Sheet</option>
+        <option value="COPYRIGHT_REGISTRATION">Copyright Registration</option>
+        <option value="ISRC_UPC_METADATA">ISRC / UPC Metadata</option>
+        <option value="PHOTO_ID">Government-Issued Photo ID</option>
+        <option value="LLC_DOCUMENT">LLC / Entity Document</option>
+        <option value="TAX_DOCUMENT">Tax Document (W-9 / W-8)</option>
+        <option value="OTHER">Other</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>File</label>
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <div class="drop-icon">📎</div>
+        <div class="drop-text">Click to select or drag and drop</div>
+        <div class="drop-hint">PDF, PNG, JPG, CSV, XLSX · Max 10MB</div>
+        <div class="file-name" id="file-name"></div>
+      </div>
+      <input type="file" id="file-input" accept=".pdf,.png,.jpg,.jpeg,.csv,.xlsx" style="display:none">
+    </div>
+
+    <div class="progress-bar" id="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+
+    <button class="btn btn-primary" id="upload-btn" onclick="uploadDocument()" disabled>
+      SUBMIT DOCUMENT
+    </button>
+  </div>
+
+  <div class="uploads-history" id="uploads-history" style="display:none">
+    <h3>Documents Submitted This Session</h3>
+    <div id="uploads-list"></div>
+  </div>
+</main>
+
+<footer class="mg-legal-footer">
+  <div class="mg-legal-footer__inner">
+    <div class="mg-legal-footer__links">
+      <a href="/terms.html">Terms of Service</a>
+      <span class="mg-legal-footer__sep">&middot;</span>
+      <a href="/privacy.html">Privacy Policy</a>
+      <span class="mg-legal-footer__sep">&middot;</span>
+      <a href="/disclosures.html">Recovery Disclosures</a>
+      <span class="mg-legal-footer__sep">&middot;</span>
+      <a href="/retention.html">Data Retention</a>
+      <span class="mg-legal-footer__sep">&middot;</span>
+      <a href="mailto:support@musigod.com">Contact</a>
+    </div>
+    <div class="mg-legal-footer__copy">
+      &copy; 2026 MusiGod Publishing Administration &nbsp;&middot;&nbsp;
+      Recovered royalties. Verified rights. Artists keep ownership. &nbsp;&middot;&nbsp;
+      MusiGod is a Publishing Administrator &mdash; artists retain 100% of rights.
+    </div>
+  </div>
+</footer>
+
+<script>
+const params = new URLSearchParams(window.location.search)
+const ARTIST_EMAIL = params.get('artist_email') || localStorage.getItem('musigod_artist_email') || localStorage.getItem('musigod_rights_audit_email') || ''
+const ARTIST_ID    = params.get('artist_id')    || localStorage.getItem('musigod_artist_id') || ''
+const AUDIT_ID     = params.get('audit_id')     || localStorage.getItem('musigod_rights_audit_id') || ''
+const RECOVERY_CASE_ID = params.get('recovery_case_id') || ''
+
+if (ARTIST_EMAIL) localStorage.setItem('musigod_artist_email', ARTIST_EMAIL)
+
+// Show context bar if we have context
+if (ARTIST_EMAIL || AUDIT_ID || RECOVERY_CASE_ID) {
+  const parts = []
+  if (ARTIST_EMAIL) parts.push('Artist: ' + ARTIST_EMAIL)
+  if (AUDIT_ID) parts.push('Audit: ' + AUDIT_ID.slice(0, 8) + '…')
+  if (RECOVERY_CASE_ID) parts.push('Case: ' + RECOVERY_CASE_ID.slice(0, 8) + '…')
+  document.getElementById('context-text').textContent = parts.join(' · ')
+  document.getElementById('context-bar').style.display = 'block'
+}
+
+let selectedFile = null
+const sessionUploads = []
+
+document.getElementById('file-input').addEventListener('change', e => {
+  const f = e.target.files[0]
+  if (!f) return
+  selectFile(f)
+})
+
+const dropZone = document.getElementById('drop-zone')
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over') })
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'))
+dropZone.addEventListener('drop', e => {
+  e.preventDefault()
+  dropZone.classList.remove('drag-over')
+  const f = e.dataTransfer.files[0]
+  if (f) selectFile(f)
+})
+
+document.getElementById('document_type').addEventListener('change', () => checkReady())
+
+function selectFile(f) {
+  if (f.size > 10 * 1024 * 1024) { showError('File exceeds 10MB limit.'); return }
+  selectedFile = f
+  document.getElementById('file-name').textContent = f.name + ' (' + formatBytes(f.size) + ')'
+  dropZone.classList.add('file-selected')
+  checkReady()
+}
+
+function checkReady() {
+  const docType = document.getElementById('document_type').value
+  document.getElementById('upload-btn').disabled = !(selectedFile && docType)
+}
+
+async function uploadDocument() {
+  clearMessages()
+  if (!ARTIST_EMAIL) { showError('Artist email is required. Return to your portal or rights audit page.'); return }
+
+  const docType = document.getElementById('document_type').value
+  if (!docType || !selectedFile) return
+
+  const btn = document.getElementById('upload-btn')
+  btn.disabled = true
+  btn.textContent = 'UPLOADING…'
+  const progressBar = document.getElementById('progress-bar')
+  const progressFill = document.getElementById('progress-fill')
+  progressBar.classList.add('show')
+
+  // Animate progress
+  let prog = 0
+  const progInterval = setInterval(() => {
+    prog = Math.min(prog + Math.random() * 15, 85)
+    progressFill.style.width = prog + '%'
+  }, 200)
+
+  try {
+    const fd = new FormData()
+    fd.append('artist_email',     ARTIST_EMAIL)
+    fd.append('artist_id',        ARTIST_ID)
+    fd.append('audit_id',         AUDIT_ID)
+    fd.append('recovery_case_id', RECOVERY_CASE_ID)
+    fd.append('document_type',    docType)
+    fd.append('file',             selectedFile, selectedFile.name)
+
+    const res = await fetch('/api/upload-artist-document', { method: 'POST', body: fd })
+    const data = await res.json()
+
+    clearInterval(progInterval)
+    progressFill.style.width = '100%'
+    setTimeout(() => progressBar.classList.remove('show'), 600)
+
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Upload failed')
+
+    showSuccess(`Document submitted successfully. Document ID: ${data.document_id}`)
+
+    // Add to session list
+    sessionUploads.push({ name: selectedFile.name, type: docType, id: data.document_id })
+    renderSessionUploads()
+
+    // Reset form
+    selectedFile = null
+    document.getElementById('file-input').value = ''
+    document.getElementById('file-name').textContent = ''
+    document.getElementById('document_type').value = ''
+    dropZone.classList.remove('file-selected')
+    btn.disabled = true
+    btn.textContent = 'SUBMIT DOCUMENT'
+
+  } catch (err) {
+    clearInterval(progInterval)
+    progressBar.classList.remove('show')
+    showError(err.message)
+    btn.disabled = false
+    btn.textContent = 'SUBMIT DOCUMENT'
+  }
+}
+
+function renderSessionUploads() {
+  if (!sessionUploads.length) return
+  document.getElementById('uploads-history').style.display = 'block'
+  document.getElementById('uploads-list').innerHTML = sessionUploads.map(u => `
+    <div class="upload-item">
+      <div>
+        <div class="upload-item-name">${esc(u.name)}</div>
+        <div class="upload-item-meta">${esc(u.type.replace(/_/g,' '))} · ID: ${esc(u.id?.slice(0,8))}…</div>
+      </div>
+      <span class="badge badge-green">Submitted</span>
+    </div>
+  `).join('')
+}
+
+function showError(msg) { const el = document.getElementById('error'); el.textContent = msg; el.classList.add('show'); }
+function showSuccess(msg) { const el = document.getElementById('success'); el.textContent = msg; el.classList.add('show'); }
+function clearMessages() { ['error','success'].forEach(id => { const el = document.getElementById(id); el.textContent=''; el.classList.remove('show'); }) }
+function esc(v) { return String(v||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) }
+function formatBytes(b) { return b > 1048576 ? (b/1048576).toFixed(1)+'MB' : (b/1024).toFixed(0)+'KB' }
+</script>
+</body>
+</html>

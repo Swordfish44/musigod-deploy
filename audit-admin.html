@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod — Royalty Audit Engine</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap');
+:root{
+  --navy:#0A1628;--navy2:#0d1e35;--dim:#111f33;--dim2:#162840;
+  --gold:#C9A84C;--gold2:#e8c76a;--gold-dim:rgba(201,168,76,0.1);
+  --border:#1e3556;--border2:#253f63;
+  --text:#dce6f5;--muted:#5a7a9e;--muted2:#8aa4c0;
+  --green:#2ecc8a;--red:#e05c5c;--orange:#e09a3c;--blue:#4a9eff;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--navy);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(201,168,76,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(201,168,76,0.03) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0;}
+.app{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:36px 22px 100px;}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:44px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.logo{font-family:'Space Mono',monospace;font-size:19px;font-weight:700;color:var(--gold);letter-spacing:3px;}
+.logo-sub{color:var(--muted);font-size:10px;letter-spacing:2px;margin-top:3px;}
+.badge{background:var(--dim);border:1px solid var(--border2);color:var(--gold);font-family:'Space Mono',monospace;font-size:10px;padding:5px 12px;border-radius:3px;letter-spacing:2px;}
+
+/* API KEY INPUT */
+.key-row{display:flex;gap:10px;margin-bottom:16px;align-items:center;}
+.key-inp{flex:1;background:var(--dim);border:1px solid var(--border);color:var(--muted2);font-family:'Space Mono',monospace;font-size:12px;padding:10px 14px;border-radius:5px;outline:none;}
+.key-inp:focus{border-color:var(--gold);}
+.key-lbl{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;white-space:nowrap;}
+
+.search-lbl{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--gold);text-transform:uppercase;margin-bottom:9px;display:block;}
+.search-row{display:flex;gap:10px;margin-bottom:6px;}
+.search-input{flex:1;background:var(--dim);border:1px solid var(--border2);color:var(--text);font-family:'Syne',sans-serif;font-size:17px;font-weight:600;padding:14px 18px;border-radius:6px;outline:none;transition:border-color .2s;}
+.search-input:focus{border-color:var(--gold);}
+.search-input::placeholder{color:var(--muted);font-weight:400;}
+.run-btn{background:var(--gold);color:var(--navy);border:none;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;letter-spacing:2px;padding:14px 22px;border-radius:6px;cursor:pointer;transition:background .2s;white-space:nowrap;}
+.run-btn:hover{background:var(--gold2);}
+.run-btn:disabled{background:var(--dim);color:var(--muted);cursor:not-allowed;}
+
+.status{font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);min-height:22px;margin-bottom:28px;letter-spacing:.5px;}
+.status .hi{color:var(--gold);}
+.status .ok{color:var(--green);}
+.status .err{color:var(--red);}
+
+.sec-lbl{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--gold);text-transform:uppercase;margin-bottom:12px;margin-top:28px;display:flex;align-items:center;gap:10px;}
+.sec-lbl::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* SOURCE CARDS */
+.sources-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:4px;}
+@media(max-width:640px){.sources-grid{grid-template-columns:1fr 1fr;}}
+.src-card{background:var(--dim);border:1px solid var(--border);border-radius:8px;padding:14px 16px;}
+.src-card.found{border-color:var(--green);}
+.src-card.not_found{border-color:var(--red);}
+.src-card.unknown{border-color:var(--orange);}
+.src-card.error{border-color:var(--border);}
+.src-name{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;margin-bottom:6px;}
+.src-stat{font-size:18px;font-weight:800;color:var(--text);margin-bottom:4px;}
+.src-sub{font-size:11px;color:var(--muted);}
+.src-badge{font-family:'Space Mono',monospace;font-size:9px;padding:2px 8px;border-radius:3px;letter-spacing:1px;margin-top:6px;display:inline-block;}
+.sb-found{background:rgba(46,204,138,.1);color:var(--green);border:1px solid var(--green);}
+.sb-notfound{background:rgba(224,80,80,.1);color:var(--red);border:1px solid var(--red);}
+.sb-unknown{background:rgba(224,154,60,.1);color:var(--orange);border:1px solid var(--orange);}
+.sb-error{background:var(--navy2);color:var(--muted);border:1px solid var(--border);}
+
+/* GAPS */
+.gaps-list{display:flex;flex-direction:column;gap:8px;}
+.gap-item{background:var(--dim);border-left:3px solid var(--border);border-radius:0 6px 6px 0;padding:12px 16px;}
+.gap-item.critical{border-left-color:var(--red);}
+.gap-item.high{border-left-color:var(--orange);}
+.gap-item.medium{border-left-color:var(--gold);}
+.gap-item.low{border-left-color:var(--muted);}
+.gap-sev{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+.sev-critical{color:var(--red);}
+.sev-high{color:var(--orange);}
+.sev-medium{color:var(--gold);}
+.sev-low{color:var(--muted);}
+.gap-msg{font-size:13px;color:var(--text);line-height:1.5;}
+.gap-impact{font-family:'Space Mono',monospace;font-size:12px;color:var(--gold);margin-top:4px;}
+
+/* CATALOG TABLE */
+.catalog-wrap{background:var(--dim);border:1px solid var(--border);border-radius:8px;overflow:hidden;max-height:320px;overflow-y:auto;}
+.ctbl{width:100%;border-collapse:collapse;}
+.ctbl th{background:var(--navy2);font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);position:sticky;top:0;}
+.ctbl td{padding:9px 14px;font-size:13px;border-bottom:1px solid rgba(30,53,86,.35);vertical-align:middle;}
+.ctbl tr:last-child td{border-bottom:none;}
+.ctbl tr:hover td{background:rgba(255,255,255,.02);}
+.rt{font-family:'Space Mono',monospace;font-size:9px;padding:2px 7px;border-radius:3px;}
+.rt-album{background:rgba(201,168,76,.15);color:var(--gold);}
+.rt-single{background:rgba(74,158,255,.15);color:var(--blue);}
+.rt-ep{background:rgba(46,204,138,.15);color:var(--green);}
+.rt-other{background:var(--navy2);color:var(--muted2);}
+
+/* ESTIMATES */
+.est-card{background:var(--dim2);border:1px solid var(--border2);border-radius:8px;padding:22px;}
+.est-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(30,53,86,.4);}
+.est-row:last-of-type{border-bottom:none;}
+.est-lbl{font-size:13px;color:var(--muted2);}
+.est-val{font-family:'Space Mono',monospace;font-size:14px;font-weight:700;color:var(--gold);}
+.est-val.z{color:var(--muted);}
+.est-total{display:flex;justify-content:space-between;align-items:center;padding-top:14px;margin-top:10px;border-top:2px solid var(--gold);}
+.et-lbl{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;}
+.et-val{font-family:'Space Mono',monospace;font-size:32px;font-weight:700;color:var(--green);}
+.disclaimer{font-size:11px;color:var(--muted);margin-top:12px;line-height:1.6;font-style:italic;}
+
+/* ACTIONS */
+.act-row{display:flex;gap:9px;flex-wrap:wrap;margin-top:18px;}
+.ab{flex:1;min-width:110px;padding:12px 16px;border-radius:5px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;font-weight:700;cursor:pointer;border:none;text-align:center;transition:opacity .2s;}
+.ab:active{transform:scale(.98);}
+.b-gold{background:var(--gold);color:var(--navy);}
+.b-gold:hover{opacity:.9;}
+.b-out{background:transparent;color:var(--gold);border:1px solid var(--gold);}
+.b-out:hover{background:var(--gold-dim);}
+.b-ghost{background:var(--dim);color:var(--muted2);border:1px solid var(--border);}
+.b-ghost:hover{color:var(--text);}
+
+/* IDLE / LOADING */
+.idle{text-align:center;padding:70px 20px;color:var(--muted);}
+.idle-icon{font-size:40px;margin-bottom:14px;opacity:.25;}
+.idle-txt{font-size:13px;line-height:1.8;}
+.spin{display:inline-block;width:11px;height:11px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:rot .6s linear infinite;margin-right:6px;vertical-align:middle;}
+@keyframes rot{to{transform:rotate(360deg);}}
+.hidden{display:none!important;}
+::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--navy);}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hdr">
+    <div><div class="logo">MUSIGOD</div><div class="logo-sub">ROYALTY AUDIT ENGINE — ADMIN</div></div>
+    <div class="badge">⬡ INTERNAL ONLY</div>
+  </div>
+
+  <!-- API CONFIG -->
+  <div class="key-row">
+    <span class="key-lbl">Admin Key</span>
+    <input class="key-inp" id="adminKey" type="password" placeholder="Enter AUDIT_ADMIN_KEY from Vercel env..." autocomplete="off"/>
+  </div>
+
+  <label class="search-lbl">↳ Artist Stage Name</label>
+  <div class="search-row">
+    <input class="search-input" id="artistInput" type="text" placeholder="e.g. Esham, Big Sean, Danny Brown..." autocomplete="off"/>
+    <button class="run-btn" id="runBtn" onclick="runScan()">SCAN ARTIST</button>
+  </div>
+  <div class="status" id="status">Ready. Enter artist name and hit Scan.</div>
+
+  <!-- IDLE -->
+  <div class="idle" id="idle">
+    <div class="idle-icon">◎</div>
+    <div class="idle-txt">
+      Scans Discogs · Spotify · MLC · SoundExchange · YouTube in parallel.<br>
+      Returns real catalog data and royalty gap estimates in seconds.
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results" class="hidden">
+
+    <div class="sec-lbl">Source Scan Results</div>
+    <div class="sources-grid" id="sourcesGrid"></div>
+
+    <div class="sec-lbl">Identified Gaps</div>
+    <div class="gaps-list" id="gapsList"></div>
+
+    <div class="sec-lbl">Catalog — Discogs</div>
+    <div class="catalog-wrap">
+      <table class="ctbl">
+        <thead><tr><th>Title</th><th>Year</th><th>Type</th><th>Label</th></tr></thead>
+        <tbody id="catalogBody"></tbody>
+      </table>
+    </div>
+
+    <div class="sec-lbl">Royalty Gap Estimates</div>
+    <div class="est-card">
+      <div id="estRows"></div>
+      <div class="est-total">
+        <div class="et-lbl">Total Estimated Owed</div>
+        <div class="et-val" id="estTotal">$0</div>
+      </div>
+      <div class="disclaimer" id="disclaimer"></div>
+      <div class="act-row">
+        <button class="ab b-gold" onclick="exportReport()">⬇ Export Report</button>
+        <button class="ab b-out" onclick="copyLink()">⬡ Copy Link</button>
+        <button class="ab b-ghost" onclick="reset()">↺ New Scan</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let lastResult = null;
+
+// Endpoint — change this to your actual Vercel deployment URL
+const API_URL = 'https://musigod.com/api/scan-artist';
+
+async function runScan() {
+  const name = document.getElementById('artistInput').value.trim();
+  const key  = document.getElementById('adminKey').value.trim();
+  if (!name) return;
+
+  document.getElementById('idle').classList.add('hidden');
+  document.getElementById('results').classList.add('hidden');
+  document.getElementById('runBtn').disabled = true;
+  setStatus(`<span class="spin"></span><span class="hi">Scanning ${name} across 5 databases...</span>`);
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-key': key
+      },
+      body: JSON.stringify({ artistName: name })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    lastResult = data;
+    renderResults(data);
+    setStatus(`<span class="ok">✓ Scan complete in ${data.scanTime} · ${data.gaps?.length || 0} gaps found</span>`);
+    document.getElementById('results').classList.remove('hidden');
+  } catch (err) {
+    setStatus(`<span class="err">Error: ${err.message}</span>`);
+    document.getElementById('idle').classList.remove('hidden');
+  }
+
+  document.getElementById('runBtn').disabled = false;
+}
+
+function renderResults(d) {
+  renderSources(d.sources);
+  renderGaps(d.gaps || []);
+  renderCatalog(d.catalog?.releases || []);
+  renderEstimates(d.estimates || {}, d.totalEstimated || 0, d.disclaimer || '');
+}
+
+function renderSources(s) {
+  const LABELS = {
+    discogs:      {name:'Discogs',      stat: s.discogs.totalReleases      ? `${s.discogs.totalReleases} releases`      : '—', sub: 'catalog'},
+    spotify:      {name:'Spotify',      stat: s.spotify.followers           ? `${s.spotify.followers.toLocaleString()} followers` : '—', sub: `${s.spotify.totalAlbums||0} albums`},
+    mlc:          {name:'The MLC',      stat: s.mlc.totalWorks              ? `${s.mlc.totalWorks} works`                : '—', sub: 'mechanicals'},
+    soundexchange:{name:'SoundExchange',stat: s.soundexchange.status        === 'found' ? 'IN DATABASE' : 'NOT FOUND',   sub: 'digital perf.'},
+    youtube:      {name:'YouTube',      stat: s.youtube.totalVideos         ? `${s.youtube.totalVideos} videos`          : '—', sub: s.youtube.totalViews ? `${(s.youtube.totalViews/1000).toFixed(0)}K views` : 'no data'},
+  };
+  const grid = document.getElementById('sourcesGrid');
+  grid.innerHTML = Object.entries(LABELS).map(([k,v]) => {
+    const src = s[k];
+    const badgeClass = src.status === 'found' ? 'sb-found' : src.status === 'not_found' ? 'sb-notfound' : src.status === 'unknown' ? 'sb-unknown' : 'sb-error';
+    const badgeText  = src.status === 'found' ? 'FOUND' : src.status === 'not_found' ? 'NOT FOUND' : src.status === 'unknown' ? 'UNKNOWN' : 'ERROR';
+    return `<div class="src-card ${src.status||'error'}">
+      <div class="src-name">${v.name}</div>
+      <div class="src-stat">${v.stat}</div>
+      <div class="src-sub">${v.sub}</div>
+      ${src.url ? `<a href="${src.url}" target="_blank" style="display:block;margin-top:6px;font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);text-decoration:none;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--muted)'">↗ VIEW SOURCE</a>` : ''}
+      <div class="src-badge ${badgeClass}">${badgeText}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderGaps(gaps) {
+  const el = document.getElementById('gapsList');
+  if (!gaps.length) { el.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:12px 0;">No gaps detected — manual verification still recommended.</div>`; return; }
+  el.innerHTML = gaps.map(g => `
+    <div class="gap-item ${g.severity}">
+      <div class="gap-sev sev-${g.severity}">${g.severity.toUpperCase()} · ${g.type.replace(/_/g,' ').toUpperCase()}</div>
+      <div class="gap-msg">${g.message}</div>
+      ${g.estimatedImpact > 0 ? `<div class="gap-impact">Est. Impact: $${g.estimatedImpact.toLocaleString()}</div>` : ''}
+    </div>`).join('');
+}
+
+function renderCatalog(releases) {
+  const tb = document.getElementById('catalogBody');
+  if (!releases.length) { tb.innerHTML = `<tr><td colspan="4" style="padding:20px 14px;color:var(--muted);font-size:13px;">No catalog data from Discogs.</td></tr>`; return; }
+  const typeClass = r => {
+    const t = (r.type||'').toLowerCase();
+    return t.includes('album') ? 'rt-album' : t.includes('single') ? 'rt-single' : t.includes('ep') ? 'rt-ep' : 'rt-other';
+  };
+  tb.innerHTML = releases.slice(0, 60).map(r => `<tr>
+    <td style="font-weight:700">${esc(r.title)}</td>
+    <td style="font-family:'Space Mono',monospace;font-size:12px;color:var(--muted2)">${r.year||'—'}</td>
+    <td><span class="rt ${typeClass(r)}">${esc((r.type||'').toUpperCase())}</span></td>
+    <td style="font-size:12px;color:var(--muted)">${esc(r.label||'—')}</td>
+  </tr>`).join('');
+}
+
+function renderEstimates(est, total, disclaimer) {
+  const LABELS = {
+    pro:'PRO Performance Royalties', mlc:'Mechanical Royalties (MLC)',
+    soundexchange:'SoundExchange Digital', youtube:'YouTube / Content ID',
+    streaming:'Streaming Metadata Gaps', neighboring:'Neighboring Rights (Intl)'
+  };
+  document.getElementById('estRows').innerHTML = Object.entries(LABELS).map(([k,l]) => {
+    const v = est[k]||0;
+    return `<div class="est-row">
+      <span class="est-lbl">${l}</span>
+      <span class="est-val ${v>0?'':'z'}">${v>0?'$'+v.toLocaleString():'—'}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('estTotal').textContent = '$' + (total||0).toLocaleString();
+  document.getElementById('disclaimer').textContent = disclaimer;
+}
+
+function exportReport() {
+  if (!lastResult) return;
+  const d = lastResult;
+  const lines = [
+    'MUSIGOD — ROYALTY GAP AUDIT REPORT',
+    '═══════════════════════════════════════════',
+    `Artist:        ${d.artistName}`,
+    `Scan Date:     ${new Date(d.scannedAt).toLocaleDateString()}`,
+    `Scan Time:     ${d.scanTime}`,
+    ``,
+    '─── SOURCE RESULTS ─────────────────────────',
+    `Discogs:       ${d.sources.discogs.totalReleases} releases found`,
+    `Spotify:       ${d.sources.spotify.followers?.toLocaleString()||'—'} followers, ${d.sources.spotify.totalAlbums} albums`,
+    `MLC:           ${d.sources.mlc.totalWorks} works registered`,
+    `SoundExchange: ${d.sources.soundexchange.status}`,
+    `YouTube:       ${d.sources.youtube.totalVideos} videos, ${d.sources.youtube.totalViews?.toLocaleString()||0} total views`,
+    ``,
+    '─── IDENTIFIED GAPS ─────────────────────────',
+    ...(d.gaps||[]).map(g => `[${g.severity.toUpperCase()}] ${g.message}${g.estimatedImpact>0?' (est. $'+g.estimatedImpact.toLocaleString()+')':''}`),
+    ``,
+    '─── ROYALTY GAP ESTIMATES ───────────────────',
+    `PRO Performance:        $${(d.estimates?.pro||0).toLocaleString()}`,
+    `Mechanical (MLC):       $${(d.estimates?.mlc||0).toLocaleString()}`,
+    `SoundExchange:          $${(d.estimates?.soundexchange||0).toLocaleString()}`,
+    `YouTube/Content ID:     $${(d.estimates?.youtube||0).toLocaleString()}`,
+    `Streaming Metadata:     $${(d.estimates?.streaming||0).toLocaleString()}`,
+    `Neighboring Rights:     $${(d.estimates?.neighboring||0).toLocaleString()}`,
+    ``,
+    `TOTAL ESTIMATED OWED:   $${(d.totalEstimated||0).toLocaleString()}`,
+    ``,
+    d.disclaimer||'',
+    ``,
+    '─────────────────────────────────────────────',
+    'MusiGod charges 15% of recovered royalties only.',
+    'No upfront fees. Artists retain 100% of rights.',
+    'musigod.com | support@musigod.com',
+  ];
+  const blob = new Blob([lines.join('\n')], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=`MusiGod_Audit_${d.artistName.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.txt`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function copyLink() {
+  const url = `${location.href.split('?')[0]}?artist=${encodeURIComponent(document.getElementById('artistInput').value.trim())}`;
+  navigator.clipboard.writeText(url).then(() => alert('Link copied!'));
+}
+
+function reset() {
+  lastResult = null;
+  document.getElementById('artistInput').value = '';
+  document.getElementById('results').classList.add('hidden');
+  document.getElementById('idle').classList.remove('hidden');
+  setStatus('Ready. Enter artist name and hit Scan.');
+}
+
+function setStatus(html) { document.getElementById('status').innerHTML = html; }
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+document.getElementById('artistInput').addEventListener('keydown', e => { if(e.key==='Enter') runScan(); });
+
+// Auto-load from URL
+window.addEventListener('load', () => {
+  const p = new URLSearchParams(location.search);
+  const a = p.get('artist');
+  if (a) { document.getElementById('artistInput').value = a; }
+});
+</script>
+</body>
+</html>

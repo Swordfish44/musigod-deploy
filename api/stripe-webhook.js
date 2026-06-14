@@ -499,18 +499,24 @@ async function sendRightsAuditNextStepsEmail(audit, session, email) {
 
   const auditId = clean(audit.audit_id || session.metadata?.audit_id)
   const recipientEmail = clean(email)
-  const unlockUrl = buildRightsAuditUnlockUrl(auditId, recipientEmail)
-  const statusUrl = `https://musigod.com/audit-status?id=${encodeURIComponent(auditId)}`
+  const statusUrl = buildRightsAuditStatusUrl(auditId, session)
   const artistName = escapeHtml(audit.artist_name || 'artist')
   const html = `
-    <p><strong>Your payment was successful and your full MusiGod Rights Audit is unlocked.</strong></p>
-    <p><strong>Audit ID:</strong> ${escapeHtml(auditId)}</p>
-    <p><strong>Next step:</strong> reply to this email with distributor, PRO, publishing admin, SoundExchange, or label-access details MusiGod should use to verify missing registrations and royalty recovery opportunities.</p>
-    <p><a href="${escapeHtml(statusUrl)}">Track your MusiGod audit status</a></p>
-    <p><a href="${escapeHtml(unlockUrl)}">Open your unlocked MusiGod Rights Audit</a></p>
-    <p><strong>Turnaround:</strong> MusiGod begins paid audit review within 1 business day. Watch your email for follow-up questions or action items.</p>
-    <p>MusiGod will review missing registrations, DSP claim issues, publishing gaps, neighboring rights problems, recovery opportunities, and your action plan.</p>
-    <p>Artist: ${artistName}</p>
+    <p>Hi ${artistName},</p>
+    <p><strong>Payment confirmed. Your MusiGod Rights Audit is unlocked.</strong></p>
+    <p><strong>Audit ID:</strong> <code>${escapeHtml(auditId)}</code></p>
+    <p>MusiGod will begin reviewing your audit within 1 business day. Watch your email for follow-up questions or action items.</p>
+    <p style="margin:24px 0;">
+      <a href="${escapeHtml(statusUrl)}"
+         style="background:#c8102e;color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">
+        View audit status and next steps
+      </a>
+    </p>
+    <p>Or paste this link in your browser:<br><a href="${escapeHtml(statusUrl)}">${escapeHtml(statusUrl)}</a></p>
+    <p>Your status page shows: Payment received · Audit unlocked · Current status · What happens next · Estimated turnaround.</p>
+    <p>MusiGod will review: missing PRO, publisher, SoundExchange, and neighboring rights registrations; DSP profile claims, YouTube Content ID, metadata, and identifier gaps; publishing, master-rights, and royalty recovery opportunities.</p>
+    <p>Reply to this email with distributor, PRO, publishing admin, SoundExchange, or label-access details MusiGod should use. Keep this email for your records.</p>
+    <p>Questions? Reply to this email or contact <a href="mailto:support@musigod.com">support@musigod.com</a>.</p>
   `
 
   logFulfillment('resend_request', {
@@ -518,6 +524,11 @@ async function sendRightsAuditNextStepsEmail(audit, session, email) {
     stripe_session_id: session.id,
     recipient_email: recipientEmail,
     resend_configured: Boolean(RESEND_API_KEY),
+    final_redirect_target: statusUrl,
+    email_type: 'post_payment_status',
+    redirect_target: statusUrl,
+    webhook_paid_confirmed: true,
+    status_email_sent: true,
   })
 
   const response = await fetch('https://api.resend.com/emails', {
@@ -526,7 +537,7 @@ async function sendRightsAuditNextStepsEmail(audit, session, email) {
     body: JSON.stringify({
       from: FROM_EMAIL,
       to: recipientEmail,
-      subject: 'Your MusiGod Rights Audit next steps',
+      subject: 'Payment confirmed — your MusiGod Rights Audit is unlocked',
       html,
     }),
   })
@@ -548,12 +559,22 @@ async function sendRightsAuditNextStepsEmail(audit, session, email) {
   return { ok: true, status: response.status }
 }
 
-function buildRightsAuditUnlockUrl(auditId, email) {
-  const url = new URL('https://musigod.com/rights-audit.html')
-  url.searchParams.set('audit_id', auditId)
-  url.searchParams.set('email', email)
-  url.searchParams.set('unlock', 'success')
-  return url.toString()
+function buildRightsAuditStatusUrl(auditId, session) {
+  const fallback = new URL('https://musigod.com/audit-status')
+  fallback.searchParams.set('id', auditId)
+  if (session.id) fallback.searchParams.set('session_id', session.id)
+
+  try {
+    const successUrl = clean(session.success_url)
+    if (!successUrl) return fallback.toString()
+    const url = new URL(successUrl)
+    if (!url.pathname.includes('/audit-status')) return fallback.toString()
+    url.searchParams.set('id', auditId)
+    if (session.id) url.searchParams.set('session_id', session.id)
+    return url.toString()
+  } catch {
+    return fallback.toString()
+  }
 }
 
 async function notifyRightsAuditPaymentConfirmed(audit, session, email, paidAt, requestId) {
@@ -598,7 +619,7 @@ async function notifyRightsAuditPaymentConfirmed(audit, session, email, paidAt, 
         stripe_session_id: session.id,
         stripe_customer_email: email,
         paid_at: paidAt,
-        status_url: `https://musigod.com/audit-status?id=${encodeURIComponent(audit.audit_id || session.metadata?.audit_id || '')}`,
+        status_url: buildRightsAuditStatusUrl(audit.audit_id || session.metadata?.audit_id || '', session),
         correlation_id: requestId,
       }),
     })

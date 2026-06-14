@@ -77,6 +77,19 @@
     .ref-code{font-family:'DM Mono',monospace;font-size:10px;color:var(--blue);letter-spacing:0.08em}
     .amount{font-family:'Bebas Neue',sans-serif;font-size:14px}
   </style>
+  <script>
+    window.MUSIGOD_PUBLIC_CONFIG_READY = fetch('/api/public-config', { credentials: 'same-origin' })
+      .then(function (response) { return response.ok ? response.json() : {}; })
+      .then(function (config) {
+        window.MUSIGOD_SENTRY_DSN = config.sentryDsn || '';
+        window.MUSIGOD_ENVIRONMENT = config.environment || 'production';
+      })
+      .catch(function () {
+        window.MUSIGOD_SENTRY_DSN = '';
+        window.MUSIGOD_ENVIRONMENT = 'production';
+      });
+  </script>
+  <script src="/sentry-browser.js"></script>
 </head>
 <body>
 

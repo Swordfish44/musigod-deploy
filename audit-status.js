@@ -1,6 +1,7 @@
 (function(){
   const params = new URLSearchParams(window.location.search)
   const auditId = (params.get('id') || params.get('audit_id') || '').trim()
+  const sessionId = (params.get('session_id') || '').trim()
   const els = {
     card: document.getElementById('status-card'),
     title: document.getElementById('status-title'),
@@ -14,6 +15,12 @@
     events: document.getElementById('event-list'),
     poll: document.getElementById('poll-state'),
   }
+
+  console.info('AUDIT_STATUS_PAGE_LOAD', {
+    audit_id: auditId || null,
+    session_id: sessionId || null,
+    final_redirect_target: window.location.pathname + window.location.search,
+  })
 
   if(!auditId){
     renderFallback('Audit ID missing', 'Use the status link from your MusiGod email or contact support with your payment receipt.')
@@ -33,7 +40,7 @@
       renderStatus(body.status, body.events || [])
       els.poll.textContent = 'Polling every 10 seconds'
     }catch(err){
-      renderFallback('Status temporarily unavailable', 'Your payment flow is not affected. Refresh this page or contact support if this persists.')
+      renderFallback('Status still syncing', 'We received your payment, but your audit status is still syncing. Check your email for confirmation. Contact support with your payment email if this does not update shortly.')
       els.poll.textContent = 'Retrying every 10 seconds'
     }
   }
@@ -84,9 +91,9 @@
   function titleFor(status){
     return ({
       PENDING_PAYMENT: 'Waiting for payment',
-      PAID: 'Payment confirmed',
-      FULFILLMENT_QUEUED: 'Fulfillment queued',
-      PROCESSING: 'Review in progress',
+      PAID: 'Payment received - audit unlocked',
+      FULFILLMENT_QUEUED: 'Audit unlocked - queued for review',
+      PROCESSING: 'Audit in progress',
       COMPLETED: 'Fulfillment complete',
       FAILED_RETRYING: 'Retrying fulfillment',
       ACTION_REQUIRED: 'MusiGod action required',

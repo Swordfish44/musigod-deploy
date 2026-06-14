@@ -1,3 +1,5 @@
+const { captureException, withSentry } = require('./_sentry')
+
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
 const N8N_REGISTERED_WEBHOOK_URL = process.env.N8N_REGISTERED_WEBHOOK_URL || 'https://musigod-n8n.onrender.com/webhook/artist-registered'
@@ -7,7 +9,7 @@ const FROM_EMAIL = process.env.FROM_EMAIL || 'MusiGod <support@musigod.com>'
 
 const ALLOWED_PLANS = new Set(['starter', 'growth'])
 
-module.exports = async function handler(req, res) {
+module.exports = withSentry(async function handler(req, res) {
   setCors(req, res)
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -45,9 +47,16 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ artist_id: artist.id, registration_id: registration?.id || null, plan: normalized.plan })
   } catch (err) {
     console.error('register-artist error:', err)
+    captureException(err, {
+      route: 'register-artist',
+      method: req.method,
+      path: req.url,
+      statusCode: 500,
+      plan: normalized.plan,
+    })
     return res.status(500).json({ error: 'Registration failed' })
   }
-}
+}, 'register-artist')
 
 function normalizePayload(body) {
   return {
@@ -125,10 +134,10 @@ async function createRegistration(artistId, payload) {
     },
   }
 
-  const rows = await sbFetch('registrations_v1', 'registrations', {
+  const rows = await sbFetch('registrations_v1?on_conflict=artist_id,registration_type', 'registrations', {
     method: 'POST',
     body: regPayload,
-    prefer: 'return=representation',
+    prefer: 'resolution=merge-duplicates,return=representation',
   })
   return rows?.[0] || null
 }

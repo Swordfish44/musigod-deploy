@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod — Submit Your Catalog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--red:#C8102E;--black:#080808;--bg:#0c0c0c;--bg2:#111;--bg3:#1a1a1a;--line:rgba(255,255,255,0.08);--text:#e8e8e8;--muted:#888;--dim:#555;--green:#22c55e;--amber:#f0a020}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--black);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column}
+  header{height:64px;background:rgba(12,12,12,0.96);border-bottom:1px solid rgba(200,16,46,0.2);display:flex;align-items:center;justify-content:space-between;padding:0 32px;position:sticky;top:0;z-index:20}
+  .logo{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:0.14em;color:#fff;text-decoration:none}.logo span{color:var(--red)}
+  main{flex:1;padding:48px 20px 80px}
+  .wrap{max-width:780px;margin:0 auto}
+  .eyebrow{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.18em;color:var(--red);margin-bottom:12px}
+  h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(36px,6vw,58px);letter-spacing:0.04em;color:#fff;margin-bottom:10px}
+  .sub{color:#888;font-size:15px;line-height:1.7;max-width:620px;margin-bottom:32px}
+  .notice{background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-left:3px solid var(--green);border-radius:6px;padding:14px 18px;color:#aaa;font-size:13px;line-height:1.65;margin-bottom:28px}
+  .panel{background:var(--bg);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:16px}
+  .panel-h{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+  .panel-title{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.14em;color:#fff}
+  .panel-num{font-family:'DM Mono',monospace;font-size:11px;color:var(--red);margin-right:10px}
+  .panel-remove{font-family:'DM Mono',monospace;font-size:10px;color:var(--dim);background:none;border:none;cursor:pointer;padding:4px 8px}
+  .panel-remove:hover{color:var(--red)}
+  .panel-b{padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .panel-b.hidden{display:none}
+  .field{display:flex;flex-direction:column;gap:7px}
+  .field.full{grid-column:1/-1}
+  label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.12em;color:var(--dim)}
+  input,select,textarea{background:var(--bg3);border:1px solid rgba(255,255,255,0.1);border-radius:5px;color:#fff;font-family:'DM Sans',sans-serif;font-size:14px;padding:10px 12px;outline:none;width:100%}
+  input:focus,select:focus,textarea:focus{border-color:rgba(200,16,46,0.5);box-shadow:0 0 0 3px rgba(200,16,46,0.07)}
+  .checks{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .check{display:flex;gap:8px;align-items:flex-start;background:var(--bg2);border:1px solid var(--line);border-radius:4px;padding:8px 10px;font-size:12px;color:#bbb;cursor:pointer}
+  .check input{width:auto;margin-top:2px;accent-color:var(--red)}
+  .btn{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.1em;padding:12px 22px;border-radius:4px;border:0;cursor:pointer}
+  .btn-red{background:var(--red);color:#fff}.btn-red:hover{background:#a00d25}.btn-red:disabled{opacity:0.5;cursor:not-allowed}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--muted)}.btn-ghost:hover{border-color:rgba(255,255,255,0.2);color:#ccc}
+  .btn-add{background:rgba(200,16,46,0.08);border:1px solid rgba(200,16,46,0.2);color:#f87171;width:100%;text-align:center;padding:13px}
+  .btn-add:hover{background:rgba(200,16,46,0.14)}
+  .actions{display:flex;gap:12px;align-items:center;justify-content:flex-end;margin-top:20px}
+  .alert{border-radius:6px;padding:14px 18px;font-size:13px;line-height:1.7;margin-top:16px}
+  .alert-green{background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);color:#d8ffe3}
+  .alert-red{background:rgba(200,16,46,0.08);border:1px solid rgba(200,16,46,0.25);color:#ff9ba8}
+  .alert strong{display:block;margin-bottom:6px;font-size:11px;font-family:'DM Mono',monospace;letter-spacing:0.08em}
+  .alert-green strong{color:var(--green)}
+  .alert-red strong{color:var(--red)}
+  .track-count{font-family:'DM Mono',monospace;font-size:10px;color:var(--dim);margin-bottom:10px}
+  .csv-hint{font-family:'DM Mono',monospace;font-size:10px;color:var(--dim);margin-top:20px;line-height:1.6}
+  .csv-hint a{color:var(--muted);text-decoration:underline;cursor:pointer}
+  footer{border-top:1px solid var(--line);padding:20px 32px;color:#333;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;text-align:center}
+  @media(max-width:600px){header{padding:0 18px}main{padding:32px 16px 60px}.panel-b{grid-template-columns:1fr}.checks{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <a class="logo" href="/"><span>MUSI</span>GOD</a>
+</header>
+
+<main>
+  <div class="wrap">
+    <div class="eyebrow">CATALOG SUBMISSION</div>
+    <h1>Submit Your Catalog</h1>
+    <p class="sub">The more detail you provide, the better your audit findings will be. Add your released songs below. You can submit your whole catalog or start with your most important releases.</p>
+
+    <div class="notice" id="audit-notice">
+      Loading your audit details...
+    </div>
+
+    <div class="track-count">Tracks added: <span id="track-count">0</span></div>
+
+    <div id="tracks-container"></div>
+
+    <button class="btn btn-add" onclick="addTrack()">+ ADD ANOTHER TRACK</button>
+
+    <p class="csv-hint">Have a lot of tracks? <a onclick="showCsvHint()">See CSV bulk upload instructions</a> or contact <a href="mailto:support@musigod.com">support@musigod.com</a> to send a spreadsheet directly.</p>
+
+    <div id="csv-hint-block" style="display:none;margin-top:12px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:16px 18px;font-size:13px;color:#aaa;line-height:1.7">
+      <strong style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.1em;color:var(--muted);display:block;margin-bottom:8px">CSV BULK UPLOAD</strong>
+      Email your catalog as a CSV or spreadsheet to <a href="mailto:support@musigod.com" style="color:var(--red)">support@musigod.com</a> with subject line <strong>"Catalog Submission — [your audit ID]"</strong>.<br><br>
+      Include columns: Track Title, Album, ISRC, Release Date, Writers, PRO, Distributor, SoundExchange (yes/no), Content ID (yes/no).<br><br>
+      We'll import it manually within 1 business day.
+    </div>
+
+    <div class="actions">
+      <a href="/audit-status.html" id="status-link" class="btn btn-ghost">BACK TO AUDIT STATUS</a>
+      <button class="btn btn-red" id="submit-btn" onclick="submitCatalog()" disabled>SUBMIT CATALOG</button>
+    </div>
+
+    <div id="result"></div>
+  </div>
+</main>
+
+<footer>MUSIGOD PUBLISHING ADMINISTRATION — CATALOG INTAKE</footer>
+
+<script>
+(function() {
+  'use strict'
+
+  var auditId = new URLSearchParams(window.location.search).get('audit_id')
+    || localStorage.getItem('musigod_rights_audit_id') || ''
+  var trackIndex = 0
+
+  // Update back link
+  if (auditId) {
+    var link = document.getElementById('status-link')
+    link.href = '/audit-status.html?audit_id=' + encodeURIComponent(auditId)
+  }
+
+  // Update notice
+  var notice = document.getElementById('audit-notice')
+  if (auditId) {
+    notice.innerHTML = '&#9989; Submitting catalog for audit <strong style="font-family:\'DM Mono\',monospace;color:#ddd">'
+      + esc(auditId) + '</strong>. This data improves your rights audit findings.'
+  } else {
+    notice.innerHTML = '&#9888; No audit ID found. <a href="/rights-audit.html" style="color:var(--red)">Start a rights audit first.</a>'
+    notice.style.background = 'rgba(200,16,46,0.06)'
+    notice.style.borderLeftColor = 'var(--red)'
+    notice.style.color = '#f87171'
+  }
+
+  // Add first track on load
+  addTrack()
+
+  function addTrack() {
+    var idx = trackIndex++
+    var container = document.getElementById('tracks-container')
+    var div = document.createElement('div')
+    div.className = 'panel'
+    div.id = 'track-' + idx
+    div.innerHTML = trackHTML(idx)
+    container.appendChild(div)
+    updateCount()
+    updateSubmitBtn()
+  }
+
+  function removeTrack(idx) {
+    var el = document.getElementById('track-' + idx)
+    if (el) el.remove()
+    updateCount()
+    updateSubmitBtn()
+  }
+
+  function toggleTrack(idx) {
+    var body = document.getElementById('track-body-' + idx)
+    if (body) body.classList.toggle('hidden')
+  }
+
+  function updateCount() {
+    var count = document.querySelectorAll('.panel[id^="track-"]').length
+    document.getElementById('track-count').textContent = count
+    return count
+  }
+
+  function updateSubmitBtn() {
+    var btn = document.getElementById('submit-btn')
+    btn.disabled = !auditId || updateCount() === 0
+  }
+
+  function trackHTML(idx) {
+    return '<div class="panel-h" onclick="toggleTrack(' + idx + ')">'
+      + '<div><span class="panel-num">TRACK ' + (document.querySelectorAll('.panel[id^="track-"]').length + 1) + '</span>'
+      + '<span class="panel-title" id="track-title-label-' + idx + '">New Track</span></div>'
+      + '<button class="panel-remove" onclick="event.stopPropagation();removeTrack(' + idx + ')">REMOVE</button>'
+      + '</div>'
+      + '<div class="panel-b" id="track-body-' + idx + '">'
+      + '<div class="field full"><label>TRACK TITLE <span style="color:var(--red)">*</span></label>'
+      + '<input id="t_title_' + idx + '" placeholder="e.g. Lost Without You" oninput="updateLabel(' + idx + ')" required></div>'
+      + '<div class="field"><label>ALBUM / PROJECT</label><input id="t_album_' + idx + '" placeholder="e.g. After Hours LP"></div>'
+      + '<div class="field"><label>ISRC</label><input id="t_isrc_' + idx + '" placeholder="e.g. USRC12345678" style="font-family:\'DM Mono\',monospace;font-size:12px"></div>'
+      + '<div class="field"><label>RELEASE DATE</label><input id="t_release_' + idx + '" type="date"></div>'
+      + '<div class="field"><label>DISTRIBUTOR</label><select id="t_dist_' + idx + '">'
+      + '<option value="">Unknown</option>'
+      + '<option>DistroKid</option><option>TuneCore</option><option>CD Baby</option>'
+      + '<option>AWAL</option><option>Stem</option><option>Symphonic</option>'
+      + '<option>UnitedMasters</option><option>Empire</option><option>Label</option><option>Other</option>'
+      + '</select></div>'
+      + '<div class="field"><label>PRO AFFILIATION</label><select id="t_pro_' + idx + '">'
+      + '<option value="">Unknown</option>'
+      + '<option>ASCAP</option><option>BMI</option><option>SESAC</option>'
+      + '<option>GMR</option><option>PRS</option><option>SOCAN</option><option>Other</option>'
+      + '</select></div>'
+      + '<div class="field full"><label>SONGWRITERS (comma-separated)</label>'
+      + '<input id="t_writers_' + idx + '" placeholder="e.g. John Smith, Jane Doe"></div>'
+      + '<div class="field full"><label>REVENUE SOURCES</label>'
+      + '<div class="checks">'
+      + '<label class="check"><input type="checkbox" id="t_rs_spotify_' + idx + '"> Spotify</label>'
+      + '<label class="check"><input type="checkbox" id="t_rs_apple_' + idx + '"> Apple Music</label>'
+      + '<label class="check"><input type="checkbox" id="t_rs_youtube_' + idx + '"> YouTube</label>'
+      + '<label class="check"><input type="checkbox" id="t_rs_tiktok_' + idx + '"> TikTok</label>'
+      + '<label class="check"><input type="checkbox" id="t_rs_soundex_' + idx + '"> SoundExchange</label>'
+      + '<label class="check"><input type="checkbox" id="t_rs_mlc_' + idx + '"> MLC</label>'
+      + '</div></div>'
+      + '<div class="field"><label>SOUNDEXCHANGE REGISTERED?</label><select id="t_soundex_' + idx + '">'
+      + '<option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option>'
+      + '</select></div>'
+      + '<div class="field"><label>YOUTUBE CONTENT ID?</label><select id="t_contentid_' + idx + '">'
+      + '<option value="">Unknown</option><option value="true">Yes</option><option value="false">No</option>'
+      + '</select></div>'
+      + '<div class="field full"><label>NOTES</label>'
+      + '<input id="t_notes_' + idx + '" placeholder="Publisher, label deal, known disputes, registration issues..."></div>'
+      + '</div>'
+  }
+
+  function updateLabel(idx) {
+    var title = document.getElementById('t_title_' + idx)?.value || 'New Track'
+    var label = document.getElementById('track-title-label-' + idx)
+    if (label) label.textContent = title || 'New Track'
+  }
+
+  function getRevenueSources(idx) {
+    var sources = []
+    var map = { spotify: 'Spotify', apple: 'Apple Music', youtube: 'YouTube',
+                tiktok: 'TikTok', soundex: 'SoundExchange', mlc: 'MLC' }
+    Object.entries(map).forEach(function(e) {
+      var el = document.getElementById('t_rs_' + e[0] + '_' + idx)
+      if (el && el.checked) sources.push(e[1])
+    })
+    return sources
+  }
+
+  function collectTracks() {
+    var tracks = []
+    document.querySelectorAll('.panel[id^="track-"]').forEach(function(panel) {
+      var idx = panel.id.replace('track-', '')
+      var title = (document.getElementById('t_title_' + idx)?.value || '').trim()
+      if (!title) return
+      tracks.push({
+        track_title: title,
+        album_title: document.getElementById('t_album_' + idx)?.value || '',
+        isrc: document.getElementById('t_isrc_' + idx)?.value || '',
+        release_date: document.getElementById('t_release_' + idx)?.value || '',
+        distributor: document.getElementById('t_dist_' + idx)?.value || '',
+        pro_affiliation: document.getElementById('t_pro_' + idx)?.value || '',
+        writers: (document.getElementById('t_writers_' + idx)?.value || '').split(',').map(function(s){return s.trim()}).filter(Boolean),
+        revenue_sources: getRevenueSources(idx),
+        soundexchange_registered: document.getElementById('t_soundex_' + idx)?.value === 'true',
+        content_id_registered: document.getElementById('t_contentid_' + idx)?.value === 'true',
+        notes: document.getElementById('t_notes_' + idx)?.value || '',
+      })
+    })
+    return tracks
+  }
+
+  async function submitCatalog() {
+    var btn = document.getElementById('submit-btn')
+    var result = document.getElementById('result')
+    result.innerHTML = ''
+
+    if (!auditId) {
+      showResult('error', 'NO AUDIT ID', 'No audit ID found. Start a rights audit first.')
+      return
+    }
+
+    var tracks = collectTracks()
+    if (!tracks.length) {
+      showResult('error', 'NO TRACKS', 'Add at least one track with a title before submitting.')
+      return
+    }
+
+    btn.disabled = true
+    btn.textContent = 'SUBMITTING...'
+
+    try {
+      var res = await fetch('/api/submit-catalog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audit_id: auditId, tracks: tracks }),
+      })
+      var body = await res.json().catch(function() { return {} })
+      if (!res.ok) throw new Error(body.error || 'HTTP ' + res.status)
+      showResult('success', '&#9989; CATALOG SUBMITTED',
+        body.message + '<br><br>Your catalog data will be used to improve your rights audit findings. '
+        + 'You can add more tracks at any time. '
+        + '<a href="/audit-status.html?audit_id=' + encodeURIComponent(auditId) + '" style="color:var(--green)">View your audit status &rarr;</a>')
+      btn.textContent = 'SUBMITTED ✓'
+    } catch (err) {
+      showResult('error', 'SUBMISSION FAILED', err.message + ' — Try again or contact support@musigod.com.')
+      btn.disabled = false
+      btn.textContent = 'SUBMIT CATALOG'
+    }
+  }
+
+  function showResult(type, title, msg) {
+    var result = document.getElementById('result')
+    result.innerHTML = '<div class="alert alert-' + (type === 'success' ? 'green' : 'red') + '">'
+      + '<strong>' + title + '</strong>' + msg + '</div>'
+    result.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
+  function showCsvHint() {
+    var el = document.getElementById('csv-hint-block')
+    el.style.display = el.style.display === 'none' ? 'block' : 'none'
+  }
+
+  function esc(v) {
+    return String(v || '').replace(/[&<>"']/g, function(c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+    })
+  }
+
+  window.addTrack = addTrack
+  window.removeTrack = removeTrack
+  window.toggleTrack = toggleTrack
+  window.updateLabel = updateLabel
+  window.submitCatalog = submitCatalog
+  window.showCsvHint = showCsvHint
+})()
+</script>
+</body>
+</html>

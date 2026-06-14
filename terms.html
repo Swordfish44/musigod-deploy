@@ -1,86 +1,318 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Terms of Service — MusiGod</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500&display=swap" rel="stylesheet">
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --black: #0A0A0A; --dark: #161616; --card: #1A1A1A;
-    --border: rgba(255,255,255,0.08); --red: #C8102E;
-    --white: #FFFFFF; --gray: #888888; --light-gray: #CCCCCC;
-    --font-display: 'Bebas Neue', sans-serif;
-    --font-body: 'DM Sans', sans-serif;
-  }
-  body { background: var(--black); color: var(--white); font-family: var(--font-body); font-size: 16px; line-height: 1.7; -webkit-font-smoothing: antialiased; }
-  nav { display: flex; align-items: center; padding: 0 2rem; height: 64px; border-bottom: 0.5px solid var(--border); }
-  .nav-logo { font-family: var(--font-display); font-size: 28px; color: var(--white); text-decoration: none; }
-  .nav-logo span { color: var(--red); }
-  main { max-width: 720px; margin: 0 auto; padding: 80px 2rem; }
-  h1 { font-family: var(--font-display); font-size: 64px; margin-bottom: 8px; }
-  .updated { font-size: 13px; color: var(--gray); margin-bottom: 48px; }
-  h2 { font-size: 20px; font-weight: 500; margin: 40px 0 12px; }
-  p { color: var(--light-gray); margin-bottom: 16px; font-weight: 300; }
-  a { color: var(--red); }
-  footer { border-top: 0.5px solid var(--border); padding: 32px 2rem; text-align: center; font-size: 13px; color: var(--gray); }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terms of Service — MusiGod</title>
+  <style>
+    :root {
+      --navy: #0a1628;
+      --navy-mid: #0d1f3c;
+      --gold: #c9a84c;
+      --gold-light: #e8c96e;
+      --white: #ffffff;
+      --off-white: #f5f5f0;
+      --text-primary: #1a1a2e;
+      --text-secondary: #4a4a6a;
+      --border: #e0ddd5;
+      --warning-bg: #fffbf0;
+      --warning-border: #c9a84c;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Georgia', serif;
+      background: var(--off-white);
+      color: var(--text-primary);
+      line-height: 1.75;
+    }
+    header {
+      background: var(--navy);
+      padding: 20px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header a { color: var(--gold); text-decoration: none; font-family: 'Arial', sans-serif; font-size: 14px; }
+    header .wordmark {
+      font-family: 'Arial', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--white);
+      letter-spacing: 2px;
+    }
+    header .wordmark span { color: var(--gold); }
+    .hero {
+      background: var(--navy-mid);
+      border-bottom: 3px solid var(--gold);
+      padding: 48px 40px 36px;
+      text-align: center;
+    }
+    .hero h1 {
+      font-family: 'Arial', sans-serif;
+      font-size: 32px;
+      color: var(--white);
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+    .hero .meta {
+      font-family: 'Arial', sans-serif;
+      font-size: 13px;
+      color: var(--gold-light);
+      letter-spacing: 0.5px;
+    }
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 48px 40px 80px;
+    }
+    .version-badge {
+      display: inline-block;
+      background: var(--navy);
+      color: var(--gold);
+      font-family: 'Arial', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      padding: 4px 12px;
+      border-radius: 3px;
+      margin-bottom: 32px;
+      text-transform: uppercase;
+    }
+    .notice {
+      background: var(--warning-bg);
+      border-left: 4px solid var(--warning-border);
+      padding: 16px 20px;
+      margin-bottom: 40px;
+      font-family: 'Arial', sans-serif;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+    .notice strong { color: var(--text-primary); }
+    h2 {
+      font-family: 'Arial', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--navy);
+      margin-top: 44px;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    p { margin-bottom: 14px; font-size: 15px; color: var(--text-primary); }
+    ul {
+      margin: 0 0 14px 24px;
+      font-size: 15px;
+      color: var(--text-primary);
+    }
+    ul li { margin-bottom: 6px; }
+    .section-number {
+      color: var(--gold);
+      font-family: 'Arial', sans-serif;
+      font-weight: 700;
+      margin-right: 6px;
+    }
+    .highlight-box {
+      background: #eef4fb;
+      border: 1px solid #ccdcee;
+      border-radius: 4px;
+      padding: 16px 20px;
+      margin: 20px 0;
+      font-size: 14px;
+      font-family: 'Arial', sans-serif;
+      color: var(--text-secondary);
+    }
+    .contact-block {
+      background: var(--navy);
+      color: var(--white);
+      padding: 32px 40px;
+      border-radius: 6px;
+      margin-top: 48px;
+      font-family: 'Arial', sans-serif;
+    }
+    .contact-block h3 { color: var(--gold); font-size: 14px; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
+    .contact-block p { color: #b0bec5; font-size: 13px; margin-bottom: 4px; }
+    .contact-block a { color: var(--gold-light); }
+
+    /* Footer */
+    footer {
+      background: var(--navy);
+      border-top: 3px solid var(--gold);
+      padding: 32px 40px;
+      font-family: 'Arial', sans-serif;
+    }
+    .footer-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      align-items: center;
+    }
+    .footer-links a {
+      color: var(--gold-light);
+      text-decoration: none;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      transition: color 0.2s;
+    }
+    .footer-links a:hover { color: var(--white); }
+    .footer-copy {
+      font-size: 11px;
+      color: #5a6a7a;
+    }
+  </style>
 </head>
 <body>
-<nav><a href="/" class="nav-logo">MUSI<span>GOD</span></a></nav>
-<main>
-  <h1>Terms of Service</h1><section style=margin:2rem 0;padding:1.5rem;background:#1a1a1a;border-left:4px solid #DC2626;border-radius:4px;><h2 style=color:#DC2626;margin:0 0 1rem 0;>Third-Party Registration Fees</h2><p style=color:#ccc;margin:0 0 1rem 0;>Your MusiGod subscription fee covers MusiGod services only. Some registration bodies charge their own one-time fees which are paid directly by you to that organization. MusiGod does not collect or pay these fees on your behalf. MusiGod will notify you before initiating any fee-bearing registration.</p><table style=width:100%;border-collapse:collapse;font-size:0.9rem;><tr style=border-bottom:1px solid #333;><th style=text-align:left;padding:0.5rem;color:#999;>Registration</th><th style=text-align:left;padding:0.5rem;color:#999;>Fee</th><th style=text-align:left;padding:0.5rem;color:#999;>Paid To</th></tr><tr><td style=padding:0.5rem;color:#fff;>ASCAP Writer</td><td style=padding:0.5rem;color:#DC2626;> one-time</td><td style=padding:0.5rem;color:#aaa;>ASCAP</td></tr><tr><td style=padding:0.5rem;color:#fff;>ASCAP Publisher</td><td style=padding:0.5rem;color:#DC2626;> one-time</td><td style=padding:0.5rem;color:#aaa;>ASCAP</td></tr><tr><td style=padding:0.5rem;color:#fff;>BMI Publisher</td><td style=padding:0.5rem;color:#DC2626;> one-time</td><td style=padding:0.5rem;color:#aaa;>BMI</td></tr><tr><td style=padding:0.5rem;color:#fff;>PRS (UK)</td><td style=padding:0.5rem;color:#DC2626;>GBP 100 one-time</td><td style=padding:0.5rem;color:#aaa;>PRS</td></tr><tr><td style=padding:0.5rem;color:#fff;>GEMA (Germany)</td><td style=padding:0.5rem;color:#DC2626;>~EUR 60/year</td><td style=padding:0.5rem;color:#aaa;>GEMA</td></tr><tr><td style=padding:0.5rem;color:#fff;>Trademark (USPTO)</td><td style=padding:0.5rem;color:#DC2626;>-350 one-time</td><td style=padding:0.5rem;color:#aaa;>USPTO</td></tr><tr><td style=padding:0.5rem;color:#fff;>State LLC</td><td style=padding:0.5rem;color:#DC2626;>-500 varies</td><td style=padding:0.5rem;color:#aaa;>Your state</td></tr><tr><td style=padding:0.5rem;color:#fff;>All other registrations</td><td style=padding:0.5rem;color:green;>Free</td><td style=padding:0.5rem;color:#aaa;>N/A</td></tr></table><p style=color:#888;font-size:0.85rem;margin:1rem 0 0 0;>MusiGod is not responsible for fee changes made by third-party organizations. Fee amounts are approximate and subject to change.</p></section>
-  <p class="updated">Last updated: April 30, 2026</p>
 
-  <p>These Terms of Service ("Terms") govern your access to and use of MusiGod Royalties ("MusiGod," "we," "our," or "us") services. By accessing or using our services, you agree to be bound by these Terms.</p>
+<header>
+  <div class="wordmark">MUSI<span>GOD</span></div>
+  <a href="portal.html">← Back to Portal</a>
+</header>
 
-  <h2>Third-Party Registration Fees</h2>
-  <p>This section explains fees you may pay directly to third-party organizations — these are completely separate from your MusiGod subscription fee.</p>
-  <p><strong style="color:#fff;">MusiGod subscription fees vs. society registration fees.</strong> Your monthly MusiGod subscription pays for our service — the work we do to register, monitor, and recover royalties on your behalf. It does not cover fees charged by performing rights organizations, government agencies, or collecting societies. Those fees, where they exist, are paid by you directly to those organizations.</p>
-  <p><strong style="color:#fff;">Fee-bearing registrations and approximate amounts:</strong></p>
-  <ul style="color:var(--light-gray);font-weight:300;padding-left:24px;margin-bottom:16px;line-height:2;">
-    <li>ASCAP Writer membership — $50 one-time, paid directly to ASCAP</li>
-    <li>ASCAP Publisher registration — $50 one-time, paid directly to ASCAP</li>
-    <li>BMI Publisher registration — $150 one-time, paid directly to BMI</li>
-    <li>PRS for Music (UK) — approximately GBP 100 one-time, paid directly to PRS</li>
-    <li>GEMA (Germany) — approximately EUR 60 per year, paid directly to GEMA</li>
-    <li>Trademark registration (USPTO) — $250–350 per class, paid directly to USPTO</li>
-    <li>State LLC formation — $50–500 depending on your state, paid directly to the state</li>
-    <li>All other registrations MusiGod handles — free</li>
+<div class="hero">
+  <h1>Terms of Service</h1>
+  <div class="meta">Effective June 1, 2026 &nbsp;·&nbsp; Version 1.0 &nbsp;·&nbsp; MusiGod Publishing Administration Platform</div>
+</div>
+
+<div class="container">
+
+  <div class="version-badge">Version 1.0 — Effective June 1, 2026</div>
+
+  <div class="notice">
+    <strong>Please read these Terms carefully.</strong> By registering, submitting documents, authorizing recovery operations, or using any MusiGod service, you agree to be bound by these Terms of Service. If you do not agree, do not use the platform.
+  </div>
+
+  <h2><span class="section-number">1.</span> About MusiGod</h2>
+  <p>MusiGod is a <strong>Publishing Administrator</strong> — not a record label, not a publisher, and not a distributor. MusiGod provides royalty recovery, rights registration, catalog administration, and publishing infrastructure services on behalf of artists and rights holders.</p>
+  <p>Artists retain 100% ownership of their copyrights, master recordings, and publishing rights at all times. MusiGod acts as a limited agent solely for the purpose of royalty administration, recovery operations, and rights registrations as explicitly authorized.</p>
+
+  <h2><span class="section-number">2.</span> Services Provided</h2>
+  <p>MusiGod may provide any combination of the following services based on your subscription tier and signed agreements:</p>
+  <ul>
+    <li>Publishing administration and royalty registration</li>
+    <li>Retroactive royalty recovery from domestic and international collection societies</li>
+    <li>Copyright registration and metadata verification</li>
+    <li>Entity formation assistance (at cost, first 1,000 artists)</li>
+    <li>PRO registration and catalog maintenance</li>
+    <li>Recovery case management and reporting</li>
+    <li>Operational dashboards and audit intelligence</li>
   </ul>
-  <p><strong style="color:#fff;">Fees are paid directly to each organization.</strong> MusiGod does not collect, hold, or pass through third-party registration fees. When a fee-bearing registration is ready, we will provide you with clear instructions and the exact payment link for that organization. You pay them. We handle everything else.</p>
-  <p><strong style="color:#fff;">Fee changes by third parties.</strong> MusiGod is not responsible for changes to fees charged by third-party organizations. Society fees can change at any time. We will do our best to keep you informed, but always confirm the current fee directly with the organization before payment.</p>
-  <p><strong style="color:#fff;">We notify you before initiating any fee-bearing registration.</strong> MusiGod will not submit a registration that requires you to pay a third-party fee without first notifying you of the amount and giving you the opportunity to approve or decline that registration.</p>
 
-  <h2>Services</h2>
-  <p>MusiGod provides royalty administration, rights registration, and catalog management services for independent music artists, labels, and publishers. Our services include automated registration with performing rights organizations, digital service providers, and international collecting societies; royalty monitoring and reconciliation; and underpayment detection and recovery.</p>
+  <h2><span class="section-number">3.</span> No Guarantee of Recovery</h2>
+  <div class="highlight-box">
+    MusiGod does not guarantee the recovery of any specific amount of royalties. All recovery estimates are analytical projections based on catalog metadata, historical benchmarks, and algorithmic analysis. Actual recoveries may differ materially from any estimate presented. Third-party collection societies control the verification, calculation, and distribution of royalty payments. MusiGod has no authority over society payment schedules, retroactive distribution policies, or audit outcomes.
+  </div>
 
-  <h2>Subscription Plans and Fees</h2>
-  <p>MusiGod offers four subscription tiers: Starter ($79/month), Growth ($129/month), Pro ($179/month), and Label ($699/month). Subscriptions are billed monthly and will automatically renew unless cancelled.</p>
-  <p>In addition to your subscription fee, MusiGod deducts 15% of royalties recovered on your behalf that were not previously being collected. This recovery fee applies only to newly recovered royalties — neighboring rights, unclaimed international royalties, Content ID revenue, and underpayment recoveries. MusiGod collects royalties on your behalf, deducts the 15% recovery share, and remits the net amount to you via your registered payment method.</p>
+  <h2><span class="section-number">4.</span> Recovery Estimates Are Probabilistic</h2>
+  <p>Any figures labeled "estimated recovery," "projected recovery," "identified leakage," or similar terminology represent probabilistic outputs of MusiGod's analytical systems. These figures:</p>
+  <ul>
+    <li>Are not commitments or guarantees of payment</li>
+    <li>May change materially based on documentation review</li>
+    <li>Are dependent on third-party society verification</li>
+    <li>May be impacted by incomplete or inconsistent metadata</li>
+    <li>Are subject to timeline variability across territories</li>
+  </ul>
 
-  <h2>Authorization</h2>
-  <p>By using MusiGod, you authorize us to act as your agent for the purpose of registering your catalog with PROs, DSPs, and international collecting societies; collecting royalties on your behalf; and negotiating with collecting societies for the recovery of underpaid royalties.</p>
-  <p>You retain full ownership of your music, masters, and publishing rights at all times. MusiGod does not acquire any ownership interest in your catalog.</p>
+  <h2><span class="section-number">5.</span> Fees and Recovery Fee Structure</h2>
+  <p>MusiGod charges fees as follows:</p>
+  <ul>
+    <li><strong>Monthly Subscriptions:</strong> Starter ($79/month), Growth ($129/month), Pro ($179/month), Label ($699/month). Subscription fees are non-refundable except as required by applicable law.</li>
+    <li><strong>Retroactive Recovery Fee:</strong> 15% of gross recovered amounts. This fee is deducted prior to remittance to the artist per the terms of the signed Publishing Administration Agreement.</li>
+    <li><strong>Rights Audit Fee:</strong> $1.00 non-refundable processing fee charged at audit initiation via Stripe.</li>
+    <li><strong>Entity Formation:</strong> Provided at cost to the first 1,000 enrolled artists.</li>
+  </ul>
+  <p>All fees are disclosed at the point of transaction. Additional fees for specialized services (sub-publisher onboarding, international representation) will be disclosed separately prior to engagement.</p>
 
-  <h2>Your Responsibilities</h2>
-  <p>You are responsible for providing accurate information about your catalog, including correct ownership splits and co-writer information. You warrant that you have the rights to the catalog you submit to MusiGod and that registering your catalog does not infringe upon any third-party rights.</p>
+  <h2><span class="section-number">6.</span> Artist Responsibilities</h2>
+  <p>By using MusiGod, you agree to:</p>
+  <ul>
+    <li>Provide accurate, complete, and current metadata for all registered works</li>
+    <li>Submit documentation promptly as requested during recovery operations</li>
+    <li>Maintain accurate PRO membership and registration information</li>
+    <li>Notify MusiGod of any co-writer agreements, split disputes, or ownership changes</li>
+    <li>Review and approve audit findings and recovery reports in a timely manner</li>
+    <li>Not submit fraudulent catalog data or claim ownership of works you do not own</li>
+  </ul>
+  <p>MusiGod's ability to recover royalties on your behalf is directly dependent on the accuracy and completeness of the information you provide. Inaccurate metadata may reduce or eliminate recovery probability and does not entitle you to a refund of subscription fees.</p>
 
-  <h2>Cancellation</h2>
-  <p>You may cancel your subscription at any time. Upon cancellation, your subscription will remain active until the end of the current billing period. MusiGod will cease registration activities on your behalf after cancellation. Any royalties collected prior to cancellation will be remitted according to the normal payment schedule.</p>
+  <h2><span class="section-number">7.</span> Document Submission Responsibility</h2>
+  <p>You are responsible for the authenticity and accuracy of all documents submitted to MusiGod, including royalty statements, copyright registrations, split sheets, and publishing agreements. By submitting documents, you represent and warrant that you have the right to share them and that they are authentic. MusiGod may rely on submitted documents without independent verification.</p>
 
-  <h2>Limitation of Liability</h2>
-  <p>MusiGod's liability to you for any cause whatsoever shall be limited to the fees paid by you to MusiGod in the three months preceding the claim. MusiGod is not liable for the actions or inactions of third-party collecting societies, PROs, or DSPs.</p>
+  <h2><span class="section-number">8.</span> Third-Party Collection Societies</h2>
+  <p>MusiGod works with domestic and international collection societies including but not limited to ASCAP, BMI, SESAC, SoundExchange, HFA, MLC, and various international affiliates. These societies operate independently and are not affiliated with MusiGod. Society decisions regarding royalty eligibility, amounts, and payment timing are final and outside MusiGod's control.</p>
 
-  <h2>Governing Law</h2>
-  <p>These Terms shall be governed by the laws of the State of Michigan, without regard to its conflict of law provisions.</p>
+  <h2><span class="section-number">9.</span> Intellectual Property</h2>
+  <p>You retain full ownership of all copyrights, master recordings, and publishing rights. MusiGod's limited power of attorney is granted solely for the purpose of royalty administration as described in your Publishing Administration Agreement and is revocable per the terms of that agreement.</p>
+  <p>MusiGod's platform, software, methodologies, audit algorithms, and analytical frameworks are proprietary and remain the intellectual property of MusiGod.</p>
 
-  <h2>Contact</h2>
-  <p>For questions about these Terms, contact us at: legal@musigod.com</p>
-  <p>MusiGod Royalties<br>Detroit, Michigan</p>
-</main>
-<footer>© 2026 MusiGod Royalties. All rights reserved.</footer>
+  <h2><span class="section-number">10.</span> Data Handling</h2>
+  <p>Your use of MusiGod is also governed by our <a href="privacy.html">Privacy Policy</a>, which describes how we collect, store, and process your information. By agreeing to these Terms, you also agree to our Privacy Policy.</p>
+
+  <h2><span class="section-number">11.</span> Limitation of Liability</h2>
+  <p>TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, MUSIGOD SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOSS OF ROYALTIES, LOSS OF REVENUE, LOSS OF DATA, OR LOSS OF BUSINESS OPPORTUNITY, ARISING FROM OR RELATED TO YOUR USE OF THE PLATFORM, EVEN IF MUSIGOD HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.</p>
+  <p>MusiGod's total cumulative liability to you for any claims arising from these Terms shall not exceed the greater of: (a) the total subscription fees paid by you to MusiGod in the twelve (12) months preceding the claim, or (b) $500.00.</p>
+  <p>MusiGod is not liable for delays, failures, or reduced recovery outcomes caused by third-party collection societies, government action, force majeure events, or inaccurate information provided by you.</p>
+
+  <h2><span class="section-number">12.</span> Acceptable Use</h2>
+  <p>You may not use MusiGod to:</p>
+  <ul>
+    <li>Submit fraudulent catalog data or claim ownership of works you do not own</li>
+    <li>Interfere with the platform's operations or security</li>
+    <li>Attempt to circumvent fee structures</li>
+    <li>Use the platform for any unlawful purpose</li>
+    <li>Reproduce or resell MusiGod's analytical output without written permission</li>
+  </ul>
+
+  <h2><span class="section-number">13.</span> Termination</h2>
+  <p>Either party may terminate services per the terms of the signed Publishing Administration Agreement. MusiGod may suspend or terminate your account immediately for material breach of these Terms, including submission of fraudulent information.</p>
+  <p>Upon termination, MusiGod retains signed agreements and recovery records per our Document Retention Policy. Recovery cases in progress at the time of termination will be resolved per the terms of your signed agreement.</p>
+
+  <h2><span class="section-number">14.</span> Dispute Resolution and Arbitration</h2>
+  <p>Any dispute, claim, or controversy arising from or relating to these Terms or your use of MusiGod shall be resolved by binding arbitration administered by the American Arbitration Association (AAA) under its Commercial Arbitration Rules. Arbitration shall take place in Detroit, Michigan. The arbitrator's decision shall be final and binding. Class action claims are expressly waived.</p>
+  <p>Notwithstanding the foregoing, either party may seek injunctive or other equitable relief in a court of competent jurisdiction to prevent irreparable harm pending arbitration.</p>
+
+  <h2><span class="section-number">15.</span> Governing Law</h2>
+  <p>These Terms are governed by the laws of the State of Michigan, without regard to conflict of law principles.</p>
+
+  <h2><span class="section-number">16.</span> Changes to These Terms</h2>
+  <p>MusiGod may update these Terms at any time. Material changes will be communicated via email to your registered address and posted on this page with an updated effective date. Continued use of the platform after the effective date constitutes acceptance of the updated Terms.</p>
+
+  <h2><span class="section-number">17.</span> Contact</h2>
+  <div class="contact-block">
+    <h3>Legal Inquiries</h3>
+    <p>MusiGod Publishing Administration</p>
+    <p>Detroit, Michigan</p>
+    <p>Email: <a href="mailto:support@musigod.com">support@musigod.com</a></p>
+    <p>For data deletion or legal hold requests, please email with subject line: <strong>LEGAL REQUEST — [Your Name]</strong></p>
+  </div>
+
+</div>
+
+<!-- MUSIGOD GLOBAL FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-links">
+      <a href="terms.html">Terms of Service</a>
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="disclosures.html">Recovery Disclosures</a>
+      <a href="retention.html">Data Retention</a>
+      <a href="mailto:support@musigod.com">Contact</a>
+    </div>
+    <div class="footer-copy">
+      &copy; 2026 MusiGod. Publishing Administration Platform. Artists retain 100% ownership. &nbsp;|&nbsp;
+      Recovered royalties. Verified rights. Artists keep ownership.
+    </div>
+  </div>
+</footer>
+
 </body>
 </html>

@@ -258,7 +258,29 @@
 
   footer { margin-top: 0; padding: 1.5rem 2rem; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
   footer p { font-size: 0.7rem; color: var(--text-muted); }
-</style>
+
+  /* MusiGod Legal Footer */
+  .mg-legal-footer { background: #0a1628; border-top: 3px solid #c9a84c; padding: 28px 40px; font-family: Arial, sans-serif; margin-top: auto; }
+  .mg-legal-footer__inner { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  .mg-legal-footer__links { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+  .mg-legal-footer__links a { color: #e8c96e; text-decoration: none; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; transition: color 0.2s; }
+  .mg-legal-footer__links a:hover { color: #fff; }
+  .mg-legal-footer__sep { color: #2a3a4a; font-size: 12px; }
+  .mg-legal-footer__copy { font-size: 11px; color: #4a5a6a; line-height: 1.5; }
+  </style>
+  <script>
+    window.MUSIGOD_PUBLIC_CONFIG_READY = fetch('/api/public-config', { credentials: 'same-origin' })
+      .then(function (response) { return response.ok ? response.json() : {}; })
+      .then(function (config) {
+        window.MUSIGOD_SENTRY_DSN = config.sentryDsn || '';
+        window.MUSIGOD_ENVIRONMENT = config.environment || 'production';
+      })
+      .catch(function () {
+        window.MUSIGOD_SENTRY_DSN = '';
+        window.MUSIGOD_ENVIRONMENT = 'production';
+      });
+  </script>
+  <script src="/sentry-browser.js"></script>
 </head>
 <body>
 
@@ -604,6 +626,14 @@
             <input type="checkbox" id="agree-age">
             <span class="checkbox-text">I confirm I am <strong>18 years of age or older</strong> and have the authority to enter this agreement.</span>
           </label>
+          <label class="checkbox-row" id="agree-row-3">
+            <input type="checkbox" id="agree-legal-terms">
+            <span class="checkbox-text">I have read and agree to the <a href="/terms.html" target="_blank" style="color:var(--red)">Terms of Service</a>.</span>
+          </label>
+          <label class="checkbox-row" id="agree-row-4">
+            <input type="checkbox" id="agree-legal-privacy">
+            <span class="checkbox-text">I have read and agree to the <a href="/privacy.html" target="_blank" style="color:var(--red)">Privacy Policy</a> and acknowledge the <a href="/disclosures.html" target="_blank" style="color:var(--red)">Recovery Disclosures</a>.</span>
+          </label>
         </div>
       </div>
     </div>
@@ -642,9 +672,25 @@
 
 <div class="toast" id="toast"><span id="toast-icon">⚠</span><span id="toast-msg">Error</span></div>
 
-<footer>
-  <p>© 2026 MusiGod Publishing Administration</p>
-  <p>Questions? <a href="mailto:support@musigod.com" style="color:var(--red);text-decoration:none">support@musigod.com</a></p>
+<footer class="mg-legal-footer">
+  <div class="mg-legal-footer__inner">
+    <div class="mg-legal-footer__links">
+      <a href="/terms.html">Terms of Service</a>
+      <span class="mg-legal-footer__sep">&middot;</span>
+      <a href="/privacy.html">Privacy Policy</a>
+      <span class="mg-legal-footer__sep">&middot;</span>
+      <a href="/disclosures.html">Recovery Disclosures</a>
+      <span class="mg-legal-footer__sep">&middot;</span>
+      <a href="/retention.html">Data Retention</a>
+      <span class="mg-legal-footer__sep">&middot;</span>
+      <a href="mailto:support@musigod.com">Contact</a>
+    </div>
+    <div class="mg-legal-footer__copy">
+      &copy; 2026 MusiGod Publishing Administration &nbsp;&middot;&nbsp;
+      Recovered royalties. Verified rights. Artists keep ownership. &nbsp;&middot;&nbsp;
+      MusiGod is a Publishing Administrator &mdash; artists retain 100% of rights.
+    </div>
+  </div>
 </footer>
 
 <script>
@@ -717,6 +763,10 @@ function validateStep(step) {
       toast('Please check both agreement boxes to continue', true);
       ok = false;
     }
+    if (!document.getElementById('agree-legal-terms').checked || !document.getElementById('agree-legal-privacy').checked) {
+      toast('Please accept the Terms of Service and Privacy Policy to continue', true);
+      ok = false;
+    }
   }
 
   return ok;
@@ -785,6 +835,17 @@ async function submitForm() {
 
     const artistId = regBody.artist_id;
     localStorage.setItem('musigod_artist_id', artistId);
+
+    // Record legal acceptance
+    const _email = document.getElementById('email')?.value || null;
+    if (window.MusiGodLegal) {
+      window.MusiGodLegal.recordFullLegalAcceptance({
+        artistId: artistId,
+        artistEmail: _email,
+        sourcePage: 'register.html',
+        method: 'checkbox',
+      });
+    }
     localStorage.setItem('musigod_plan', plan);
 
     document.getElementById('section-4').classList.remove('active');
@@ -945,5 +1006,7 @@ if (params.get('checkout') === 'cancelled') {
   setTimeout(() => toast('Checkout was cancelled. Choose your plan and submit again when ready.', true), 300);
 }
 </script>
+  <script>window.__MG_ANON_KEY = window.__MG_ANON_KEY || '';</script>
+  <script src="/js/legal-acceptance.js" type="module"></script>
 </body>
 </html>

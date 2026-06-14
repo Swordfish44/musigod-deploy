@@ -38,24 +38,52 @@ The migration is idempotent and adds:
 10. Add the signing secret to Vercel as `STRIPE_WEBHOOK_SECRET`.
 11. Redeploy production after adding or changing Vercel environment variables.
 
+## Pre-Deploy QA: Run Test Artist Echo
+
+**Run before every production deploy.**
+
+```bash
+MUSIGOD_API_BASE=https://musigod.com \
+STRIPE_SECRET_KEY=sk_test_... \
+SUPABASE_SERVICE_ROLE_KEY=... \
+node scripts/test-rights-audit-flow.js
+```
+
+All steps must PASS before deploying. See `docs/QA_TEST_ARTIST_ECHO.md` for full reference.
+
+To also verify email delivery:
+
+```bash
+MUSIGOD_API_BASE=https://musigod.com \
+STRIPE_SECRET_KEY=sk_test_... \
+SUPABASE_SERVICE_ROLE_KEY=... \
+ALLOW_TEST_EMAILS=true \
+node scripts/test-rights-audit-flow.js
+```
+
 ## Live Checkout Verification
 
 1. Submit a real Rights Audit request at `https://musigod.com/rights-audit.html`.
 2. Click `UNLOCK FULL AUDIT`.
-3. Complete the Stripe Checkout payment.
+3. Complete the Stripe Checkout payment using test card `4242 4242 4242 4242`.
 4. Confirm Stripe redirects to:
 
 ```text
-https://musigod.com/rights-audit.html?audit_id=AUDIT_ID&unlock=success&session_id=CHECKOUT_SESSION_ID
+https://musigod.com/audit-status.html?audit_id=AUDIT_ID&session_id=CHECKOUT_SESSION_ID
 ```
 
-5. Confirm the page shows:
-
-```text
-Your full MusiGod Rights Audit has been unlocked. Check your email for next steps.
-```
-
+5. Confirm the page shows the green AUDIT UNLOCKED state with artist name and paid timestamp.
 6. Confirm the Stripe webhook delivery returns HTTP 200.
 7. Confirm `public.rights_audits_v1` shows `paid_status = 'PAID'`.
 8. Confirm the admin Rights Audits view shows `PAID`.
+9. Confirm confirmation email CTA points to `audit-status.html`, not `rights-audit.html`.
 
+## Rollback
+
+All previous versions are in GitHub history. To roll back any file:
+
+```text
+GitHub repo → file → History → previous commit → ⋯ → Revert
+```
+
+Then locally: `git pull && vercel --prod --force`

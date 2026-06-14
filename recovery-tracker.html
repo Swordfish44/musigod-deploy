@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod — Recovery Tracker v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --red:#E8262A;--red-dark:#B81E22;
+  --black:#0A0A0A;--surface:#111111;--surface-2:#1A1A1A;--surface-3:#252525;
+  --border:rgba(255,255,255,0.08);--border-mid:rgba(255,255,255,0.14);
+  --text:#FFFFFF;--text-dim:#999999;--text-muted:#555555;
+  --green:#22C55E;--amber:#F59E0B;--blue:#3B82F6;--purple:#A855F7;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--black);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;}
+header{position:sticky;top:0;z-index:100;background:rgba(10,10,10,0.96);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:64px;}
+.logo{font-size:1.4rem;font-weight:800;letter-spacing:-0.01em;text-decoration:none;}
+.logo-musi{color:#fff;}.logo-god{color:var(--red);}
+nav a{font-size:0.72rem;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-dim);text-decoration:none;padding:0.45rem 0.9rem;border-radius:4px;}
+nav a:hover{color:var(--text);}
+
+main{max-width:900px;margin:0 auto;padding:3rem 2rem 6rem;}
+.page-title{font-size:0.62rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--red);margin-bottom:0.5rem;}
+h1{font-size:clamp(1.6rem,3.5vw,2.2rem);font-weight:800;letter-spacing:-0.02em;margin-bottom:2.5rem;}
+
+/* LOOKUP FORM */
+.lookup-card{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:2rem;}
+.lookup-card label{font-size:0.7rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:0.4rem;}
+.lookup-card input{width:100%;background:var(--surface-3);border:1px solid var(--border-mid);color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.95rem;padding:0.75rem 1rem;border-radius:6px;outline:none;margin-bottom:1.25rem;}
+.lookup-card input:focus{border-color:var(--red);}
+.btn-lookup{background:var(--red);color:#fff;border:none;font-family:'DM Sans',sans-serif;font-size:0.8rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;padding:0.75rem 2rem;border-radius:6px;cursor:pointer;width:100%;}
+.btn-lookup:hover{background:var(--red-dark);}
+.btn-lookup:disabled{background:var(--surface-3);color:var(--text-muted);cursor:not-allowed;}
+.err-msg{color:var(--red);font-size:0.85rem;margin-top:0.75rem;display:none;}
+
+/* SUMMARY CARDS */
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:2.5rem;}
+.sum-cell{background:var(--surface);padding:1.25rem;}
+.sum-label{font-size:0.6rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.3rem;}
+.sum-val{font-size:1.7rem;font-weight:800;letter-spacing:-0.02em;}
+.sum-sub{font-size:0.68rem;color:var(--text-muted);margin-top:0.2rem;}
+.val-green{color:var(--green);}.val-amber{color:var(--amber);}.val-red{color:var(--red);}.val-white{color:var(--text);}
+
+/* SECTION */
+.section{margin-bottom:2.5rem;}
+.section-hdr{font-size:0.6rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);padding-bottom:0.6rem;border-bottom:1px solid var(--border);margin-bottom:1.25rem;}
+
+/* REPORT SUMMARY BOX */
+.report-box{background:var(--surface-2);border:1px solid var(--border);border-left:3px solid var(--red);border-radius:8px;padding:1.25rem 1.5rem;margin-bottom:2rem;}
+.report-box-title{font-size:0.62rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.6rem;}
+.report-box p{font-size:0.88rem;color:var(--text-dim);line-height:1.7;}
+.report-id{font-size:0.72rem;font-family:monospace;color:var(--text-muted);margin-top:0.5rem;}
+
+/* CASE CARD */
+.case-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.25rem 1.5rem;margin-bottom:0.75rem;transition:border-color 0.15s;}
+.case-card:hover{border-color:var(--border-mid);}
+.case-top{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:0.6rem;flex-wrap:wrap;}
+.case-title{font-size:0.92rem;font-weight:700;line-height:1.3;}
+.case-badges{display:flex;gap:0.4rem;flex-shrink:0;flex-wrap:wrap;align-items:center;}
+.badge{font-size:0.58rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:0.22rem 0.55rem;border-radius:3px;}
+.badge-status-identified{background:rgba(59,130,246,0.15);color:var(--blue);}
+.badge-status-submitted{background:rgba(245,158,11,0.15);color:var(--amber);}
+.badge-status-collecting{background:rgba(168,85,247,0.15);color:var(--purple);}
+.badge-status-recovered,.badge-status-paid_out{background:rgba(34,197,94,0.15);color:var(--green);}
+.badge-status-rejected,.badge-status-closed_no_recovery{background:rgba(232,38,42,0.15);color:var(--red);}
+.badge-status-open,.badge-status-in_progress{background:rgba(255,255,255,0.08);color:var(--text-dim);}
+.badge-priority-high,.badge-priority-urgent{background:rgba(245,158,11,0.12);color:var(--amber);}
+.badge-priority-normal{background:rgba(255,255,255,0.05);color:var(--text-muted);}
+.case-meta{display:flex;gap:1.5rem;flex-wrap:wrap;font-size:0.78rem;color:var(--text-muted);}
+.case-meta strong{color:var(--text-dim);}
+.case-amounts{display:flex;gap:1.5rem;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border);flex-wrap:wrap;}
+.amt-block{display:flex;flex-direction:column;gap:0.15rem;}
+.amt-label{font-size:0.6rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);}
+.amt-val{font-size:1.1rem;font-weight:700;}
+.case-notes{font-size:0.8rem;color:var(--text-muted);margin-top:0.6rem;font-style:italic;}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:4rem 1rem;color:var(--text-muted);}
+.empty-icon{font-size:2.5rem;margin-bottom:1rem;opacity:0.3;}
+.empty p{font-size:0.88rem;line-height:1.7;}
+
+/* HIDDEN */
+.hidden{display:none!important;}
+#results{display:none;}
+</style>
+</head>
+<body>
+<header>
+  <a class="logo" href="/"><span class="logo-musi">MUSI</span><span class="logo-god">GOD</span></a>
+  <nav>
+    <a href="/audit-status">Audit Status</a>
+    <a href="/rights-audit">New Audit</a>
+  </nav>
+</header>
+
+<main>
+  <p class="page-title">Recovery Pipeline</p>
+  <h1>Your Recovery Tracker</h1>
+
+  <!-- Lookup Form -->
+  <div id="lookupCard" class="lookup-card">
+    <label for="auditInput">Audit ID</label>
+    <input id="auditInput" type="text" placeholder="e.g. aud_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off">
+    <label for="emailInput">Email Address</label>
+    <input id="emailInput" type="email" placeholder="Email used at audit checkout" autocomplete="email">
+    <button class="btn-lookup" id="lookupBtn" onclick="loadCases()">View My Recovery Cases</button>
+    <p class="err-msg" id="errMsg"></p>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+    <div id="reportBox" class="report-box hidden">
+      <div class="report-box-title">Audit Report Summary</div>
+      <p id="execSummary"></p>
+      <p class="report-id" id="reportId"></p>
+    </div>
+
+    <div class="summary-grid" id="summaryGrid">
+      <div class="sum-cell"><div class="sum-label">Identified</div><div class="sum-val val-amber" id="sumIdentified">—</div><div class="sum-sub">potential royalties</div></div>
+      <div class="sum-cell"><div class="sum-label">Recovered</div><div class="sum-val val-green" id="sumRecovered">—</div><div class="sum-sub">collected so far</div></div>
+      <div class="sum-cell"><div class="sum-label">Open Cases</div><div class="sum-val val-white" id="sumOpen">—</div><div class="sum-sub">in progress</div></div>
+      <div class="sum-cell"><div class="sum-label">Closed</div><div class="sum-val val-green" id="sumClosed">—</div><div class="sum-sub">recovered / paid out</div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-hdr">Recovery Cases</div>
+      <div id="casesList"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYwNTkyODAsImV4cCI6MjA2MTYzNTI4MH0.8aTpFhXRQSOZBe38qb5bVkrT4PiEiIK5WsVCpw5rfhY'
+
+const STATUS_LABELS = {
+  IDENTIFIED: 'Identified',
+  SUBMITTED: 'Submitted',
+  COLLECTING: 'Collecting',
+  RECOVERED: 'Recovered',
+  PAID_OUT: 'Paid Out',
+  CLOSED_NO_RECOVERY: 'Closed',
+  REJECTED: 'Rejected',
+  OPEN: 'Open',
+  IN_PROGRESS: 'In Progress',
+}
+
+const CASE_TYPE_LABELS = {
+  PRO_REGISTRATION_GAP: 'PRO Registration Gap',
+  SOUNDEXCHANGE_GAP: 'SoundExchange Gap',
+  YOUTUBE_CONTENT_ID: 'YouTube Content ID',
+  NEIGHBORING_RIGHTS: 'Neighboring Rights',
+  PUBLISHING_ADMIN_CONFLICT: 'Publishing Admin Conflict',
+  METADATA_GAP: 'Metadata Gap',
+  DSP_PROFILE_GAP: 'DSP Profile Gap',
+  UNCLAIMED_ROYALTIES: 'Unclaimed Royalties',
+}
+
+// Pre-fill from URL params
+const params = new URLSearchParams(window.location.search)
+if (params.get('audit_id')) document.getElementById('auditInput').value = params.get('audit_id')
+if (params.get('email'))    document.getElementById('emailInput').value = params.get('email')
+
+async function loadCases() {
+  const auditId = document.getElementById('auditInput').value.trim()
+  const email   = document.getElementById('emailInput').value.trim()
+  const btn     = document.getElementById('lookupBtn')
+  const errMsg  = document.getElementById('errMsg')
+
+  errMsg.style.display = 'none'
+  if (!auditId || !email) {
+    showErr('Both Audit ID and email are required.')
+    return
+  }
+
+  btn.disabled = true
+  btn.textContent = 'Loading…'
+
+  try {
+    const res = await fetch(`/api/get-recovery-cases?audit_id=${encodeURIComponent(auditId)}&email=${encodeURIComponent(email)}`)
+    const data = await res.json()
+
+    if (!res.ok) {
+      showErr(data.error || `Error ${res.status}`)
+      btn.disabled = false
+      btn.textContent = 'View My Recovery Cases'
+      return
+    }
+
+    renderResults(data)
+  } catch (err) {
+    showErr('Network error — please try again.')
+    btn.disabled = false
+    btn.textContent = 'View My Recovery Cases'
+  }
+}
+
+function renderResults(data) {
+  document.getElementById('lookupCard').classList.add('hidden')
+  document.getElementById('results').style.display = 'block'
+
+  // Report summary
+  if (data.report) {
+    const r = data.report
+    document.getElementById('execSummary').textContent = r.executive_summary || 'Audit report generated.'
+    document.getElementById('reportId').textContent = `Report ID: ${r.report_id} · ${r.findings_count || 0} findings · Status: ${r.status}`
+    document.getElementById('reportBox').classList.remove('hidden')
+  }
+
+  // Summary stats
+  const t = data.totals || {}
+  document.getElementById('sumIdentified').textContent = fmt(t.total_identified || 0)
+  document.getElementById('sumRecovered').textContent  = fmt(t.total_recovered  || 0)
+  document.getElementById('sumOpen').textContent       = t.open_cases    || 0
+  document.getElementById('sumClosed').textContent     = t.recovered_cases || 0
+
+  // Cases list
+  const cases = data.recovery_cases || []
+  const list  = document.getElementById('casesList')
+  if (!cases.length) {
+    list.innerHTML = `<div class="empty"><div class="empty-icon">◎</div><p>No recovery cases yet.<br>Your audit findings will generate cases once the review is complete.</p></div>`
+    return
+  }
+
+  list.innerHTML = cases.map(c => {
+    const statusKey  = (c.status || '').toLowerCase().replace(/_/g, '_')
+    const statusText = STATUS_LABELS[c.status] || c.status
+    const typeText   = CASE_TYPE_LABELS[c.case_type] || c.case_type || 'Unknown'
+    const priKey     = (c.priority || 'normal').toLowerCase()
+
+    const progressBar = c.amount_identified > 0
+      ? `<div style="background:var(--surface-3);border-radius:3px;height:4px;margin-top:0.75rem;overflow:hidden"><div style="background:var(--green);width:${Math.min(100,(c.amount_recovered/c.amount_identified)*100).toFixed(1)}%;height:100%;border-radius:3px;transition:width 0.3s"></div></div>`
+      : ''
+
+    return `<div class="case-card">
+      <div class="case-top">
+        <div class="case-title">${esc(typeText)}${c.work_title ? ` — <span style="font-weight:400;color:var(--text-dim)">${esc(c.work_title)}</span>` : ''}</div>
+        <div class="case-badges">
+          <span class="badge badge-status-${statusKey}">${esc(statusText)}</span>
+          <span class="badge badge-priority-${priKey}">${esc(c.priority || 'NORMAL')}</span>
+        </div>
+      </div>
+      <div class="case-meta">
+        ${c.royalty_source ? `<span>Source: <strong>${esc(c.royalty_source)}</strong></span>` : ''}
+        ${c.territory ? `<span>Territory: <strong>${esc(c.territory)}</strong></span>` : ''}
+        ${c.isrc ? `<span>ISRC: <strong style="font-family:monospace">${esc(c.isrc)}</strong></span>` : ''}
+        <span>Opened: <strong>${fmtDate(c.created_at)}</strong></span>
+        ${c.submitted_at ? `<span>Submitted: <strong>${fmtDate(c.submitted_at)}</strong></span>` : ''}
+        ${c.recovered_at ? `<span>Recovered: <strong>${fmtDate(c.recovered_at)}</strong></span>` : ''}
+      </div>
+      <div class="case-amounts">
+        <div class="amt-block"><div class="amt-label">Identified</div><div class="amt-val val-amber">${fmt(c.amount_identified)}</div></div>
+        <div class="amt-block"><div class="amt-label">Recovered</div><div class="amt-val val-green">${fmt(c.amount_recovered)}</div></div>
+        <div class="amt-block"><div class="amt-label">MusiGod Fee</div><div class="amt-val" style="color:var(--text-dim)">${fmt(c.musigod_fee_amount)}</div></div>
+        <div class="amt-block"><div class="amt-label">Confidence</div><div class="amt-val" style="font-size:0.9rem;color:var(--text-dim)">${parseFloat(c.recovery_confidence_score||0).toFixed(0)}%</div></div>
+      </div>
+      ${progressBar}
+      ${c.notes ? `<div class="case-notes">${esc(c.notes)}</div>` : ''}
+    </div>`
+  }).join('')
+}
+
+function fmt(v) {
+  const n = parseFloat(v || 0)
+  return n === 0 ? '$0' : '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function esc(v) {
+  return String(v || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]))
+}
+
+function showErr(msg) {
+  const el = document.getElementById('errMsg')
+  el.textContent = msg
+  el.style.display = 'block'
+}
+
+// Auto-load if both params in URL
+if (params.get('audit_id') && params.get('email')) {
+  loadCases()
+}
+</script>
+</body>
+</html>

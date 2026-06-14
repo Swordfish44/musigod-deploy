@@ -155,6 +155,15 @@
       .sidebar{display:none}
       .metrics{grid-template-columns:repeat(3,1fr)}
     }
+  
+  /* MusiGod Legal Footer */
+  .mg-legal-footer { background: #0a1628; border-top: 3px solid #c9a84c; padding: 28px 40px; font-family: Arial, sans-serif; margin-top: auto; }
+  .mg-legal-footer__inner { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  .mg-legal-footer__links { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+  .mg-legal-footer__links a { color: #e8c96e; text-decoration: none; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; transition: color 0.2s; }
+  .mg-legal-footer__links a:hover { color: #fff; }
+  .mg-legal-footer__sep { color: #2a3a4a; font-size: 12px; }
+  .mg-legal-footer__copy { font-size: 11px; color: #4a5a6a; line-height: 1.5; }
   </style>
   <script>
     window.MUSIGOD_PUBLIC_CONFIG_READY = fetch('/api/public-config', { credentials: 'same-origin' })
@@ -351,7 +360,7 @@
       </div>
       <div id="rights-audits-loading" class="loading">LOADING RIGHTS AUDITS<div class="loading-bar"></div></div>
       <table class="tbl hidden" id="rights-audits-table">
-        <thead><tr><th>ARTIST</th><th>EMAIL</th><th>CATALOG</th><th>CONCERNS</th><th>STATUS</th><th>PAYMENT</th><th>SUBMITTED</th></tr></thead>
+        <thead><tr><th>ARTIST</th><th>EMAIL</th><th>CATALOG</th><th>CONCERNS</th><th>STATUS</th><th>PAYMENT</th><th>FULFILLMENT</th><th>EMAIL SENT</th><th>N8N</th><th>SUBMITTED</th><th>ACTIONS</th></tr></thead>
         <tbody id="rights-audits-tbody"></tbody>
       </table>
     </div>
@@ -917,14 +926,26 @@ function renderRightsAudits(){
   rightsAudits.forEach(a=>{
     const concerns = Array.isArray(a.rights_concerns) ? a.rights_concerns.join(', ') : ''
     const paid = a.paid_status === 'PAID'
+    const fStatus = a.fulfillment_status || '—'
+    const fStatusColor = fStatus==='FULFILLED'?'var(--green)':fStatus==='FAILED'?'var(--red)':fStatus.includes('EMAIL')?'var(--blue)':'var(--amber)'
+    const emailSent = a.next_steps_email_sent_at ? '&#10003; ' + fmtDate(a.next_steps_email_sent_at) : '&mdash;'
+    const emailColor = a.next_steps_email_sent_at ? 'var(--green)' : 'var(--muted)'
+    const n8nStatus = a.n8n_fulfillment_status || '&mdash;'
+    const n8nColor = (n8nStatus||'').startsWith('OK') ? 'var(--green)' : (n8nStatus||'').startsWith('FAIL') ? 'var(--red)' : 'var(--muted)'
     tbody.innerHTML += `<tr>
-      <td><div class="artist-name">${esc(a.artist_name)}</div><div class="reg-cat">${esc(a.audit_id)}</div></td>
+      <td><div class="artist-name">${esc(a.artist_name)}</div><div class="reg-cat" style="font-size:9px">${esc(a.audit_id)}</div></td>
       <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">${esc(a.email)}</td>
       <td><div class="reg-name-cell">${esc(a.catalog_size)}</div><div class="reg-cat">${esc(a.released_music)}</div></td>
-      <td style="max-width:340px;color:#aaa;font-size:12px;line-height:1.5">${esc(concerns)}</td>
+      <td style="max-width:220px;color:#aaa;font-size:11px;line-height:1.5">${esc(concerns)}</td>
       <td>${badgeHTML(a.status || 'NEW')}</td>
       <td><span class="badge" style="color:${paid?'var(--green)':'var(--amber)'};background:${paid?'rgba(34,197,94,0.1)':'rgba(240,160,32,0.1)'};border:1px solid ${paid?'rgba(34,197,94,0.2)':'rgba(240,160,32,0.2)'}"><span class="badge-dot" style="background:${paid?'var(--green)':'var(--amber)'}"></span>${paid?'PAID':'UNPAID'}</span>${paid && a.paid_at ? `<div class="reg-cat">${fmtDate(a.paid_at)}</div>` : ''}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:9px;color:${fStatusColor}">${esc(fStatus)}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:9px;color:${emailColor}">${emailSent}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:9px;color:${n8nColor}">${esc(n8nStatus)}</td>
       <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)">${fmtDate(a.created_at)}</td>
+      <td><div style="display:flex;gap:5px;align-items:center">
+        <a class="btn btn-ghost" style="font-size:9px;padding:4px 8px;text-decoration:none" href="/audit-status.html?audit_id=${esc(a.audit_id)}" target="_blank">Status</a>
+      </div></td>
     </tr>`
   })
   if(rightsAudits.length===0){
@@ -1020,6 +1041,26 @@ function renderCats(){
 // â€&mdash;â‚¬ INIT â€&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;â‚¬
 loadAll()
 </script>
+<footer class="mg-legal-footer">
+  <div class="mg-legal-footer__inner">
+    <div class="mg-legal-footer__links">
+      <a href="/terms.html">Terms of Service</a>
+      <span class="mg-legal-footer__sep">&middot;</span>
+      <a href="/privacy.html">Privacy Policy</a>
+      <span class="mg-legal-footer__sep">&middot;</span>
+      <a href="/disclosures.html">Recovery Disclosures</a>
+      <span class="mg-legal-footer__sep">&middot;</span>
+      <a href="/retention.html">Data Retention</a>
+      <span class="mg-legal-footer__sep">&middot;</span>
+      <a href="mailto:support@musigod.com">Contact</a>
+    </div>
+    <div class="mg-legal-footer__copy">
+      &copy; 2026 MusiGod Publishing Administration &nbsp;&middot;&nbsp;
+      Recovered royalties. Verified rights. Artists keep ownership. &nbsp;&middot;&nbsp;
+      MusiGod is a Publishing Administrator &mdash; artists retain 100% of rights.
+    </div>
+  </div>
+</footer>
 </body>
 </html>
 

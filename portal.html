@@ -127,7 +127,29 @@
     .reg-grid { grid-template-columns: 1fr; }
     .earnings-promo { flex-direction: column; align-items: flex-start; }
   }
-</style>
+
+  /* MusiGod Legal Footer */
+  .mg-legal-footer { background: #0a1628; border-top: 3px solid #c9a84c; padding: 28px 40px; font-family: Arial, sans-serif; margin-top: auto; }
+  .mg-legal-footer__inner { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  .mg-legal-footer__links { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+  .mg-legal-footer__links a { color: #e8c96e; text-decoration: none; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; transition: color 0.2s; }
+  .mg-legal-footer__links a:hover { color: #fff; }
+  .mg-legal-footer__sep { color: #2a3a4a; font-size: 12px; }
+  .mg-legal-footer__copy { font-size: 11px; color: #4a5a6a; line-height: 1.5; }
+  </style>
+  <script>
+    window.MUSIGOD_PUBLIC_CONFIG_READY = fetch('/api/public-config', { credentials: 'same-origin' })
+      .then(function (response) { return response.ok ? response.json() : {}; })
+      .then(function (config) {
+        window.MUSIGOD_SENTRY_DSN = config.sentryDsn || '';
+        window.MUSIGOD_ENVIRONMENT = config.environment || 'production';
+      })
+      .catch(function () {
+        window.MUSIGOD_SENTRY_DSN = '';
+        window.MUSIGOD_ENVIRONMENT = 'production';
+      });
+  </script>
+  <script src="/sentry-browser.js"></script>
 </head>
 <body>
 
@@ -143,7 +165,7 @@
 <div class="hero">
   <div class="hero-inner">
     <p class="hero-eyebrow">Artist Dashboard</p>
-    <h1>Welcome back, Naim Salaam</h1>
+    <h1>Welcome back, <span id="portal-name">…</span></h1>
     <p class="hero-sub" id="hero-sub">Loading your registrations&hellip;</p>
 
     <div class="stats-row" id="stats-row" style="display:none">
@@ -156,7 +178,7 @@
     <div class="earnings-promo">
       <div>
         <h3>Your Royalty Earnings</h3>
-        <p>YTD: <span class="g">$63,470.59</span> &nbsp;·&nbsp; Pending payout: <span class="a">$33,169.48</span></p>
+        <p>YTD: <span class="g" id="promo-ytd">—</span> &nbsp;·&nbsp; Pending payout: <span class="a" id="promo-pending">—</span></p>
       </div>
       <a href="earnings.html" class="btn-red">View Earnings →</a>
     </div>
@@ -177,9 +199,25 @@
   <div id="reg-container"><div class="loading-state"><div class="spinner"></div>Loading registrations…</div></div>
 </main>
 
-<footer>
-  <p>&copy; 2026 MusiGod. All rights reserved.</p>
-  <p class="tagline">Profits in passion.</p>
+<footer class="mg-legal-footer">
+  <div class="mg-legal-footer__inner">
+    <div class="mg-legal-footer__links">
+      <a href="/terms.html">Terms of Service</a>
+      <span class="mg-legal-footer__sep">&middot;</span>
+      <a href="/privacy.html">Privacy Policy</a>
+      <span class="mg-legal-footer__sep">&middot;</span>
+      <a href="/disclosures.html">Recovery Disclosures</a>
+      <span class="mg-legal-footer__sep">&middot;</span>
+      <a href="/retention.html">Data Retention</a>
+      <span class="mg-legal-footer__sep">&middot;</span>
+      <a href="mailto:support@musigod.com">Contact</a>
+    </div>
+    <div class="mg-legal-footer__copy">
+      &copy; 2026 MusiGod Publishing Administration &nbsp;&middot;&nbsp;
+      Recovered royalties. Verified rights. Artists keep ownership. &nbsp;&middot;&nbsp;
+      MusiGod is a Publishing Administrator &mdash; artists retain 100% of rights.
+    </div>
+  </div>
 </footer>
 
 <script>
@@ -187,6 +225,33 @@ const SUPABASE_URL = 'https://uykzkrnoetcldeuxzqyy.supabase.co';
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MzA2MTksImV4cCI6MjA5MzEwNjYxOX0.r4Dx_Jkgje2kYNGh9PQtuyuJgBGJwVAviHM9QmAJcrs';
 const ARTIST_ID = getArtistId();
 let allRegs = [], currentFilter = 'ALL';
+
+async function loadArtistMeta() {
+  if (!ARTIST_ID) { document.getElementById('portal-name').textContent = 'Artist'; return; }
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/artists_v1?id=eq.${ARTIST_ID}&select=legal_first_name,legal_last_name,artist_name`, {
+      headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}`, 'Accept-Profile': 'artists' }
+    });
+    const [a] = await res.json();
+    if (a) {
+      const name = a.artist_name || `${a.legal_first_name} ${a.legal_last_name}`.trim();
+      document.getElementById('portal-name').textContent = name || 'Artist';
+    }
+  } catch(_) { document.getElementById('portal-name').textContent = 'Artist'; }
+  try {
+    const fmt = n => '$' + Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const [stmts, disb] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/statements_v1?artist_id=eq.${ARTIST_ID}&select=net_amount&status=eq.RECEIVED`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}`, 'Accept-Profile': 'royalties' } }).then(r => r.json()).catch(() => []),
+      fetch(`${SUPABASE_URL}/rest/v1/disbursement_queue_v1?artist_id=eq.${ARTIST_ID}&status=eq.PENDING&select=net_to_artist_usd`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}`, 'Accept-Profile': 'royalties' } }).then(r => r.json()).catch(() => []),
+    ]);
+    const ytd = Array.isArray(stmts) ? stmts.reduce((s, x) => s + (+x.net_amount||0), 0) : 0;
+    const pending = Array.isArray(disb) ? disb.reduce((s, x) => s + (+x.net_to_artist_usd||0), 0) : 0;
+    if (ytd > 0 || pending > 0) {
+      document.getElementById('promo-ytd').textContent = fmt(ytd);
+      document.getElementById('promo-pending').textContent = fmt(pending);
+    }
+  } catch(_) {}
+}
 
 function getArtistId() {
   const params = new URLSearchParams(window.location.search);
@@ -257,6 +322,7 @@ function filterRegs(status, btn) {
   btn.classList.add('active');
   renderAll();
 }
+loadArtistMeta();
 fetchRegistrations();
 </script>
 </body>
