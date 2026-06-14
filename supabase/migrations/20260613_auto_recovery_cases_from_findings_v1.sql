@@ -38,7 +38,7 @@ BEGIN
     SELECT *
     FROM registrations.audit_findings_v1
     WHERE artist_email = p_artist_email
-      AND (p_audit_id IS NULL OR audit_id = p_audit_id)
+      AND (p_audit_id IS NULL OR audit_id = p_audit_id OR audit_id IS NULL)
       AND status != 'REJECTED'
       AND finding_type IN (
         'PRO_MISSING_REGISTRATION',
