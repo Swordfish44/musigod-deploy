@@ -25,7 +25,7 @@ module.exports = withSentry(async function handler(req, res) {
   const artist_email = clean(body.artist_email)
   const audit_id     = clean(body.audit_id) || null
   const artist_id    = clean(body.artist_id) || null
-  const send_email   = body.send_email === true
+  const send_email   = body.send_email !== false
 
   if (!artist_email) return res.status(400).json({ error: 'artist_email is required' })
 
@@ -60,7 +60,7 @@ module.exports = withSentry(async function handler(req, res) {
 
     // Step 4: Optionally send email
     if (send_email && report && RESEND_API_KEY) {
-      await sendReportEmail({ report, artist_email })
+      await sendReportEmail({ report, artist_email, audit_id })
     }
 
     // Step 5: Create admin queue task
@@ -99,22 +99,29 @@ module.exports = withSentry(async function handler(req, res) {
   }
 }, 'generate-audit-report')
 
-async function sendReportEmail({ report, artist_email }) {
-  const reportUrl = `https://musigod.com/audit-report.html?report_id=${encodeURIComponent(report.id)}&email=${encodeURIComponent(artist_email)}`
+async function sendReportEmail({ report, artist_email, audit_id }) {
+  const resolvedAuditId = report.audit_id || audit_id || ''
+  const trackerUrl = `https://musigod.com/recovery-tracker?audit_id=${encodeURIComponent(resolvedAuditId)}&email=${encodeURIComponent(artist_email)}`
+  const reportUrl  = `https://musigod.com/audit-report.html?report_id=${encodeURIComponent(report.id)}&email=${encodeURIComponent(artist_email)}`
+  const recovered  = parseFloat(report.total_estimated_recovery || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
   const html = `
-    <p>Your MusiGod Rights Audit Report is ready.</p>
-    <p><strong>Report ID:</strong> <code>${esc(report.report_id)}</code></p>
-    <p><strong>Findings:</strong> ${report.findings_count} potential royalty issues identified</p>
-    <p><strong>Estimated Recovery:</strong> $${parseFloat(report.total_estimated_recovery || 0).toLocaleString()}</p>
+    <p style="font-size:16px;">Your MusiGod rights audit is complete — we found <strong>${recovered} in recoverable royalties</strong> across ${report.findings_count} issue${report.findings_count !== 1 ? 's' : ''}.</p>
     <p>${esc(report.executive_summary || '')}</p>
-    <p style="margin:24px 0;">
-      <a href="${esc(reportUrl)}"
-         style="background:#E8262A;color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">
-        View Full Audit Report
+    <p style="margin:32px 0;">
+      <a href="${esc(trackerUrl)}"
+         style="background:#E8262A;color:#fff;padding:16px 32px;border-radius:6px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block;">
+        Track Your Recovery Cases →
       </a>
     </p>
-    <p>Or paste this link: <a href="${esc(reportUrl)}">${esc(reportUrl)}</a></p>
-    <p>MusiGod Publishing Administration · Artists keep ownership.</p>
+    <p style="color:#666;font-size:14px;">
+      Your tracker shows every open case, the amounts identified, and our progress recovering them.<br>
+      Report reference: <code>${esc(report.report_id)}</code>
+    </p>
+    <p style="color:#666;font-size:13px;">
+      <a href="${esc(reportUrl)}">View full audit report</a> ·
+      <a href="${esc(trackerUrl)}">Open recovery tracker</a>
+    </p>
+    <p style="color:#999;font-size:12px;margin-top:32px;">MusiGod Publishing Administration · Artists retain 100% ownership.</p>
   `
   const emailRes = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -122,7 +129,7 @@ async function sendReportEmail({ report, artist_email }) {
     body: JSON.stringify({
       from: FROM_EMAIL,
       to: artist_email,
-      subject: 'Your MusiGod Rights Audit Report is ready',
+      subject: `${recovered} in recoverable royalties identified — your MusiGod recovery tracker is ready`,
       html,
     }),
   })
