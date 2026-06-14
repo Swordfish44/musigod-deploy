@@ -28,8 +28,18 @@ module.exports = withSentry(async function handler(req, res) {
   const send_email   = body.send_email !== false
 
   if (!artist_email) return res.status(400).json({ error: 'artist_email is required' })
+  if (!audit_id)     return res.status(400).json({ error: 'audit_id is required' })
 
   try {
+    // Guard: audit must exist in rights_audits_v1 with paid_status=PAID
+    const audits = await sbFetch(
+      `rights_audits_v1?audit_id=eq.${encodeURIComponent(audit_id)}&email=eq.${encodeURIComponent(artist_email.toLowerCase())}&paid_status=eq.PAID&select=audit_id,artist_name&limit=1`,
+      'public'
+    )
+    if (!audits?.length) {
+      return res.status(402).json({ error: 'Audit not found or payment not confirmed' })
+    }
+
     console.info(JSON.stringify({
       ts: new Date().toISOString(),
       event: 'AUDIT_REPORT_GENERATE_START',
