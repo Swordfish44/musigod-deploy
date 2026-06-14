@@ -434,17 +434,19 @@ const SB_URL = 'https://uykzkrnoetcldeuxzqyy.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MzA2MTksImV4cCI6MjA5MzEwNjYxOX0.r4Dx_Jkgje2kYNGh9PQtuyuJgBGJwVAviHM9QmAJcrs';
 
 async function sbFetch(path, opts = {}) {
+  const { headers: extraHeaders, prefer, body, method } = opts;
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    method: method || 'GET',
+    body: body,
     headers: {
       'apikey': SB_KEY,
       'Authorization': `Bearer ${SB_KEY}`,
       'Content-Type': 'application/json',
       'Accept-Profile': 'crm',
       'Content-Profile': 'crm',
-      'Prefer': opts.prefer || 'return=representation',
-      ...opts.headers
+      'Prefer': prefer || 'return=representation',
+      ...(extraHeaders || {})
     },
-    ...opts
   });
   if (!res.ok) {
     const err = await res.text();
