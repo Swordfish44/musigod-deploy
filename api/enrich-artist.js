@@ -8,6 +8,7 @@ const {
   generateASCAPCSV, generateBMICSV, generateMLCCSV,
   generateMasterCatalogCSV, generateGapsReport,
 } = require('../lib/generate-registration-files');
+const { syncEnrichmentToGraph } = require('./graph-sync');
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -101,6 +102,11 @@ module.exports = async function handler(req, res) {
 
     await sbPatch(job_id, { progress_pct: 88, progress_label: 'Generating registration CSVs…' });
 
+    // Sync enrichment data to rights graph (non-blocking)
+    syncEnrichmentToGraph(artistName, catalog.enrichedTracks).catch(err =>
+      console.warn('[enrich] graph sync failed:', err.message)
+    );
+
     const gapsReport = generateGapsReport(catalog.enrichedTracks);
 
     await sbPatch(job_id, {
@@ -137,3 +143,4 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ job_id, status: 'ERROR', error: err.message });
   }
 };
+

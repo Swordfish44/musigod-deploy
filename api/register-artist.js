@@ -1,4 +1,5 @@
 const { captureException, withSentry } = require('./_sentry')
+const { syncArtistToGraph } = require('./graph-sync')
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
@@ -31,6 +32,7 @@ module.exports = withSentry(async function handler(req, res) {
     const registration = await createRegistration(artist.id, normalized)
 
     await Promise.allSettled([
+      syncArtistToGraph(artist),
       notifyN8n(artist.id, registration?.id, normalized),
       sendEmail({
         to: normalized.email,
@@ -213,3 +215,4 @@ function getRawBody(req) {
     req.on('error', reject)
   })
 }
+
