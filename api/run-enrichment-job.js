@@ -11,6 +11,7 @@ const {
   generateMasterCatalogCSV,
   generateGapsReport,
 } = require('../lib/generate-registration-files');
+const { persistEnrichedTracks } = require('../lib/persist-enriched-tracks');
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -84,6 +85,19 @@ module.exports = async function handler(req, res) {
     const masterCSV  = generateMasterCatalogCSV(catalog.enrichedTracks);
     const gapsReport = generateGapsReport(catalog.enrichedTracks);
 
+    // Persist per-track rows — see api/enrich-artist.js for why this exists.
+    let persistResult = { persisted: 0, failed: 0, errors: [] };
+    try {
+      persistResult = await persistEnrichedTracks(catalog.enrichedTracks, {
+        artistName: artistName,
+        artistMbid: catalog.mbid,
+        jobId: job_id,
+      });
+    } catch (persistErr) {
+      console.error(`[run-job] persistEnrichedTracks failed for job_id=${job_id}:`, persistErr.message);
+      persistResult = { persisted: 0, failed: catalog.enrichedTracks.length, errors: [{ message: persistErr.message }] };
+    }
+
     const result = {
       artistName,
       mbid:              catalog.mbid,
@@ -91,6 +105,8 @@ module.exports = async function handler(req, res) {
       processedReleases: catalog.processedReleases,
       totalTracks:       catalog.totalTracks,
       gapsReport,
+      tracksPersisted:     persistResult.persisted,
+      tracksPersistFailed: persistResult.failed,
       files: {
         ascap:  { filename: `${artistName}_ASCAP_Registration.csv`,  content: ascapCSV },
         bmi:    { filename: `${artistName}_BMI_Registration.csv`,    content: bmiCSV },
@@ -108,9 +124,9 @@ module.exports = async function handler(req, res) {
       result,
     });
 
-    console.log(`[run-job] DONE job_id=${job_id} tracks=${catalog.totalTracks}`);
+    console.log(`[run-job] DONE job_id=${job_id} tracks=${catalog.totalTracks} persisted=${persistResult.persisted}`);
 
-    return res.status(200).json({ job_id, status: 'DONE', totalTracks: catalog.totalTracks });
+    return res.status(200).json({ job_id, status: 'DONE', totalTracks: catalog.totalTracks, tracksPersisted: persistResult.persisted });
 
   } catch (err) {
     console.error(`[run-job] ERROR job_id=${job_id}:`, err.message);
