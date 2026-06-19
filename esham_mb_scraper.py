@@ -76,15 +76,14 @@ def fetch_works(mbid):
     limit  = 100
 
     while True:
-        # NOTE: 'artist-rels' is a relationship include, same invalid-for-browse
-        # class as 'releases' was on the recording endpoint above (MB browse
-        # endpoints only support a narrow whitelist of inc values, not the
-        # full lookup-style inc list). Dropped it. ISWCs are core Work
-        # attribute data (not a subquery), so they come back with no inc at
-        # all — if works_with_iswc shows 0 in the report despite the two
-        # known ASCAP ISWCs, that's the signal this assumption was wrong and
-        # iswcs needs to be added back as an explicit inc value instead.
-        data  = mb_get("work", {"artist": mbid, "limit": limit, "offset": offset})
+        # 'iswcs' turned out NOT to be default-included after all — the prior
+        # run came back with works_with_iswc=0 across all 8 works, which is
+        # the signal flagged below that the "core attribute" assumption was
+        # wrong. Recording-browse proved 'isrcs' IS a valid standalone
+        # subquery inc (811 recordings came back clean with it), so by the
+        # same pattern 'iswcs' is the work-side analog — added back alone,
+        # without 'artist-rels' which is still the rejected relationship type.
+        data  = mb_get("work", {"artist": mbid, "limit": limit, "offset": offset, "inc": "iswcs"})
         batch = data.get("works", [])
         works.extend(batch)
         total = data.get("work-count", len(works))
