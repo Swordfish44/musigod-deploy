@@ -55,7 +55,7 @@ def fetch_recordings(mbid):
     limit  = 100
 
     while True:
-        data  = mb_get("recording", {"artist": mbid, "limit": limit, "offset": offset, "inc": "isrcs+releases"})
+        data  = mb_get("recording", {"artist": mbid, "limit": limit, "offset": offset, "inc": "isrcs"})
         batch = data.get("recordings", [])
         recordings.extend(batch)
         total = data.get("recording-count", len(recordings))
@@ -76,7 +76,15 @@ def fetch_works(mbid):
     limit  = 100
 
     while True:
-        data  = mb_get("work", {"artist": mbid, "limit": limit, "offset": offset, "inc": "artist-rels+iswcs"})
+        # NOTE: 'artist-rels' is a relationship include, same invalid-for-browse
+        # class as 'releases' was on the recording endpoint above (MB browse
+        # endpoints only support a narrow whitelist of inc values, not the
+        # full lookup-style inc list). Dropped it. ISWCs are core Work
+        # attribute data (not a subquery), so they come back with no inc at
+        # all — if works_with_iswc shows 0 in the report despite the two
+        # known ASCAP ISWCs, that's the signal this assumption was wrong and
+        # iswcs needs to be added back as an explicit inc value instead.
+        data  = mb_get("work", {"artist": mbid, "limit": limit, "offset": offset})
         batch = data.get("works", [])
         works.extend(batch)
         total = data.get("work-count", len(works))
