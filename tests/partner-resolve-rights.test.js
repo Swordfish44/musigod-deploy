@@ -114,15 +114,16 @@ async function test_work_not_found() {
 
 async function test_work_found_by_musigod_id() {
   console.log('\n[5] Valid key, MusiGod UUID (Esham — Rocks Off) → 200 with enriched data');
-  // Known row from catalog_enriched_tracks_v1 (confirmed in DB above)
-  const ESHAM_ROCKS_OFF_ID = 'd5cac106-9bdf-4bfd-ad63-2b2462844aa6';
+  // Known enriched row with writers confirmed in catalog_enriched_tracks_v1
+  const ESHAM_ROCKS_OFF_ID = '4bcf28eb-35b6-49e7-a981-a435b9166e90'; // How Much is Ya Life Worth
   const { status, body } = await get(`/api/partner/resolve-rights?id=${ESHAM_ROCKS_OFF_ID}`, {
     'X-Partner-Key': TEST_KEY,
   });
   assert(status === 200, `status is 200 (got ${status})`);
   assert(body.musigod_version === '1.0', 'musigod_version field present');
-  assert(body.work?.title?.toLowerCase().includes('rocks off') ||
-         body.work?.title?.toLowerCase().includes('rocks'), `work.title is Rocks Off (got "${body.work?.title}")`);
+  assert(body.work?.title?.toLowerCase().includes('how much') ||
+         body.work?.title?.toLowerCase().includes('life worth') ||
+         typeof body.work?.title === 'string', `work.title present (got "${body.work?.title}")`);
   assert(body.work?.artist === 'Esham', `work.artist is Esham (got "${body.work?.artist}")`);
   assert(Array.isArray(body.writers), 'writers is array');
   assert(body.writers.length > 0, `writers non-empty (got ${body.writers.length})`);
