@@ -176,6 +176,43 @@ async function fetchRegistrations(nodeId) {
   });
 }
 
+// Fetch AI consent state via fn_get_consent_state_v1 RPC.
+// Returns all three consent types (ai_training, ai_generation, nil_use)
+// with effective_status. Falls back gracefully if the function doesn't
+// exist yet (migration not applied).
+async function fetchConsentState(workNodeId) {
+  if (!workNodeId) {
+    return buildDefaultConsent();
+  }
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/rpc/fn_get_consent_state_v1`, {
+      method: 'POST',
+      headers: {
+        'apikey':        SB_KEY,
+        'Authorization': `Bearer ${SB_KEY}`,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify({ p_work_id: workNodeId }),
+    });
+    if (!res.ok) return buildDefaultConsent(); // migration not yet applied
+    const rows = await res.json();
+    if (!Array.isArray(rows) || !rows.length) return buildDefaultConsent();
+    const byType = {};
+    for (const row of rows) byType[row.consent_type] = row.effective_status;
+    return {
+      ai_training:    byType.ai_training   || 'unset',
+      ai_generation:  byType.ai_generation || 'unset',
+      nil_use:        byType.nil_use        || 'unset',
+    };
+  } catch {
+    return buildDefaultConsent();
+  }
+}
+
+function buildDefaultConsent() {
+  return { ai_training: 'unset', ai_generation: 'unset', nil_use: 'unset' };
+}
+
 function buildResponse({ track, recording, composition, recordings, lookupType, lookupValue }) {
   const response = {
     musigod_version: '1.0',
@@ -186,10 +223,7 @@ function buildResponse({ track, recording, composition, recordings, lookupType, 
     writers: [],
     splits: [],
     registrations: [],
-    consent: {
-      ai_licensing: 'unknown', // Lane A ships this — placeholder per spec
-      note: 'AI-licensing consent state requires Lane A (consent ledger). Coming Q3 2026.',
-    },
+    consent: null, // populated below via fn_get_consent_state_v1 (Lane A)
     gaps: [],
   };
 
@@ -335,6 +369,10 @@ module.exports = async function handler(req, res) {
       result.splits        = await fetchSplits(compNodeId);
       result.registrations = await fetchRegistrations(compNodeId);
     }
+
+    // Fetch live AI consent state (Lane A). Falls back to 'unset' if
+    // the migration hasn't been applied yet — never throws.
+    result.consent = await fetchConsentState(compNodeId || result.work?.musigod_id || null);
 
     return res.status(200).json(result);
 
