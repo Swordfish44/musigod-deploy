@@ -12,6 +12,10 @@
     ],
     "rewrites": [
         {
+            "source": "/dead",
+            "destination": "/dead.html"
+        },
+        {
             "source": "/admin",
             "destination": "/admin.html"
         },
