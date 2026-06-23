@@ -5,7 +5,7 @@
             "headers": [
                 {
                     "key": "Content-Security-Policy",
-                    "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' https://*.supabase.co https://*.n8n.cloud https://musigod-n8n.onrender.com https://cdn.jsdelivr.net https://api.stripe.com https://musigod.com https://api.discogs.com https://www.googleapis.com https://accounts.spotify.com https://api.spotify.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com;"
+                    "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' https://*.supabase.co https://*.n8n.cloud https://musigod-n8n.onrender.com https://cdn.jsdelivr.net https://api.stripe.com https://musigod.com https://api.discogs.com https://www.googleapis.com https://accounts.spotify.com https://api.spotify.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com;"
                 }
             ]
         }
@@ -14,6 +14,26 @@
         {
             "source": "/dead",
             "destination": "/dead.html"
+        },
+        {
+            "source": "/favicon.ico",
+            "destination": "/favicon.ico"
+        },
+        {
+            "source": "/favicon-16.png",
+            "destination": "/favicon-16.png"
+        },
+        {
+            "source": "/favicon-32.png",
+            "destination": "/favicon-32.png"
+        },
+        {
+            "source": "/apple-touch-icon.png",
+            "destination": "/apple-touch-icon.png"
+        },
+        {
+            "source": "/favicon-192.png",
+            "destination": "/favicon-192.png"
         },
         {
             "source": "/admin",
