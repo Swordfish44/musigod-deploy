@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Free Marketing — CLIVE DAVIS IS DEAD | MusiGod Admin</title>
+<link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACeUlEQVR4nO2XXUhTYRjHf0enhsOWqX1sTptYZFbURUUQJZWbUBdFC/oYUuBFFF4FkV0V2BdB4JWgNyl5lVGRpOlNJYjSTQ5c5keNTZyNZs3Nj21n53RTp+ncGl24i/a/eh7O/32e3/txDucViJD+tVlmheQ0tQsAacloHtlPSEbzSKUlszlEbEEKIAXw3wKoIpOH269g1lYoubHvKsN+h5Lvy93Gkz23lLzJ/pL6kdZFBQ/k7cRSWMluzWbyMzWEkZgV53EteOj1WLk72hYbYKmq9SZufGxW8gtFVTG9AgK3y2qw6I0sSEHqP7XSMdVHQApRnL2Bivxd7FhdEn8Fluqk9iB3Rh/jF+dZn5WLad3emN6a4mNY9EYA6mxNPJ18qzyz+ezYfPZlx8U8A9aZcdTpqzBrDwFg0RtRCel88I5FFxEELhtOAOAJzvDc1RtvXokBPHJ0AVCtryIjTcU53VEAWpxdUV5Dtpa8TA0AQ74vhGUpYYCYW9Dtfs9UYJpStY76shoKstYw7Hcw8N0W5c3NyFHiWXFBictzNtG5/8Ei7/H+61hnxpU85gqE5TBtzh4AzuqOANDiiJ49wI+QT4kLsjRKPOSzU9R9mntLTn6k4n4H2iZ6CEkiAD5xjmeud8v6Ps9N4gl6AShR61AJ6fHKJg7wLejllbsfgPbJN8yFA8v6JFmm0f4CgLUZOZz6dXATUdzXEKDW2kCtteGvhZrtHZSqCzmjO8zNrReRZIlO9wAAhuyN/w6QqGRkrg010uUe4HxhJXVbLNwvv0RIEvGL8wx6xxiZneBrYHrROCH1R5QCSAGkAJIO8PuWmjQA+HNVXmk5Te3CT8hI1SZ0lQK2AAAAAElFTkSuQmCC">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --red:#C8102E;--bg:#080808;--bg2:#0c0c0c;--bg3:#0e0e0e;--bg4:#111;--bg5:#161616;
+    --text:#e8e8e8;--muted:#555;--muted2:#888;--dim:#333;
+    --green:#22c55e;--blue:#3090f0;--amber:#f0a020;--purple:#a855f7;
+    --campaign-red:#E31010;--campaign-green:#1DB954;
+    --border:1px solid #1a1a1a;
+  }
+  html,body{background:var(--bg);color:var(--text);font-family:'DM Sans','Segoe UI',sans-serif;font-size:14px;min-height:100vh;}
+
+  /* HEADER */
+  .hdr{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;border-bottom:var(--border);background:var(--bg2);position:sticky;top:0;z-index:100;}
+  .hdr-logo{font-family:'Bebas Neue','Impact',sans-serif;font-size:22px;letter-spacing:0.08em;color:var(--text);}
+  .hdr-logo span{color:var(--campaign-green);}
+  .hdr-badge{font-size:10px;letter-spacing:0.12em;color:var(--campaign-red);border:1px solid var(--campaign-red);padding:3px 8px;border-radius:2px;}
+
+  /* LAYOUT */
+  .layout{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 52px);}
+  .sidebar{background:var(--bg2);border-right:var(--border);padding:20px 0;position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto;}
+  .sidebar-label{font-size:10px;letter-spacing:0.14em;color:var(--muted);padding:0 16px 8px;margin-top:16px;}
+  .sidebar-item{padding:8px 16px;cursor:pointer;color:var(--muted2);font-size:12px;letter-spacing:0.04em;transition:all 0.1s;border-left:2px solid transparent;}
+  .sidebar-item:hover{color:var(--text);background:var(--bg3);}
+  .sidebar-item.active{color:var(--text);border-left-color:var(--campaign-green);background:var(--bg3);}
+
+  /* MAIN */
+  .main{padding:32px;overflow-y:auto;max-width:960px;}
+  .page-title{font-family:'Bebas Neue','Impact',sans-serif;font-size:32px;letter-spacing:0.06em;margin-bottom:4px;}
+  .page-title .dead{color:var(--campaign-red);}
+  .page-sub{color:var(--muted2);font-size:13px;margin-bottom:32px;letter-spacing:0.02em;}
+  .campaign-url{color:var(--campaign-green);font-family:'DM Mono',monospace;}
+
+  /* SECTIONS */
+  .section{margin-bottom:40px;}
+  .section-title{font-size:10px;letter-spacing:0.16em;color:var(--muted);margin-bottom:16px;padding-bottom:8px;border-bottom:var(--border);text-transform:uppercase;}
+
+  /* COPY CARD */
+  .copy-grid{display:grid;gap:12px;}
+  .copy-card{background:var(--bg3);border:var(--border);border-radius:4px;overflow:hidden;}
+  .copy-card-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:var(--border);background:var(--bg4);}
+  .copy-card-label{font-size:10px;letter-spacing:0.1em;color:var(--muted2);text-transform:uppercase;}
+  .copy-btn{font-size:11px;letter-spacing:0.06em;padding:4px 12px;background:transparent;border:1px solid var(--dim);color:var(--muted2);border-radius:2px;cursor:pointer;transition:all 0.15s;font-family:inherit;}
+  .copy-btn:hover{border-color:var(--campaign-green);color:var(--campaign-green);}
+  .copy-btn.copied{border-color:var(--campaign-green);color:var(--campaign-green);}
+  .copy-card-body{padding:14px;white-space:pre-wrap;line-height:1.65;font-size:13px;color:var(--text);font-family:'DM Mono',monospace;}
+
+  /* UTM BUILDER */
+  .utm-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+  .field-group{display:flex;flex-direction:column;gap:6px;}
+  .field-label{font-size:10px;letter-spacing:0.1em;color:var(--muted2);text-transform:uppercase;}
+  .field-inp{background:var(--bg3);border:var(--border);color:var(--text);padding:8px 12px;border-radius:3px;font-size:13px;font-family:'DM Mono',monospace;width:100%;outline:none;transition:border-color 0.15s;}
+  .field-inp:focus{border-color:var(--campaign-green);}
+  .utm-output{background:var(--bg3);border:var(--border);border-radius:4px;padding:14px;font-family:'DM Mono',monospace;font-size:12px;color:var(--campaign-green);word-break:break-all;margin-bottom:12px;min-height:40px;}
+  .btn-primary{background:var(--campaign-green);color:#000;border:none;padding:9px 20px;border-radius:3px;font-size:12px;letter-spacing:0.08em;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity 0.15s;}
+  .btn-primary:hover{opacity:0.85;}
+
+  /* CHECKLIST */
+  .checklist-grid{display:grid;gap:8px;}
+  .checklist-item{display:flex;align-items:flex-start;gap:12px;background:var(--bg3);border:var(--border);border-radius:4px;padding:12px 14px;cursor:pointer;transition:border-color 0.15s;}
+  .checklist-item:hover{border-color:var(--dim);}
+  .checklist-item.done{border-color:var(--campaign-green);opacity:0.7;}
+  .check-box{width:16px;height:16px;min-width:16px;border:1px solid var(--muted);border-radius:2px;display:flex;align-items:center;justify-content:center;margin-top:1px;transition:all 0.15s;}
+  .checklist-item.done .check-box{background:var(--campaign-green);border-color:var(--campaign-green);color:#000;}
+  .check-label{font-size:13px;color:var(--text);}
+  .check-sub{font-size:11px;color:var(--muted2);margin-top:2px;}
+
+  /* TRACKING */
+  .tracking-table{width:100%;border-collapse:collapse;}
+  .tracking-table th{font-size:10px;letter-spacing:0.1em;color:var(--muted);text-align:left;padding:8px 12px;border-bottom:var(--border);text-transform:uppercase;}
+  .tracking-table td{padding:8px 12px;border-bottom:1px solid #111;font-size:12px;vertical-align:top;}
+  .tracking-table tr:last-child td{border-bottom:none;}
+  .status-badge{font-size:10px;letter-spacing:0.08em;padding:2px 8px;border-radius:2px;border:1px solid;}
+  .status-drafted{color:var(--muted2);border-color:var(--dim);}
+  .status-posted{color:var(--campaign-green);border-color:var(--campaign-green);}
+  .status-followup{color:var(--amber);border-color:var(--amber);}
+  .status-removed{color:var(--campaign-red);border-color:var(--campaign-red);}
+  .add-row-btn{margin-top:12px;background:transparent;border:var(--border);color:var(--muted2);padding:8px 16px;border-radius:3px;cursor:pointer;font-size:12px;font-family:inherit;transition:all 0.15s;}
+  .add-row-btn:hover{border-color:var(--campaign-green);color:var(--campaign-green);}
+  .del-btn{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px;}
+  .del-btn:hover{color:var(--campaign-red);}
+
+  /* RULES */
+  .rules-grid{display:grid;gap:8px;}
+  .rule-item{display:flex;gap:12px;align-items:flex-start;padding:10px 14px;background:var(--bg3);border:var(--border);border-radius:4px;}
+  .rule-icon{color:var(--campaign-red);font-size:14px;min-width:20px;}
+  .rule-text{font-size:13px;color:var(--muted2);line-height:1.5;}
+
+  /* TABS */
+  .tab-bar{display:flex;gap:4px;margin-bottom:20px;border-bottom:var(--border);padding-bottom:0;}
+  .tab{padding:8px 16px;font-size:12px;letter-spacing:0.06em;cursor:pointer;color:var(--muted2);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s;}
+  .tab.active{color:var(--text);border-bottom-color:var(--campaign-green);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  /* SECTION NAV */
+  .view-section{display:none;}
+  .view-section.active{display:block;}
+
+  @media(max-width:700px){
+    .layout{grid-template-columns:1fr;}
+    .sidebar{display:none;}
+    .utm-grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-logo">MUSI<span>GOD</span></div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div class="hdr-badge">FREE MARKETING</div>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-label">CAMPAIGN</div>
+    <div class="sidebar-item active" onclick="nav('copy',this)">COPY LIBRARY</div>
+    <div class="sidebar-item" onclick="nav('utm',this)">UTM BUILDER</div>
+    <div class="sidebar-item" onclick="nav('checklist',this)">POST CHECKLIST</div>
+    <div class="sidebar-item" onclick="nav('tracking',this)">TRACKING LOG</div>
+    <div class="sidebar-label">GUIDELINES</div>
+    <div class="sidebar-item" onclick="nav('rules',this)">DO NOT SPAM</div>
+  </nav>
+
+  <div class="main">
+
+    <div class="page-title">CLIVE DAVIS IS <span class="dead">DEAD</span></div>
+    <div class="page-sub">Free marketing command center &nbsp;·&nbsp; Campaign URL: <span class="campaign-url">https://musigod.com/dead</span></div>
+
+    <!-- ─── COPY LIBRARY ─────────────────────────────────────── -->
+    <div class="view-section active" id="view-copy">
+
+      <div class="tab-bar">
+        <div class="tab active" onclick="tab(this,'t-short')">SHORT</div>
+        <div class="tab" onclick="tab(this,'t-long')">LONG</div>
+        <div class="tab" onclick="tab(this,'t-templates')">TEMPLATES</div>
+        <div class="tab" onclick="tab(this,'t-hashtags')">HASHTAGS</div>
+        <div class="tab" onclick="tab(this,'t-dm')">DM / EMAIL</div>
+      </div>
+
+      <!-- SHORT CAPTIONS -->
+      <div class="tab-panel active" id="t-short">
+        <div class="copy-grid">
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">X / Twitter — Punchy</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">CLIVE DAVIS IS DEAD.
+Not the man. The model.
+Artist ownership is the future.
+→ https://musigod.com/dead</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">X / Twitter — Question</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">What happens when independent artists don't need gatekeepers anymore?
+
+https://musigod.com/dead</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Instagram Caption — Short</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">The gatekeeper era is over.
+Artist ownership is the future. 🎵
+
+Link in bio → musigod.com/dead
+
+#IndependentArtist #MusicBusiness #ArtistOwnership #MusicPublishing #IndieMusic</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">TikTok / YouTube Shorts</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">The old music industry was built on gatekeepers deciding who made it. That era is dead. Artist ownership is the future. MusiGod is building the infrastructure for it. 🔗 musigod.com/dead
+
+#MusicBusiness #IndependentArtist #MusicRights #ArtistOwnership #MusiGod #IndieArtist</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Email Signature Line</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">Artist ownership is the future → https://musigod.com/dead</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">LinkedIn — One-liner</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">The music industry's gatekeeper era is over. Independent artists need infrastructure, not intermediaries. https://musigod.com/dead</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LONG CAPTIONS -->
+      <div class="tab-panel" id="t-long">
+        <div class="copy-grid">
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">LinkedIn — Founder Post</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">I built MusiGod because independent artists don't need another middleman.
+
+They need infrastructure.
+
+The old music industry was built on gatekeepers — A&R execs, label deals, distribution contracts that took 80% off the top. That model made sense when distribution was scarce.
+
+Distribution isn't scarce anymore.
+
+What's scarce is ownership infrastructure. Publishing administration. Royalty registration. Rights graph. Payout rails.
+
+The average independent artist collects less than 35% of the royalties they're owed. Not because the money doesn't exist — because the infrastructure to find it and move it doesn't exist for most artists.
+
+That's what MusiGod is building.
+
+Artist ownership is the future.
+
+→ https://musigod.com/dead</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Reddit / Forum — Educational</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">The old industry helped artists get discovered. That was real value when radio and retail shelf space were scarce.
+
+The new problem is different: artists are releasing music independently, building real audiences, generating real streams — but not controlling the rights, registrations, and royalties behind their catalog.
+
+Publishing administration used to be something only major labels could afford to do properly. Registering with every PRO, every territory, every DSP, every neighboring rights society — it's 100+ registrations per release, done manually, across bureaucratic systems that weren't designed to talk to each other.
+
+That's the gap MusiGod closes.
+
+Not a label. Not a distributor. Infrastructure.
+
+https://musigod.com/dead</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Hacker News "Show HN" Draft</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">Show HN: MusiGod — publishing administration infrastructure for independent artists
+
+Hey HN. I'm the solo founder of MusiGod, a music publishing administration platform built for the ownership era.
+
+The problem: the average independent artist collects less than 35% of royalties owed — not because the money doesn't exist, but because the infrastructure to register, track, and collect it across 100+ PROs, DSPs, and territories is prohibitively complex.
+
+What we built: a rights graph (25 node types, built for 100M works / 20M creators), royalty ingestion and payout rails, and a B2B2B API that lets AI music platforms clear independent catalog before training on it.
+
+The Warner Music acquisition of Sureel AI last month validated the thesis — attribution/detection got funded. Ownership graph and payout infrastructure is the next layer.
+
+Stack: Vercel, Supabase (PostgreSQL), raw fetch, Stripe Connect, n8n, Resend.
+
+Would love feedback from anyone who's worked on rights management, music tech, or royalty systems.
+
+https://musigod.com/dead</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Medium / Substack Draft Opening</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">Title: The Gatekeeper Era Is Dead. Here's What Comes Next.
+
+The music industry spent a century gatekeeping access — to distribution, to radio, to audiences.
+
+That era is over.
+
+Streaming broke distribution scarcity. Social media broke audience scarcity. Independent artists don't need permission to release music or build fans anymore.
+
+But there's a second problem nobody built infrastructure for: ownership.
+
+Publishing administration. Rights registration. Royalty collection across every PRO, every territory, every platform. The average independent artist collects less than 35% of the money they're owed — not because the money doesn't exist, but because the system to collect it was built for major labels, not independent artists.
+
+That's the problem MusiGod exists to solve.
+
+→ https://musigod.com/dead</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POST TEMPLATES -->
+      <div class="tab-panel" id="t-templates">
+        <div class="copy-grid">
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Template A — Provocative</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">CLIVE DAVIS IS DEAD.
+Not the man. The model.
+The old music industry was built on gatekeepers.
+The new one is built on ownership.
+Artist ownership is the future.
+https://musigod.com/dead</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Template B — Educational</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">The old industry helped artists get discovered.
+The new problem is different:
+artists are releasing music but not controlling the rights, registrations, and royalties behind it.
+MusiGod exists for the ownership era.
+https://musigod.com/dead</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Template C — Founder POV</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">I built MusiGod because independent artists don't need another middleman.
+They need infrastructure.
+Registration. Publishing. Royalty recovery. Ownership.
+The gatekeeper era is dead.
+https://musigod.com/dead</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Template D — Detroit Angle</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">Detroit artists never needed permission.
+Motown proved that.
+Hip hop proved that.
+The next era is ownership.
+MusiGod is building for that future.
+https://musigod.com/dead</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Quora Answer Opener</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">The single biggest issue in independent music publishing is registration gaps.
+
+Most independent artists release music without ever registering it with their PRO, the MLC, neighboring rights societies, or international collection bodies. That means royalties generated by their streams, syncs, and radio plays are sitting in collection society accounts — unclaimed.
+
+The infrastructure problem is real: there are 100+ registrations required to fully protect a single release across every territory. Major labels have entire departments for this. Independent artists have nothing.
+
+That's the problem platforms like MusiGod (https://musigod.com) are solving — automating the registration and royalty recovery process for independent catalog.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HASHTAGS -->
+      <div class="tab-panel" id="t-hashtags">
+        <div class="copy-grid">
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Instagram / TikTok — Full Set</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">#IndependentArtist #MusicBusiness #ArtistOwnership #MusicPublishing #IndieMusic #MusicRights #RoyaltyCollection #MusicIndustry #IndieArtist #SongwritersOfInstagram #MusicMarketing #MusicEntrepreneur #PublishingRights #MusiGod #ArtistFirst #MusicTech #DIYArtist #MusicLaw #SongwriterLife #MusicBiz</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Twitter / X — Focused</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">#MusicBusiness #ArtistOwnership #IndependentArtist #MusicPublishing #MusicTech</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Detroit / Hip Hop Angle</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">#Detroit #DetroitHipHop #DetroitMusic #DetroitArtist #MichiganMusic #DetroitRap #IndependentArtist #ArtistOwnership #MusicBusiness #MusiGod</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">LinkedIn / Founder</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">#MusicTech #IndependentArtist #MusicBusiness #StartupFounder #MusicPublishing #ArtistOwnership #Fintech #MusicIndustry</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DM / EMAIL -->
+      <div class="tab-panel" id="t-dm">
+        <div class="copy-grid">
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Artist DM — Cold Outreach</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">Hey [Name] — love your work.
+
+I'm the founder of MusiGod, a publishing administration platform built for independent artists.
+
+Quick question: do you know how much of your catalog is registered with ASCAP/BMI, the MLC, and neighboring rights societies internationally?
+
+Most independent artists we talk to are collecting less than 35% of what they're actually owed — not because the streams aren't there, but because the registrations aren't.
+
+We handle all of it. No label deal required.
+
+Worth a 15-minute call?
+
+[Your name]
+musigod.com</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Artist DM — Warm / Referral</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">Hey [Name] — [Mutual connection] said I should reach out.
+
+I built MusiGod to solve the publishing administration problem for independent artists. Registration, royalty recovery, rights management — the infrastructure side that labels have always handled internally.
+
+We're onboarding artists now. If you've got catalog you want fully registered and protected, I'd love to show you what we've recovered for artists at your level.
+
+https://musigod.com/dead
+
+[Your name]</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Newsletter / Blog Pitch</span><button class="copy-btn" onclick="copy(this)">COPY</button></div>
+            <div class="copy-card-body">Subject: Story idea — the royalty gap killing independent artists
+
+Hi [Editor name],
+
+I'm the founder of MusiGod, a publishing administration platform for independent artists built in Detroit.
+
+Here's the stat that surprises people: the average independent artist collects less than 35% of the royalties they're owed. The rest sits in PRO accounts, the MLC, neighboring rights societies — unclaimed, because the registration infrastructure is too complex for most artists to navigate alone.
+
+I think there's a story here about the ownership gap in the independent music economy — and how infrastructure (not another streaming deal) is what artists actually need.
+
+Happy to share data from our catalog, connect you with artists, or write something for your audience.
+
+Best,
+[Your name]
+Founder, MusiGod
+musigod.com</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── UTM BUILDER ─────────────────────────────────────── -->
+    <div class="view-section" id="view-utm">
+      <div class="section">
+        <div class="section-title">UTM Link Builder</div>
+        <div class="utm-grid">
+          <div class="field-group">
+            <div class="field-label">Source</div>
+            <input class="field-inp" id="utm-source" placeholder="reddit" oninput="buildUTM()">
+          </div>
+          <div class="field-group">
+            <div class="field-label">Medium</div>
+            <input class="field-inp" id="utm-medium" placeholder="organic" oninput="buildUTM()">
+          </div>
+          <div class="field-group">
+            <div class="field-label">Campaign</div>
+            <input class="field-inp" id="utm-campaign" placeholder="clive_davis_dead" oninput="buildUTM()">
+          </div>
+          <div class="field-group">
+            <div class="field-label">Content (optional)</div>
+            <input class="field-inp" id="utm-content" placeholder="founder_post" oninput="buildUTM()">
+          </div>
+        </div>
+        <div class="utm-output" id="utm-output">https://musigod.com/dead</div>
+        <button class="btn-primary" onclick="copyUTM()">COPY LINK</button>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Quick Presets</div>
+        <div class="copy-grid">
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Reddit — r/WeAreTheMusicMakers</span><button class="copy-btn" onclick="copyText(this,'https://musigod.com/dead?utm_source=reddit&utm_medium=organic&utm_campaign=clive_davis_dead&utm_content=r_watmm')">COPY</button></div>
+            <div class="copy-card-body">https://musigod.com/dead?utm_source=reddit&utm_medium=organic&utm_campaign=clive_davis_dead&utm_content=r_watmm</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">LinkedIn</span><button class="copy-btn" onclick="copyText(this,'https://musigod.com/dead?utm_source=linkedin&utm_medium=organic&utm_campaign=clive_davis_dead')">COPY</button></div>
+            <div class="copy-card-body">https://musigod.com/dead?utm_source=linkedin&utm_medium=organic&utm_campaign=clive_davis_dead</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Twitter / X</span><button class="copy-btn" onclick="copyText(this,'https://musigod.com/dead?utm_source=twitter&utm_medium=organic&utm_campaign=clive_davis_dead')">COPY</button></div>
+            <div class="copy-card-body">https://musigod.com/dead?utm_source=twitter&utm_medium=organic&utm_campaign=clive_davis_dead</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Instagram</span><button class="copy-btn" onclick="copyText(this,'https://musigod.com/dead?utm_source=instagram&utm_medium=organic&utm_campaign=clive_davis_dead')">COPY</button></div>
+            <div class="copy-card-body">https://musigod.com/dead?utm_source=instagram&utm_medium=organic&utm_campaign=clive_davis_dead</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">TikTok</span><button class="copy-btn" onclick="copyText(this,'https://musigod.com/dead?utm_source=tiktok&utm_medium=organic&utm_campaign=clive_davis_dead')">COPY</button></div>
+            <div class="copy-card-body">https://musigod.com/dead?utm_source=tiktok&utm_medium=organic&utm_campaign=clive_davis_dead</div>
+          </div>
+          <div class="copy-card">
+            <div class="copy-card-header"><span class="copy-card-label">Hacker News</span><button class="copy-btn" onclick="copyText(this,'https://musigod.com/dead?utm_source=hackernews&utm_medium=organic&utm_campaign=clive_davis_dead')">COPY</button></div>
+            <div class="copy-card-body">https://musigod.com/dead?utm_source=hackernews&utm_medium=organic&utm_campaign=clive_davis_dead</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── POST CHECKLIST ─────────────────────────────────── -->
+    <div class="view-section" id="view-checklist">
+      <div class="section">
+        <div class="section-title">Free Distribution Channels</div>
+        <div class="checklist-grid" id="checklist-container"></div>
+      </div>
+    </div>
+
+    <!-- ─── TRACKING LOG ───────────────────────────────────── -->
+    <div class="view-section" id="view-tracking">
+      <div class="section">
+        <div class="section-title">Post Tracking Log <span style="color:var(--muted);font-size:10px;margin-left:8px;">Saved in browser</span></div>
+        <table class="tracking-table">
+          <thead>
+            <tr>
+              <th>Platform</th>
+              <th>URL / Thread</th>
+              <th>Date</th>
+              <th>Notes</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tracking-body"></tbody>
+        </table>
+        <button class="add-row-btn" onclick="addTrackingRow()">+ ADD ENTRY</button>
+      </div>
+    </div>
+
+    <!-- ─── DO NOT SPAM ────────────────────────────────────── -->
+    <div class="view-section" id="view-rules">
+      <div class="section">
+        <div class="section-title">Distribution Guidelines — Do Not Spam</div>
+        <div class="rules-grid">
+          <div class="rule-item"><div class="rule-icon">✓</div><div class="rule-text">Post manually and naturally — adapt every post to the community you're posting in</div></div>
+          <div class="rule-item"><div class="rule-icon">✓</div><div class="rule-text">Never mass-post identical copy across multiple communities at the same time</div></div>
+          <div class="rule-item"><div class="rule-icon">✓</div><div class="rule-text">Always read and follow each platform's self-promotion and community rules</div></div>
+          <div class="rule-item"><div class="rule-icon">✗</div><div class="rule-text">Do not use bots, automation tools, or mass-posting software of any kind</div></div>
+          <div class="rule-item"><div class="rule-icon">✗</div><div class="rule-text">Do not impersonate users, create fake accounts, or post under false identities</div></div>
+          <div class="rule-item"><div class="rule-icon">✗</div><div class="rule-text">Do not make false factual claims about real people, living or deceased</div></div>
+          <div class="rule-item"><div class="rule-icon">✗</div><div class="rule-text">Do not post in communities where the topic is clearly off-topic or unwelcome</div></div>
+          <div class="rule-item"><div class="rule-icon">!</div><div class="rule-text">"Clive Davis Is Dead" is a metaphorical statement about the gatekeeper era — clarify this when context requires it to avoid misrepresentation</div></div>
+          <div class="rule-item"><div class="rule-icon">!</div><div class="rule-text">Quality over volume — one well-placed post in the right community is worth more than 100 spam posts</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<script>
+// ─── Navigation ───────────────────────────────────────────────────────────
+function nav(id, el) {
+  document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(s => s.classList.remove('active'));
+  document.getElementById('view-' + id).classList.add('active');
+  el.classList.add('active');
+}
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────
+function tab(el, panelId) {
+  const bar = el.closest('.tab-bar');
+  const main = bar.nextElementSibling;
+  bar.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  // Find all tab panels in parent
+  const panels = bar.parentElement.querySelectorAll('.tab-panel');
+  panels.forEach(p => p.classList.remove('active'));
+  document.getElementById(panelId).classList.add('active');
+}
+
+// ─── Copy buttons ─────────────────────────────────────────────────────────
+function copy(btn) {
+  const text = btn.closest('.copy-card').querySelector('.copy-card-body').innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'COPIED';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'COPY'; btn.classList.remove('copied'); }, 1800);
+  });
+}
+
+function copyText(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'COPIED';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'COPY'; btn.classList.remove('copied'); }, 1800);
+  });
+}
+
+// ─── UTM Builder ──────────────────────────────────────────────────────────
+function buildUTM() {
+  const base = 'https://musigod.com/dead';
+  const src  = document.getElementById('utm-source').value.trim();
+  const med  = document.getElementById('utm-medium').value.trim();
+  const camp = document.getElementById('utm-campaign').value.trim();
+  const cont = document.getElementById('utm-content').value.trim();
+  const params = new URLSearchParams();
+  if (src)  params.set('utm_source', src);
+  if (med)  params.set('utm_medium', med);
+  if (camp) params.set('utm_campaign', camp);
+  if (cont) params.set('utm_content', cont);
+  const qs = params.toString();
+  document.getElementById('utm-output').textContent = qs ? base + '?' + qs : base;
+}
+
+function copyUTM() {
+  const text = document.getElementById('utm-output').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('[onclick="copyUTM()"]');
+    btn.textContent = 'COPIED ✓';
+    setTimeout(() => btn.textContent = 'COPY LINK', 1800);
+  });
+}
+
+// ─── Checklist ────────────────────────────────────────────────────────────
+const CHANNELS = [
+  { label: 'r/WeAreTheMusicMakers', sub: 'reddit.com/r/WeAreTheMusicMakers — largest indie producer community' },
+  { label: 'r/musicbusiness', sub: 'reddit.com/r/musicbusiness — music industry discussions' },
+  { label: 'r/IndieHeads', sub: 'reddit.com/r/indieheads — independent music fans' },
+  { label: 'r/hiphopheads', sub: 'reddit.com/r/hiphopheads — hip hop community' },
+  { label: 'r/makinghiphop', sub: 'reddit.com/r/makinghiphop — hip hop producers and artists' },
+  { label: 'r/songwriting', sub: 'reddit.com/r/songwriting — songwriter community' },
+  { label: 'Facebook: Independent Music Artists', sub: 'Large Facebook group for indie artists' },
+  { label: 'Facebook: Music Business Networking', sub: 'Music industry Facebook group' },
+  { label: 'Facebook: Detroit Hip Hop', sub: 'Detroit-specific hip hop community' },
+  { label: 'Facebook: Detroit Music Scene', sub: 'Detroit local music community' },
+  { label: 'LinkedIn — Founder post', sub: 'Personal profile post with full founder narrative' },
+  { label: 'LinkedIn — MusiGod company page', sub: 'Company page post' },
+  { label: 'X/Twitter — Thread', sub: 'Multi-tweet thread using Template A or C' },
+  { label: 'Instagram Reels caption', sub: 'Short-form video with campaign caption + hashtags' },
+  { label: 'TikTok video description', sub: 'Video content with campaign description' },
+  { label: 'YouTube Shorts description', sub: 'Short-form video with full description' },
+  { label: 'Discord — music production servers', sub: 'Relevant music-focused Discord communities' },
+  { label: 'SoundCloud — profile/comments', sub: 'Where contextually appropriate' },
+  { label: 'Bandcamp — community posts', sub: 'Bandcamp artist and fan community' },
+  { label: 'Quora — music publishing answers', sub: 'Answer questions about royalties, publishing, rights' },
+  { label: 'Medium article', sub: 'Full-length piece using the long-form draft' },
+  { label: 'Substack post or note', sub: 'Music industry newsletter audience' },
+  { label: 'IndieHackers launch post', sub: 'indie.hackers.com — startup/builder community' },
+  { label: 'Product Hunt upcoming page', sub: 'producthunt.com — tech/startup audience' },
+  { label: 'Hacker News "Show HN"', sub: 'news.ycombinator.com — use the HN draft template' },
+  { label: 'Music industry newsletter submission', sub: 'Hypebot, Music Business Worldwide, Water & Music' },
+];
+
+const STORAGE_KEY = 'mg_checklist_v1';
+
+function loadChecklist() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
+}
+
+function saveChecklist(state) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function renderChecklist() {
+  const state = loadChecklist();
+  const container = document.getElementById('checklist-container');
+  container.innerHTML = CHANNELS.map((ch, i) => {
+    const done = state[i] || false;
+    return `<div class="checklist-item${done?' done':''}" onclick="toggleCheck(${i},this)">
+      <div class="check-box">${done ? '✓' : ''}</div>
+      <div>
+        <div class="check-label">${ch.label}</div>
+        <div class="check-sub">${ch.sub}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleCheck(i, el) {
+  const state = loadChecklist();
+  state[i] = !state[i];
+  saveChecklist(state);
+  el.classList.toggle('done', state[i]);
+  el.querySelector('.check-box').textContent = state[i] ? '✓' : '';
+}
+
+// ─── Tracking Log ─────────────────────────────────────────────────────────
+const TRACK_KEY = 'mg_tracking_v1';
+
+function loadTracking() {
+  try { return JSON.parse(localStorage.getItem(TRACK_KEY) || '[]'); } catch { return []; }
+}
+
+function saveTracking(rows) {
+  localStorage.setItem(TRACK_KEY, JSON.stringify(rows));
+}
+
+const STATUSES = ['Drafted','Posted','Follow-up Needed','Removed'];
+const STATUS_CLASSES = ['status-drafted','status-posted','status-followup','status-removed'];
+
+function renderTracking() {
+  const rows = loadTracking();
+  const tbody = document.getElementById('tracking-body');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--muted);padding:20px 12px;text-align:center;">No entries yet. Click "+ ADD ENTRY" to start logging.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td><input style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:12px;width:100%;outline:none;" value="${esc(r.platform)}" oninput="updateField(${i},'platform',this.value)" placeholder="Platform"></td>
+      <td><input style="background:transparent;border:none;color:var(--muted2);font-family:'DM Mono',monospace;font-size:11px;width:100%;outline:none;" value="${esc(r.url)}" oninput="updateField(${i},'url',this.value)" placeholder="URL or thread"></td>
+      <td><input type="date" style="background:transparent;border:none;color:var(--muted2);font-family:inherit;font-size:12px;width:100%;outline:none;" value="${r.date||''}" oninput="updateField(${i},'date',this.value)"></td>
+      <td><input style="background:transparent;border:none;color:var(--muted2);font-family:inherit;font-size:12px;width:100%;outline:none;" value="${esc(r.notes)}" oninput="updateField(${i},'notes',this.value)" placeholder="Notes"></td>
+      <td>
+        <select style="background:var(--bg3);border:var(--border);color:var(--text);font-family:inherit;font-size:11px;padding:3px 6px;border-radius:2px;" onchange="updateField(${i},'status',this.value)">
+          ${STATUSES.map((s,si) => `<option value="${s}"${r.status===s?' selected':''}>${s}</option>`).join('')}
+        </select>
+      </td>
+      <td><button class="del-btn" onclick="deleteRow(${i})">×</button></td>
+    </tr>`).join('');
+}
+
+function addTrackingRow() {
+  const rows = loadTracking();
+  rows.push({ platform:'', url:'', date: new Date().toISOString().slice(0,10), notes:'', status:'Drafted' });
+  saveTracking(rows);
+  renderTracking();
+}
+
+function updateField(i, field, val) {
+  const rows = loadTracking();
+  rows[i][field] = val;
+  saveTracking(rows);
+}
+
+function deleteRow(i) {
+  const rows = loadTracking();
+  rows.splice(i, 1);
+  saveTracking(rows);
+  renderTracking();
+}
+
+function esc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────
+renderChecklist();
+renderTracking();
+buildUTM();
+</script>
+</body>
+</html>
