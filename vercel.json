@@ -16,6 +16,10 @@
             "destination": "/dead.html"
         },
         {
+            "source": "/free-marketing-dead",
+            "destination": "/free-marketing-dead.html"
+        },
+        {
             "source": "/favicon.ico",
             "destination": "/favicon.ico"
         },
