@@ -1,0 +1,445 @@
+openapi: 3.0.3
+info:
+  title: MusiGod Partner Rights Resolution API
+  version: "1.0"
+  description: |
+    Read-only API for resolving ownership, writer credits, PRO registration
+    status, and AI-licensing consent for independent music catalog.
+
+    **The problem this solves:** AI music platforms (and DSPs, labels, and PROs)
+    need to clear independent catalog before training on it, syncing it, or
+    paying royalties from it. Existing infrastructure (ASCAP, BMI, MusicBrainz)
+    covers major-label works. Independent catalog — the long tail — has no
+    machine-readable ownership graph. MusiGod is that graph.
+
+    **What you get from this API:**
+    - Writer credits with IPI numbers and percentage splits
+    - ISWC (composition) and ISRC (recording) identifiers
+    - PRO registration status (ASCAP / BMI / MLC / SESAC)
+    - AI-licensing consent state (Q3 2026 — see `consent` field)
+    - Gap flags so you know exactly what is and isn't cleared
+
+    **Auth:** Pass your partner API key in the `X-Partner-Key` header.
+    Keys are issued by MusiGod. Contact partnerships@musigod.com.
+
+    **Rate limits:** Default 60 requests/minute per key.
+    Response header `X-RateLimit-Limit` shows your limit.
+
+    **Base URL:** `https://musigod.com/api/partner`
+
+contact:
+  name: MusiGod Partnerships
+  email: partnerships@musigod.com
+  url: https://musigod.com
+
+license:
+  name: Proprietary — MusiGod Partner License
+  url: https://musigod.com/terms
+
+servers:
+  - url: https://musigod.com/api/partner
+    description: Production
+
+security:
+  - PartnerKey: []
+
+paths:
+  /resolve-rights:
+    get:
+      operationId: resolveRights
+      summary: Resolve ownership for a work or recording
+      description: |
+        Given an ISRC, ISWC, or MusiGod internal work ID, returns the full
+        ownership graph: writer credits, splits, PRO registration status, and
+        AI-licensing consent state.
+
+        Exactly one identifier is required per call. Lookup priority:
+        - `isrc` — resolves a specific sound recording, then bridges to its
+          underlying composition
+        - `iswc` — resolves a composition directly, returns all known recordings
+        - `id` — MusiGod internal UUID (from catalog feed or webhook)
+
+        **Enriched catalog path:** For indie works not yet in the formal PRO
+        graph, the API falls back to MusiGod's enriched catalog (MusicBrainz →
+        Discogs → Genius pipeline). Enrichment source is indicated in the
+        response `work.enrichment_source` field.
+      parameters:
+        - name: isrc
+          in: query
+          description: International Standard Recording Code (e.g. USASN0802427)
+          schema:
+            type: string
+            pattern: '^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$'
+          example: USASN0802427
+        - name: iswc
+          in: query
+          description: International Standard Musical Work Code (e.g. T-123.456.789-0)
+          schema:
+            type: string
+            pattern: '^T[-.]?\d{3}[-.]?\d{3}[-.]?\d{3}[-.]?\d$'
+          example: T-055.506.097-0
+        - name: id
+          in: query
+          description: MusiGod internal work UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Work resolved — full ownership graph returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResolvedWork"
+              examples:
+                esham_track:
+                  summary: Esham — Rocks Off (enriched catalog)
+                  value:
+                    musigod_version: "1.0"
+                    resolved_at: "2026-06-22T12:00:00Z"
+                    lookup:
+                      type: isrc
+                      value: USASN0802427
+                    work:
+                      source: musigod_enriched
+                      musigod_id: d5cac106-9bdf-4bfd-ad63-2b2462844aa6
+                      title: Rocks Off
+                      artist: Esham
+                      artist_mbid: 25bac939-a1ad-406f-9e00-584afd47dbfe
+                      release: Helterskkkelter
+                      release_year: "1993"
+                      iswc: null
+                      isrcs:
+                        - USASN0802427
+                      enriched: true
+                      enrichment_source: recovered_from_csv
+                    recordings:
+                      - isrc: USASN0802427
+                        title: Rocks Off
+                        album_title: Helterskkkelter
+                    writers:
+                      - name: Esham
+                        mbid: null
+                        ipi: null
+                        role: writer
+                        source: recovered_from_csv
+                    splits: []
+                    registrations: []
+                    consent:
+                      ai_licensing: unknown
+                      note: "AI-licensing consent state requires Lane A (consent ledger). Coming Q3 2026."
+                    gaps:
+                      - missing_iswc
+                      - splits_not_confirmed
+                      - no_pro_registrations
+        "400":
+          description: Missing or invalid identifier
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Provide one of: isrc, iswc, or id"
+        "401":
+          description: Invalid or missing partner API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Invalid or missing X-Partner-Key"
+        "404":
+          description: Work not found in MusiGod catalog
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFound"
+              example:
+                error: work_not_found
+                message: "No work found for isrc=USXXX0000000"
+                lookup:
+                  type: isrc
+                  value: USXXX0000000
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Rate limit exceeded: 60 req/min"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    PartnerKey:
+      type: apiKey
+      in: header
+      name: X-Partner-Key
+      description: |
+        Partner API key issued by MusiGod. Pass in the X-Partner-Key header.
+        Keys are SHA-256 hashed before storage — MusiGod never retains the
+        plaintext key after issuance.
+
+  schemas:
+    ResolvedWork:
+      type: object
+      required:
+        - musigod_version
+        - resolved_at
+        - lookup
+        - work
+        - writers
+        - splits
+        - registrations
+        - consent
+        - gaps
+      properties:
+        musigod_version:
+          type: string
+          example: "1.0"
+        resolved_at:
+          type: string
+          format: date-time
+        lookup:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [isrc, iswc, musigod_id]
+            value:
+              type: string
+        work:
+          $ref: "#/components/schemas/WorkSummary"
+        recordings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Recording"
+        writers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Writer"
+        splits:
+          type: array
+          description: |
+            Confirmed ownership split allocations. Empty if splits have not
+            been submitted to MusiGod. Gap flag `splits_not_confirmed` is set
+            when this array is empty.
+          items:
+            $ref: "#/components/schemas/Split"
+        registrations:
+          type: array
+          description: PRO and society registration records
+          items:
+            $ref: "#/components/schemas/Registration"
+        consent:
+          $ref: "#/components/schemas/ConsentState"
+        gaps:
+          type: array
+          description: |
+            List of data gaps for this work. Use this to understand what is
+            and isn't cleared before licensing. Possible values:
+            - `missing_iswc` — no ISWC on record
+            - `missing_writers` — no writer credits resolved
+            - `missing_isrc` — no ISRC for any recording
+            - `splits_not_confirmed` — ownership percentages not confirmed
+            - `no_pro_registrations` — not registered with any PRO in our graph
+          items:
+            type: string
+            enum:
+              - missing_iswc
+              - missing_writers
+              - missing_isrc
+              - splits_not_confirmed
+              - no_pro_registrations
+
+    WorkSummary:
+      type: object
+      properties:
+        source:
+          type: string
+          enum: [musigod_graph, musigod_enriched]
+          description: |
+            `musigod_graph` — data from the formal rights graph (PRO-confirmed).
+            `musigod_enriched` — data from MusicBrainz/Discogs/Genius enrichment.
+        musigod_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        artist:
+          type: string
+        artist_mbid:
+          type: string
+          nullable: true
+        release:
+          type: string
+          nullable: true
+        release_year:
+          type: string
+          nullable: true
+        iswc:
+          type: string
+          nullable: true
+          example: "T-055.506.097-0"
+        isrcs:
+          type: array
+          items:
+            type: string
+        ascap_id:
+          type: string
+          nullable: true
+        bmi_id:
+          type: string
+          nullable: true
+        sesac_id:
+          type: string
+          nullable: true
+        mlc_work_id:
+          type: string
+          nullable: true
+        musicbrainz_id:
+          type: string
+          nullable: true
+        public_domain:
+          type: boolean
+          default: false
+        enriched:
+          type: boolean
+        enrichment_source:
+          type: string
+          nullable: true
+          enum: [musicbrainz, discogs, genius, manual, recovered_from_csv]
+
+    Recording:
+      type: object
+      properties:
+        isrc:
+          type: string
+        title:
+          type: string
+        version_title:
+          type: string
+          nullable: true
+        duration_seconds:
+          type: integer
+          nullable: true
+        release_date:
+          type: string
+          format: date
+          nullable: true
+        album_title:
+          type: string
+          nullable: true
+        master_rights_holder:
+          type: string
+          nullable: true
+          description: Sound recording rights holder (separate from composition)
+
+    Writer:
+      type: object
+      properties:
+        name:
+          type: string
+        mbid:
+          type: string
+          nullable: true
+          description: MusicBrainz artist ID
+        ipi:
+          type: string
+          nullable: true
+          description: Interested Party Information number (PRO identifier)
+        role:
+          type: string
+          enum: [writer, composer, lyricist, arranger, publisher, administrator]
+        source:
+          type: string
+          nullable: true
+          enum: [musicbrainz, discogs, genius, manual, recovered_from_csv]
+
+    Split:
+      type: object
+      properties:
+        role:
+          type: string
+          description: Role of this split party (writer, publisher, administrator)
+        share_percent:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+        right_type:
+          type: string
+          description: e.g. performance, mechanical, sync, master
+        territory_scope:
+          type: string
+          description: Territory or WORLD
+        confirmed_by_party:
+          type: boolean
+        confirmed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    Registration:
+      type: object
+      properties:
+        registration_type:
+          type: string
+        registration_number:
+          type: string
+          nullable: true
+        registration_date:
+          type: string
+          format: date
+          nullable: true
+        registrar:
+          type: string
+          description: ASCAP, BMI, SESAC, MLC, etc.
+        status:
+          type: string
+          enum: [pending, active, rejected, expired]
+
+    ConsentState:
+      type: object
+      description: |
+        AI-licensing consent state for this work. Indicates whether the
+        rightsholder has explicitly consented to AI training / synchronization
+        use. Full implementation ships in Lane A (Q3 2026).
+      properties:
+        ai_licensing:
+          type: string
+          enum: [granted, denied, unknown]
+          description: |
+            `granted` — explicit opt-in on file.
+            `denied` — explicit opt-out on file.
+            `unknown` — no consent record yet (default until Lane A ships).
+        note:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+    NotFound:
+      type: object
+      properties:
+        error:
+          type: string
+          example: work_not_found
+        message:
+          type: string
+        lookup:
+          type: object
+          properties:
+            type:
+              type: string
+            value:
+              type: string

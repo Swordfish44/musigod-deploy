@@ -370,35 +370,51 @@ function renderResults(d) {
   }).join('');
 
   renderOverrides(d);
-  renderTrackTable(d);
+  renderTrackTable(d); // async — fires and renders independently
 }
 
-function renderTrackTable(d) {
-  // Re-request enriched tracks from server isn't ideal
-  // So we parse the master CSV back for display
-  const lines = d.files.master.content.split('\n').slice(1).filter(Boolean);
-  const tbody = document.getElementById('trackBody');
-  tbody.innerHTML = lines.slice(0, 100).map(line => {
-    const cols = parseCSVLine(line);
-    const trackTitle   = cols[0] || '';
-    const releaseTitle = cols[1] || '';
-    const year         = cols[2] || '';
-    const writers      = cols[8] || '';
-    const isrc         = cols[6] || '';
-    const iswc         = cols[7] || '';
-    const issues       = cols[14] || '';
-    const hasIssues    = issues.length > 0;
-    const hasWriters   = writers && writers !== '';
-    return `<tr>
-      <td style="font-weight:700;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(trackTitle)}</td>
-      <td style="color:var(--muted2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(releaseTitle)}</td>
-      <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted2)">${year}</td>
-      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:${hasWriters?'var(--text)':'var(--red)'}">${esc(writers)||'—'}</td>
-      <td style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted)">${isrc||'—'}</td>
-      <td style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted)">${iswc||'—'}</td>
-      <td><span class="tag ${hasIssues?'tag-warn':'tag-ok'}">${hasIssues?'REVIEW':'READY'}</span></td>
-    </tr>`;
-  }).join('');
+async function renderTrackTable(d) {
+  // Reads from catalog_enriched_tracks_v1 via /api/get-enriched-tracks.
+  // CSV is the export layer only — not the system of record for display.
+  const tbody  = document.getElementById('trackBody');
+  const artist = document.getElementById('artistName').value.trim();
+  const key    = document.getElementById('adminKey').value.trim();
+
+  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:18px;color:var(--muted2)"><span class="spin"></span> Loading tracks…</td></tr>`;
+
+  try {
+    const res = await fetch(`/api/get-enriched-tracks?artist_name=${encodeURIComponent(artist)}&limit=500`, {
+      headers: { 'x-admin-key': key },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const { tracks } = await res.json();
+
+    if (!tracks || !tracks.length) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:18px;color:var(--muted2)">No tracks found in enriched_tracks_v1 for "${esc(artist)}".</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = tracks.slice(0, 500).map(t => {
+      const writerNames = Array.isArray(t.writers) && t.writers.length
+        ? t.writers.map(w => w.name || w).filter(Boolean).join(', ')
+        : '';
+      const isrc       = (t.isrcs && t.isrcs.length) ? t.isrcs[0] : '';
+      const hasWriters = !!writerNames;
+      const hasIssues  = !t.enriched || !writerNames || !isrc;
+      return `<tr>
+        <td style="font-weight:700;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(t.track_title)}">${esc(t.track_title)}</td>
+        <td style="color:var(--muted2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(t.release_title||'')}">${esc(t.release_title||'—')}</td>
+        <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted2)">${esc(t.release_year||'')}</td>
+        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:${hasWriters?'var(--text)':'var(--red)'}" title="${esc(writerNames)}">${esc(writerNames)||'—'}</td>
+        <td style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted)">${esc(isrc)||'—'}</td>
+        <td style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted)">${esc(t.iswc||'')||'—'}</td>
+        <td><span class="tag ${hasIssues?'tag-warn':'tag-ok'}">${hasIssues?'REVIEW':'READY'}</span></td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    console.error('[renderTrackTable] error:', err.message);
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:18px;color:var(--red)">Failed to load tracks: ${esc(err.message)}</td></tr>`;
+  }
 }
 
 function downloadFile(key) {

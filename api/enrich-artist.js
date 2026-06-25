@@ -8,6 +8,7 @@ const {
   generateASCAPCSV, generateBMICSV, generateMLCCSV,
   generateMasterCatalogCSV, generateGapsReport,
 } = require('../lib/generate-registration-files');
+const { persistEnrichedTracks } = require('../lib/persist-enriched-tracks');
 const { syncEnrichmentToGraph } = require('./graph-sync');
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co';
@@ -109,6 +110,23 @@ module.exports = async function handler(req, res) {
 
     const gapsReport = generateGapsReport(catalog.enrichedTracks);
 
+    // Persist per-track rows. This is the step that was missing entirely —
+    // previously only the CSV-formatted output below was saved (as a JSONB
+    // blob on this one job row), never per-track rows. Never let a
+    // persistence failure fail the whole job; the MB/Discogs/Genius calls
+    // already succeeded by this point.
+    let persistResult = { persisted: 0, failed: 0, errors: [] };
+    try {
+      persistResult = await persistEnrichedTracks(catalog.enrichedTracks, {
+        artistName: artistName,
+        artistMbid: catalog.mbid,
+        jobId: job_id,
+      });
+    } catch (persistErr) {
+      console.error(`[enrich] persistEnrichedTracks failed for job_id=${job_id}:`, persistErr.message);
+      persistResult = { persisted: 0, failed: catalog.enrichedTracks.length, errors: [{ message: persistErr.message }] };
+    }
+
     await sbPatch(job_id, {
       status:         'DONE',
       progress_pct:   100,
@@ -120,6 +138,8 @@ module.exports = async function handler(req, res) {
         processedReleases: catalog.processedReleases,
         totalTracks:       catalog.totalTracks,
         gapsReport,
+        tracksPersisted:   persistResult.persisted,
+        tracksPersistFailed: persistResult.failed,
         files: {
           ascap:  { filename: `${artistName}_ASCAP_Registration.csv`,  content: generateASCAPCSV(catalog.enrichedTracks, publisherName, publisherIPI) },
           bmi:    { filename: `${artistName}_BMI_Registration.csv`,    content: generateBMICSV(catalog.enrichedTracks, publisherName, publisherIPI) },
@@ -130,8 +150,8 @@ module.exports = async function handler(req, res) {
       },
     });
 
-    console.log(`[enrich] DONE job_id=${job_id} tracks=${catalog.totalTracks}`);
-    return res.status(200).json({ job_id, status: 'DONE', totalTracks: catalog.totalTracks });
+    console.log(`[enrich] DONE job_id=${job_id} tracks=${catalog.totalTracks} persisted=${persistResult.persisted}`);
+    return res.status(200).json({ job_id, status: 'DONE', totalTracks: catalog.totalTracks, tracksPersisted: persistResult.persisted });
 
   } catch (err) {
     console.error(`[enrich] ERROR job_id=${job_id}:`, err.message);
