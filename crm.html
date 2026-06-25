@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+  <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACeUlEQVR4nO2XXUhTYRjHf0enhsOWqX1sTptYZFbURUUQJZWbUBdFC/oYUuBFFF4FkV0V2BdB4JWgNyl5lVGRpOlNJYjSTQ5c5keNTZyNZs3Nj21n53RTp+ncGl24i/a/eh7O/32e3/txDucViJD+tVlmheQ0tQsAacloHtlPSEbzSKUlszlEbEEKIAXw3wKoIpOH269g1lYoubHvKsN+h5Lvy93Gkz23lLzJ/pL6kdZFBQ/k7cRSWMluzWbyMzWEkZgV53EteOj1WLk72hYbYKmq9SZufGxW8gtFVTG9AgK3y2qw6I0sSEHqP7XSMdVHQApRnL2Bivxd7FhdEn8Fluqk9iB3Rh/jF+dZn5WLad3emN6a4mNY9EYA6mxNPJ18qzyz+ezYfPZlx8U8A9aZcdTpqzBrDwFg0RtRCel88I5FFxEELhtOAOAJzvDc1RtvXokBPHJ0AVCtryIjTcU53VEAWpxdUV5Dtpa8TA0AQ74vhGUpYYCYW9Dtfs9UYJpStY76shoKstYw7Hcw8N0W5c3NyFHiWXFBictzNtG5/8Ei7/H+61hnxpU85gqE5TBtzh4AzuqOANDiiJ49wI+QT4kLsjRKPOSzU9R9mntLTn6k4n4H2iZ6CEkiAD5xjmeud8v6Ps9N4gl6AShR61AJ6fHKJg7wLejllbsfgPbJN8yFA8v6JFmm0f4CgLUZOZz6dXATUdzXEKDW2kCtteGvhZrtHZSqCzmjO8zNrReRZIlO9wAAhuyN/w6QqGRkrg010uUe4HxhJXVbLNwvv0RIEvGL8wx6xxiZneBrYHrROCH1R5QCSAGkAJIO8PuWmjQA+HNVXmk5Te3CT8hI1SZ0lQK2AAAAAElFTkSuQmCC">
+  <link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,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">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MusiGod CRM</title>
+<style>
+  :root {
+    --gold: #C8A951;
+    --dark: #0A0A0A;
+    --gray: #1A1A2E;
+    --mid: #2A2A3E;
+    --light: #F5F5F5;
+    --text: #E0E0E0;
+    --muted: #888;
+    --green: #2ECC71;
+    --red: #E74C3C;
+    --blue: #3498DB;
+    --orange: #E67E22;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--dark); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; min-height: 100vh; }
+
+  /* NAV */
+  nav { background: var(--gray); border-bottom: 2px solid var(--gold); padding: 0 24px; display: flex; align-items: center; gap: 32px; height: 56px; }
+  nav .logo { color: var(--gold); font-weight: 800; font-size: 18px; letter-spacing: 1px; }
+  nav a { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 6px 12px; border-radius: 6px; transition: all .2s; }
+  nav a:hover, nav a.active { color: var(--gold); background: rgba(200,169,81,.1); }
+  nav .spacer { flex: 1; }
+  nav .admin-key { font-size: 11px; color: var(--muted); }
+
+  /* LAYOUT */
+  .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* STATS ROW */
+  .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 28px; }
+  .stat-card { background: var(--gray); border: 1px solid rgba(200,169,81,.2); border-radius: 10px; padding: 18px 20px; }
+  .stat-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .stat-card .value { font-size: 28px; font-weight: 700; color: var(--gold); }
+  .stat-card .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* TOOLBAR */
+  .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .toolbar h2 { font-size: 18px; font-weight: 700; color: var(--text); flex: 1; }
+  .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .2s; }
+  .btn-gold { background: var(--gold); color: var(--dark); }
+  .btn-gold:hover { background: #dbb95f; }
+  .btn-outline { background: transparent; color: var(--gold); border: 1px solid var(--gold); }
+  .btn-outline:hover { background: rgba(200,169,81,.1); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-danger { background: var(--red); color: white; }
+
+  select, input[type=text], input[type=email], input[type=date], textarea {
+    background: var(--mid); border: 1px solid rgba(255,255,255,.1); color: var(--text);
+    padding: 8px 12px; border-radius: 8px; font-size: 13px; outline: none;
+  }
+  select:focus, input:focus, textarea:focus { border-color: var(--gold); }
+  select { cursor: pointer; }
+
+  /* TABLE */
+  .table-wrap { background: var(--gray); border-radius: 12px; border: 1px solid rgba(200,169,81,.15); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: var(--mid); color: var(--gold); font-weight: 600; padding: 12px 16px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .8px; white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid rgba(255,255,255,.05); transition: background .15s; }
+  tbody tr:hover { background: rgba(200,169,81,.05); cursor: pointer; }
+  tbody tr:last-child { border-bottom: none; }
+  td { padding: 12px 16px; color: var(--text); vertical-align: middle; }
+  td .muted { color: var(--muted); font-size: 12px; }
+  .empty { text-align: center; padding: 60px; color: var(--muted); }
+
+  /* BADGES */
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+  .badge-vip { background: rgba(200,169,81,.2); color: var(--gold); }
+  .badge-high { background: rgba(52,152,219,.2); color: var(--blue); }
+  .badge-medium { background: rgba(255,255,255,.08); color: var(--muted); }
+  .badge-low { background: rgba(255,255,255,.04); color: var(--muted); }
+  .badge-identified { background: rgba(255,255,255,.08); color: var(--muted); }
+  .badge-contacted { background: rgba(52,152,219,.2); color: var(--blue); }
+  .badge-responded { background: rgba(230,126,34,.2); color: var(--orange); }
+  .badge-meeting_scheduled { background: rgba(46,204,113,.2); color: var(--green); }
+  .badge-proposal_sent { background: rgba(200,169,81,.2); color: var(--gold); }
+  .badge-negotiating { background: rgba(200,169,81,.3); color: var(--gold); }
+  .badge-active { background: rgba(46,204,113,.2); color: var(--green); }
+  .badge-closed_won { background: rgba(46,204,113,.3); color: var(--green); }
+  .badge-closed_lost { background: rgba(231,76,60,.2); color: var(--red); }
+  .badge-on_hold { background: rgba(255,255,255,.08); color: var(--muted); }
+  .badge-tier1 { background: rgba(200,169,81,.2); color: var(--gold); }
+  .badge-tier2 { background: rgba(52,152,219,.2); color: var(--blue); }
+
+  /* MODAL */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 1000; align-items: center; justify-content: center; padding: 24px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--gray); border: 1px solid rgba(200,169,81,.3); border-radius: 16px; width: 100%; max-width: 680px; max-height: 90vh; overflow-y: auto; padding: 28px; }
+  .modal h3 { font-size: 18px; font-weight: 700; color: var(--gold); margin-bottom: 20px; }
+  .modal-close { float: right; background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; margin-top: -4px; }
+  .modal-close:hover { color: var(--text); }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-group label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; font-weight: 600; }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; }
+  .form-group textarea { resize: vertical; min-height: 80px; }
+  .modal-footer { margin-top: 24px; display: flex; gap: 12px; justify-content: flex-end; }
+
+  /* DETAIL PANEL */
+  .detail-panel { background: var(--gray); border: 1px solid rgba(200,169,81,.2); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+  .detail-panel h3 { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .detail-panel .sub { font-size: 14px; color: var(--muted); margin-bottom: 16px; }
+  .detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .detail-field { }
+  .detail-field .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 4px; }
+  .detail-field .val { font-size: 14px; color: var(--text); }
+
+  /* PIPELINE KANBAN */
+  .kanban { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; overflow-x: auto; }
+  .kanban-col { background: var(--gray); border-radius: 10px; border: 1px solid rgba(255,255,255,.07); padding: 12px; min-height: 300px; }
+  .kanban-col h4 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,.07); display: flex; justify-content: space-between; align-items: center; }
+  .kanban-col h4 span { background: rgba(255,255,255,.1); padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+  .kanban-card { background: var(--mid); border-radius: 8px; padding: 12px; margin-bottom: 8px; border: 1px solid rgba(255,255,255,.06); cursor: pointer; transition: border-color .2s; }
+  .kanban-card:hover { border-color: var(--gold); }
+  .kanban-card .name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .kanban-card .co { font-size: 11px; color: var(--muted); }
+  .kanban-card .tags { margin-top: 8px; display: flex; gap: 4px; flex-wrap: wrap; }
+  .kanban-card .tag { font-size: 10px; padding: 2px 7px; background: rgba(200,169,81,.15); color: var(--gold); border-radius: 10px; }
+
+  /* FOLLOW-UPS */
+  .followup-row td:first-child { border-left: 3px solid var(--orange); }
+  .overdue td:first-child { border-left: 3px solid var(--red); }
+
+  /* LOG FORM */
+  .log-section { margin-top: 24px; }
+  .log-section h4 { font-size: 14px; font-weight: 700; color: var(--gold); margin-bottom: 16px; }
+  .log-entry { background: var(--mid); border-radius: 8px; padding: 14px; margin-bottom: 10px; border-left: 3px solid rgba(200,169,81,.3); }
+  .log-entry .log-meta { font-size: 11px; color: var(--muted); margin-bottom: 6px; display: flex; gap: 12px; }
+  .log-entry .log-text { font-size: 13px; color: var(--text); }
+  .log-entry .log-outcome { margin-top: 6px; }
+
+  /* TABS */
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,.08); padding-bottom: 0; }
+  .tab { padding: 10px 18px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .2s; }
+  .tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+  .tab:hover { color: var(--text); }
+
+  .loading { text-align: center; padding: 40px; color: var(--muted); }
+  .search-box { padding: 8px 14px; width: 240px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">MUSIGOD CRM</div>
+  <a href="admin.html">Admin</a>
+  <a href="crm.html" class="active">CRM</a>
+  <a href="affiliate-dashboard.html">Affiliates</a>
+  <a href="catalog-enrichment.html">Catalog</a>
+  <div class="spacer"></div>
+  <div class="admin-key">musigod.com</div>
+</nav>
+
+<div class="container">
+
+  <!-- STATS -->
+  <div class="stats" id="statsRow">
+    <div class="stat-card"><div class="label">Total Contacts</div><div class="value" id="statTotal">—</div><div class="sub">All pipeline</div></div>
+    <div class="stat-card"><div class="label">Active Partners</div><div class="value" id="statActive">—</div><div class="sub">Live deals</div></div>
+    <div class="stat-card"><div class="label">Follow-ups Due</div><div class="value" id="statFollowups">—</div><div class="sub">Next 7 days</div></div>
+    <div class="stat-card"><div class="label">Pipeline Value</div><div class="value" id="statValue">—</div><div class="sub">Monthly est.</div></div>
+    <div class="stat-card"><div class="label">VIP Prospects</div><div class="value" id="statVip">—</div><div class="sub">Priority targets</div></div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('contacts')">Contacts</div>
+    <div class="tab" onclick="switchTab('pipeline')">Pipeline</div>
+    <div class="tab" onclick="switchTab('partnerships')">Partnerships</div>
+    <div class="tab" onclick="switchTab('followups')">Follow-ups</div>
+    <div class="tab" onclick="switchTab('affiliates')">Affiliate Pipeline</div>
+  </div>
+
+  <!-- CONTACTS TAB -->
+  <div class="page active" id="tab-contacts">
+    <div class="toolbar">
+      <h2>Contacts</h2>
+      <input type="text" class="search-box" placeholder="Search name, company..." oninput="filterContacts(this.value)" />
+      <select id="filterType" onchange="loadContacts()">
+        <option value="">All Types</option>
+        <option value="distributor">Distributors</option>
+        <option value="daw_platform">DAW / Tools</option>
+        <option value="attorney">Attorneys</option>
+        <option value="manager">Managers</option>
+        <option value="press">Press</option>
+        <option value="influencer">Influencers</option>
+        <option value="affiliate">Affiliates</option>
+        <option value="partner">Partners</option>
+        <option value="artist">Artists</option>
+        <option value="education">Education</option>
+        <option value="other">Other</option>
+      </select>
+      <select id="filterStage" onchange="loadContacts()">
+        <option value="">All Stages</option>
+        <option value="identified">Identified</option>
+        <option value="contacted">Contacted</option>
+        <option value="responded">Responded</option>
+        <option value="meeting_scheduled">Meeting Scheduled</option>
+        <option value="proposal_sent">Proposal Sent</option>
+        <option value="negotiating">Negotiating</option>
+        <option value="active">Active</option>
+        <option value="closed_won">Closed Won</option>
+      </select>
+      <button class="btn btn-gold" onclick="openAddContact()">+ Add Contact</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Company</th>
+            <th>Type</th>
+            <th>Stage</th>
+            <th>Priority</th>
+            <th>Country</th>
+            <th>Last Activity</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="contactsBody">
+          <tr><td colspan="8" class="loading">Loading contacts...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PIPELINE TAB -->
+  <div class="page" id="tab-pipeline">
+    <div class="toolbar"><h2>Pipeline View</h2><button class="btn btn-outline" onclick="loadPipeline()">Refresh</button></div>
+    <div class="kanban" id="kanbanBoard"></div>
+  </div>
+
+  <!-- PARTNERSHIPS TAB -->
+  <div class="page" id="tab-partnerships">
+    <div class="toolbar">
+      <h2>Partnerships</h2>
+      <button class="btn btn-gold" onclick="openAddPartnership()">+ New Partnership</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Partner</th><th>Type</th><th>Deal</th><th>Status</th><th>Monthly Value</th><th>Active Since</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="partnershipsBody">
+          <tr><td colspan="7" class="loading">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- FOLLOW-UPS TAB -->
+  <div class="page" id="tab-followups">
+    <div class="toolbar"><h2>Follow-ups Due (Next 7 Days)</h2><button class="btn btn-outline" onclick="loadFollowups()">Refresh</button></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Due Date</th><th>Contact</th><th>Company</th><th>Stage</th><th>Last Outcome</th><th>Subject</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="followupsBody">
+          <tr><td colspan="7" class="loading">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- AFFILIATES TAB -->
+  <div class="page" id="tab-affiliates">
+    <div class="toolbar">
+      <h2>Affiliate Pipeline</h2>
+      <button class="btn btn-gold" onclick="openAddAffiliate()">+ Add Affiliate</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Tier</th><th>Status</th><th>Referrals</th><th>Earned</th><th>Code</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="affiliatesBody">
+          <tr><td colspan="7" class="loading">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- ADD CONTACT MODAL -->
+<div class="modal-overlay" id="contactModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('contactModal')">×</button>
+    <h3 id="contactModalTitle">Add Contact</h3>
+    <div class="form-grid">
+      <div class="form-group"><label>Full Name *</label><input type="text" id="cf_name" placeholder="Jane Smith" /></div>
+      <div class="form-group"><label>Email</label><input type="email" id="cf_email" placeholder="jane@company.com" /></div>
+      <div class="form-group"><label>Company</label><input type="text" id="cf_company" /></div>
+      <div class="form-group"><label>Title / Role</label><input type="text" id="cf_title" /></div>
+      <div class="form-group"><label>Type *</label>
+        <select id="cf_type">
+          <option value="partner">Partner</option>
+          <option value="distributor">Distributor</option>
+          <option value="daw_platform">DAW / Tool</option>
+          <option value="attorney">Attorney</option>
+          <option value="manager">Manager</option>
+          <option value="press">Press</option>
+          <option value="influencer">Influencer</option>
+          <option value="affiliate">Affiliate</option>
+          <option value="artist">Artist</option>
+          <option value="education">Education</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Pipeline Stage</label>
+        <select id="cf_stage">
+          <option value="identified">Identified</option>
+          <option value="contacted">Contacted</option>
+          <option value="responded">Responded</option>
+          <option value="meeting_scheduled">Meeting Scheduled</option>
+          <option value="proposal_sent">Proposal Sent</option>
+          <option value="negotiating">Negotiating</option>
+          <option value="active">Active</option>
+          <option value="closed_won">Closed Won</option>
+          <option value="closed_lost">Closed Lost</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Priority</label>
+        <select id="cf_priority">
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="vip">VIP</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Source</label>
+        <select id="cf_source">
+          <option value="cold_outreach">Cold Outreach</option>
+          <option value="referral">Referral</option>
+          <option value="conference">Conference</option>
+          <option value="inbound">Inbound</option>
+          <option value="social">Social</option>
+          <option value="direct">Direct</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Country</label><input type="text" id="cf_country" placeholder="US" /></div>
+      <div class="form-group"><label>PRO Territory</label><input type="text" id="cf_territory" placeholder="ASCAP, PRS, GEMA..." /></div>
+      <div class="form-group"><label>Website</label><input type="text" id="cf_website" /></div>
+      <div class="form-group"><label>Phone</label><input type="text" id="cf_phone" /></div>
+      <div class="form-group full"><label>Notes</label><textarea id="cf_notes" placeholder="Key context, talking points, relationship history..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('contactModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveContact()">Save Contact</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOG OUTREACH MODAL -->
+<div class="modal-overlay" id="logModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('logModal')">×</button>
+    <h3>Log Outreach — <span id="logContactName"></span></h3>
+    <div class="form-grid">
+      <div class="form-group"><label>Channel</label>
+        <select id="lf_channel">
+          <option value="email">Email</option>
+          <option value="linkedin">LinkedIn</option>
+          <option value="phone">Phone</option>
+          <option value="instagram">Instagram</option>
+          <option value="dm">DM</option>
+          <option value="in_person">In Person</option>
+          <option value="conference">Conference</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Direction</label>
+        <select id="lf_direction">
+          <option value="outbound">Outbound</option>
+          <option value="inbound">Inbound</option>
+        </select>
+      </div>
+      <div class="form-group full"><label>Subject / Topic</label><input type="text" id="lf_subject" placeholder="Partnership intro — MusiGod x DistroKid" /></div>
+      <div class="form-group full"><label>Summary</label><textarea id="lf_summary" placeholder="What was said, key points, their reaction..."></textarea></div>
+      <div class="form-group"><label>Outcome</label>
+        <select id="lf_outcome">
+          <option value="no_response">No Response</option>
+          <option value="replied">Replied</option>
+          <option value="meeting_booked">Meeting Booked</option>
+          <option value="interested">Interested</option>
+          <option value="follow_up_needed">Follow-up Needed</option>
+          <option value="declined">Declined</option>
+          <option value="converted">Converted</option>
+          <option value="bounced">Bounced</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Follow-up Date</label><input type="date" id="lf_followup" /></div>
+      <div class="form-group"><label>Update Stage To</label>
+        <select id="lf_stage">
+          <option value="">(no change)</option>
+          <option value="contacted">Contacted</option>
+          <option value="responded">Responded</option>
+          <option value="meeting_scheduled">Meeting Scheduled</option>
+          <option value="proposal_sent">Proposal Sent</option>
+          <option value="negotiating">Negotiating</option>
+          <option value="active">Active</option>
+          <option value="closed_won">Closed Won</option>
+          <option value="closed_lost">Closed Lost</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('logModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveLog()">Log Activity</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONTACT DETAIL MODAL -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal" style="max-width:780px">
+    <button class="modal-close" onclick="closeModal('detailModal')">×</button>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
+<script>
+const SB_URL = 'https://uykzkrnoetcldeuxzqyy.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MzA2MTksImV4cCI6MjA5MzEwNjYxOX0.r4Dx_Jkgje2kYNGh9PQtuyuJgBGJwVAviHM9QmAJcrs';
+
+async function sbFetch(path, opts = {}) {
+  const { headers: extraHeaders, prefer, body, method } = opts;
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    method: method || 'GET',
+    body: body,
+    headers: {
+      'apikey': SB_KEY,
+      'Authorization': `Bearer ${SB_KEY}`,
+      'Content-Type': 'application/json',
+      'Accept-Profile': 'crm',
+      'Content-Profile': 'crm',
+      'Prefer': prefer || 'return=representation',
+      ...(extraHeaders || {})
+    },
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+let allContacts = [];
+let currentContactId = null;
+
+// ── TABS ─────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'contacts') loadContacts();
+  if (name === 'pipeline') loadPipeline();
+  if (name === 'partnerships') loadPartnerships();
+  if (name === 'followups') loadFollowups();
+  if (name === 'affiliates') loadAffiliates();
+}
+
+// ── STATS ─────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const [contacts, partnerships, followups] = await Promise.all([
+      sbFetch('contacts?select=id,pipeline_stage,priority'),
+      sbFetch('partnerships?select=id,status,estimated_monthly_value'),
+      sbFetch('follow_ups_due?select=contact_id', { headers: { 'Accept-Profile': 'crm' } })
+    ]);
+    document.getElementById('statTotal').textContent = contacts.length;
+    document.getElementById('statActive').textContent = partnerships.filter(p => p.status === 'active').length;
+    document.getElementById('statFollowups').textContent = followups.length;
+    const val = partnerships.reduce((s, p) => s + (p.estimated_monthly_value || 0), 0);
+    document.getElementById('statValue').textContent = val > 0 ? `$${(val/1000).toFixed(1)}K` : '$0';
+    document.getElementById('statVip').textContent = contacts.filter(c => c.priority === 'vip').length;
+  } catch(e) { console.error('Stats error:', e); }
+}
+
+// ── CONTACTS ─────────────────────────────────────────────────
+async function loadContacts() {
+  const type = document.getElementById('filterType').value;
+  const stage = document.getElementById('filterStage').value;
+  let path = 'contacts?select=*&order=created_at.desc';
+  if (type) path += `&type=eq.${type}`;
+  if (stage) path += `&pipeline_stage=eq.${stage}`;
+  try {
+    allContacts = await sbFetch(path);
+    renderContacts(allContacts);
+  } catch(e) {
+    document.getElementById('contactsBody').innerHTML = `<tr><td colspan="8" class="empty">Error loading contacts: ${e.message}</td></tr>`;
+  }
+}
+
+function renderContacts(contacts) {
+  const body = document.getElementById('contactsBody');
+  if (!contacts.length) { body.innerHTML = '<tr><td colspan="8" class="empty">No contacts yet. Add your first target above.</td></tr>'; return; }
+  body.innerHTML = contacts.map(c => `
+    <tr onclick="openDetail('${c.id}')">
+      <td><strong>${c.full_name}</strong></td>
+      <td>${c.company || '<span class="muted">—</span>'}</td>
+      <td><span class="badge badge-medium">${c.type}</span></td>
+      <td><span class="badge badge-${c.pipeline_stage}">${c.pipeline_stage.replace(/_/g,' ')}</span></td>
+      <td><span class="badge badge-${c.priority}">${c.priority}</span></td>
+      <td>${c.country || '—'}</td>
+      <td class="muted">${c.updated_at ? new Date(c.updated_at).toLocaleDateString() : '—'}</td>
+      <td onclick="event.stopPropagation()">
+        <button class="btn btn-outline btn-sm" onclick="openLogModal('${c.id}','${c.full_name.replace(/'/g,"\\'")}')">Log</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterContacts(q) {
+  const filtered = allContacts.filter(c =>
+    c.full_name.toLowerCase().includes(q.toLowerCase()) ||
+    (c.company||'').toLowerCase().includes(q.toLowerCase())
+  );
+  renderContacts(filtered);
+}
+
+// ── PIPELINE KANBAN ───────────────────────────────────────────
+async function loadPipeline() {
+  const stages = ['identified','contacted','responded','meeting_scheduled','proposal_sent'];
+  const labels = { identified:'Identified', contacted:'Contacted', responded:'Responded', meeting_scheduled:'Meeting Scheduled', proposal_sent:'Proposal Sent' };
+  try {
+    const contacts = await sbFetch('contacts?select=id,full_name,company,type,priority,pipeline_stage,tags&order=priority.desc');
+    const board = document.getElementById('kanbanBoard');
+    board.innerHTML = stages.map(stage => {
+      const cards = contacts.filter(c => c.pipeline_stage === stage);
+      return `
+        <div class="kanban-col">
+          <h4>${labels[stage]} <span>${cards.length}</span></h4>
+          ${cards.map(c => `
+            <div class="kanban-card" onclick="openDetail('${c.id}')">
+              <div class="name">${c.full_name}</div>
+              <div class="co">${c.company || c.type}</div>
+              ${c.tags && c.tags.length ? `<div class="tags">${c.tags.slice(0,3).map(t=>`<span class="tag">${t}</span>`).join('')}</div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }).join('');
+  } catch(e) { document.getElementById('kanbanBoard').innerHTML = `<p style="color:var(--red);padding:20px">${e.message}</p>`; }
+}
+
+// ── PARTNERSHIPS ──────────────────────────────────────────────
+async function loadPartnerships() {
+  try {
+    const rows = await sbFetch('partnerships?select=*,contacts(full_name,company)&order=created_at.desc');
+    const body = document.getElementById('partnershipsBody');
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="7" class="empty">No partnerships yet.</td></tr>'; return; }
+    body.innerHTML = rows.map(p => `
+      <tr>
+        <td><strong>${p.partner_name}</strong><div class="muted">${p.contacts?.full_name || ''}</div></td>
+        <td>${p.partner_type}</td>
+        <td>${p.deal_type || '—'}</td>
+        <td><span class="badge badge-${p.status === 'active' ? 'active' : 'identified'}">${p.status}</span></td>
+        <td>${p.estimated_monthly_value ? '$'+Number(p.estimated_monthly_value).toLocaleString() : '—'}</td>
+        <td>${p.active_since || '—'}</td>
+        <td><button class="btn btn-outline btn-sm" onclick="editPartnership('${p.id}')">Edit</button></td>
+      </tr>
+    `).join('');
+  } catch(e) { document.getElementById('partnershipsBody').innerHTML = `<tr><td colspan="7" class="empty">${e.message}</td></tr>`; }
+}
+
+// ── FOLLOW-UPS ────────────────────────────────────────────────
+async function loadFollowups() {
+  try {
+    const rows = await sbFetch('follow_ups_due?select=*');
+    const body = document.getElementById('followupsBody');
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="7" class="empty">No follow-ups due. You\'re caught up.</td></tr>'; return; }
+    const today = new Date().toISOString().split('T')[0];
+    body.innerHTML = rows.map(r => {
+      const overdue = r.next_follow_up < today;
+      return `<tr class="${overdue ? 'overdue' : 'followup-row'}">
+        <td><strong>${r.next_follow_up}</strong>${overdue ? ' <span style="color:var(--red);font-size:11px">OVERDUE</span>' : ''}</td>
+        <td>${r.full_name}</td>
+        <td>${r.company || '—'}</td>
+        <td><span class="badge badge-${r.pipeline_stage}">${r.pipeline_stage}</span></td>
+        <td>${r.last_outcome || '—'}</td>
+        <td>${r.subject || '—'}</td>
+        <td><button class="btn btn-outline btn-sm" onclick="openLogModal('${r.contact_id}','${r.full_name.replace(/'/g,"\\'")}')">Log Follow-up</button></td>
+      </tr>`;
+    }).join('');
+  } catch(e) { document.getElementById('followupsBody').innerHTML = `<tr><td colspan="7" class="empty">${e.message}</td></tr>`; }
+}
+
+// ── AFFILIATES ────────────────────────────────────────────────
+async function loadAffiliates() {
+  try {
+    const rows = await sbFetch('affiliate_pipeline?select=*,contacts(full_name,email)&order=created_at.desc');
+    const body = document.getElementById('affiliatesBody');
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="7" class="empty">No affiliates in pipeline yet.</td></tr>'; return; }
+    body.innerHTML = rows.map(a => `
+      <tr>
+        <td><strong>${a.contacts?.full_name || '—'}</strong><div class="muted">${a.contacts?.email || ''}</div></td>
+        <td><span class="badge badge-${a.tier === 'tier1_artist' ? 'medium' : a.tier === 'tier2_pro' ? 'tier2' : 'tier1'}">${a.tier.replace(/_/g,' ')}</span></td>
+        <td><span class="badge badge-${a.status === 'active' ? 'active' : 'identified'}">${a.status}</span></td>
+        <td>${a.total_referrals} / ${a.active_referrals} active</td>
+        <td>$${Number(a.total_earned||0).toLocaleString()}</td>
+        <td>${a.affiliate_code || '—'}</td>
+        <td><button class="btn btn-outline btn-sm" onclick="editAffiliate('${a.id}')">Edit</button></td>
+      </tr>
+    `).join('');
+  } catch(e) { document.getElementById('affiliatesBody').innerHTML = `<tr><td colspan="7" class="empty">${e.message}</td></tr>`; }
+}
+
+// ── CONTACT DETAIL ────────────────────────────────────────────
+async function openDetail(id) {
+  currentContactId = id;
+  try {
+    const [contact, logs] = await Promise.all([
+      sbFetch(`contacts?id=eq.${id}&select=*`).then(r => r[0]),
+      sbFetch(`outreach_log?contact_id=eq.${id}&select=*&order=created_at.desc`)
+    ]);
+    const content = document.getElementById('detailContent');
+    content.innerHTML = `
+      <h3>${contact.full_name}</h3>
+      <div class="sub">${contact.title || ''} ${contact.title && contact.company ? '·' : ''} ${contact.company || ''}</div>
+      <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+        <span class="badge badge-${contact.pipeline_stage}">${contact.pipeline_stage.replace(/_/g,' ')}</span>
+        <span class="badge badge-${contact.priority}">${contact.priority}</span>
+        <span class="badge badge-medium">${contact.type}</span>
+        ${contact.country ? `<span class="badge badge-medium">${contact.country}</span>` : ''}
+      </div>
+      <div class="detail-grid" style="margin-bottom:20px">
+        <div class="detail-field"><div class="lbl">Email</div><div class="val">${contact.email || '—'}</div></div>
+        <div class="detail-field"><div class="lbl">Website</div><div class="val">${contact.website ? `<a href="${contact.website}" target="_blank" style="color:var(--gold)">${contact.website}</a>` : '—'}</div></div>
+        <div class="detail-field"><div class="lbl">Territory</div><div class="val">${contact.territory || '—'}</div></div>
+        <div class="detail-field"><div class="lbl">Source</div><div class="val">${contact.source || '—'}</div></div>
+        <div class="detail-field"><div class="lbl">Tags</div><div class="val">${(contact.tags||[]).join(', ') || '—'}</div></div>
+        <div class="detail-field"><div class="lbl">Added</div><div class="val">${new Date(contact.created_at).toLocaleDateString()}</div></div>
+      </div>
+      ${contact.notes ? `<div style="background:var(--mid);border-radius:8px;padding:14px;margin-bottom:20px;font-size:13px;line-height:1.6;color:var(--text)">${contact.notes}</div>` : ''}
+      <div style="display:flex;gap:10px;margin-bottom:24px">
+        <button class="btn btn-gold" onclick="closeModal('detailModal');openLogModal('${id}','${contact.full_name.replace(/'/g,"\\'")}')">Log Activity</button>
+        <button class="btn btn-outline" onclick="openEditContact('${id}')">Edit Contact</button>
+      </div>
+      <div class="log-section">
+        <h4>Activity History (${logs.length})</h4>
+        ${logs.length === 0 ? '<p style="color:var(--muted);font-size:13px">No activity logged yet.</p>' :
+          logs.map(l => `
+            <div class="log-entry">
+              <div class="log-meta">
+                <span>${new Date(l.created_at).toLocaleDateString()}</span>
+                <span>${l.channel} · ${l.direction}</span>
+                ${l.next_follow_up ? `<span style="color:var(--orange)">Follow-up: ${l.next_follow_up}</span>` : ''}
+              </div>
+              ${l.subject ? `<div class="log-text" style="font-weight:600;margin-bottom:4px">${l.subject}</div>` : ''}
+              ${l.summary ? `<div class="log-text">${l.summary}</div>` : ''}
+              ${l.outcome ? `<div class="log-outcome"><span class="badge badge-${l.outcome === 'converted' ? 'active' : l.outcome === 'declined' ? 'closed_lost' : 'medium'}">${l.outcome.replace(/_/g,' ')}</span></div>` : ''}
+            </div>
+          `).join('')}
+      </div>
+    `;
+    document.getElementById('detailModal').classList.add('open');
+  } catch(e) { alert('Error loading contact: ' + e.message); }
+}
+
+// ── MODALS ────────────────────────────────────────────────────
+function openAddContact() {
+  currentContactId = null;
+  document.getElementById('contactModalTitle').textContent = 'Add Contact';
+  ['name','email','company','title','country','territory','website','phone','notes'].forEach(f => {
+    document.getElementById(`cf_${f}`).value = '';
+  });
+  document.getElementById('cf_type').value = 'partner';
+  document.getElementById('cf_stage').value = 'identified';
+  document.getElementById('cf_priority').value = 'medium';
+  document.getElementById('cf_source').value = 'cold_outreach';
+  document.getElementById('contactModal').classList.add('open');
+}
+
+async function openEditContact(id) {
+  closeModal('detailModal');
+  try {
+    const c = await sbFetch(`contacts?id=eq.${id}&select=*`).then(r => r[0]);
+    currentContactId = id;
+    document.getElementById('contactModalTitle').textContent = 'Edit Contact';
+    document.getElementById('cf_name').value = c.full_name || '';
+    document.getElementById('cf_email').value = c.email || '';
+    document.getElementById('cf_company').value = c.company || '';
+    document.getElementById('cf_title').value = c.title || '';
+    document.getElementById('cf_type').value = c.type || 'partner';
+    document.getElementById('cf_stage').value = c.pipeline_stage || 'identified';
+    document.getElementById('cf_priority').value = c.priority || 'medium';
+    document.getElementById('cf_source').value = c.source || 'cold_outreach';
+    document.getElementById('cf_country').value = c.country || '';
+    document.getElementById('cf_territory').value = c.territory || '';
+    document.getElementById('cf_website').value = c.website || '';
+    document.getElementById('cf_phone').value = c.phone || '';
+    document.getElementById('cf_notes').value = c.notes || '';
+    document.getElementById('contactModal').classList.add('open');
+  } catch(e) { alert(e.message); }
+}
+
+async function saveContact() {
+  const payload = {
+    full_name: document.getElementById('cf_name').value.trim(),
+    email: document.getElementById('cf_email').value.trim() || null,
+    company: document.getElementById('cf_company').value.trim() || null,
+    title: document.getElementById('cf_title').value.trim() || null,
+    type: document.getElementById('cf_type').value,
+    pipeline_stage: document.getElementById('cf_stage').value,
+    priority: document.getElementById('cf_priority').value,
+    source: document.getElementById('cf_source').value,
+    country: document.getElementById('cf_country').value.trim() || null,
+    territory: document.getElementById('cf_territory').value.trim() || null,
+    website: document.getElementById('cf_website').value.trim() || null,
+    phone: document.getElementById('cf_phone').value.trim() || null,
+    notes: document.getElementById('cf_notes').value.trim() || null,
+  };
+  if (!payload.full_name) { alert('Name is required'); return; }
+  try {
+    if (currentContactId) {
+      await sbFetch(`contacts?id=eq.${currentContactId}`, { method: 'PATCH', body: JSON.stringify(payload) });
+    } else {
+      await sbFetch('contacts', { method: 'POST', body: JSON.stringify(payload) });
+    }
+    closeModal('contactModal');
+    loadContacts();
+    loadStats();
+  } catch(e) { alert('Save failed: ' + e.message); }
+}
+
+function openLogModal(contactId, contactName) {
+  currentContactId = contactId;
+  document.getElementById('logContactName').textContent = contactName;
+  document.getElementById('lf_subject').value = '';
+  document.getElementById('lf_summary').value = '';
+  document.getElementById('lf_followup').value = '';
+  document.getElementById('lf_outcome').value = 'no_response';
+  document.getElementById('lf_stage').value = '';
+  document.getElementById('logModal').classList.add('open');
+}
+
+async function saveLog() {
+  const payload = {
+    contact_id: currentContactId,
+    channel: document.getElementById('lf_channel').value,
+    direction: document.getElementById('lf_direction').value,
+    subject: document.getElementById('lf_subject').value.trim() || null,
+    summary: document.getElementById('lf_summary').value.trim() || null,
+    outcome: document.getElementById('lf_outcome').value,
+    next_follow_up: document.getElementById('lf_followup').value || null,
+  };
+  try {
+    await sbFetch('outreach_log', { method: 'POST', body: JSON.stringify(payload), prefer: 'return=minimal' });
+    const newStage = document.getElementById('lf_stage').value;
+    if (newStage) {
+      await sbFetch(`contacts?id=eq.${currentContactId}`, {
+        method: 'PATCH', body: JSON.stringify({ pipeline_stage: newStage }), prefer: 'return=minimal'
+      });
+    }
+    closeModal('logModal');
+    loadContacts();
+    loadStats();
+  } catch(e) { alert('Log failed: ' + e.message); }
+}
+
+function openAddPartnership() { alert('Partnership modal — coming in next sprint. For now, add via Supabase dashboard or ask me to extend.'); }
+function openAddAffiliate() { alert('Affiliate modal — coming in next sprint.'); }
+function editPartnership(id) { alert('Edit partnership — extend me.'); }
+function editAffiliate(id) { alert('Edit affiliate — extend me.'); }
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));
+
+// ── INIT ──────────────────────────────────────────────────────
+loadStats();
+loadContacts();
+</script>
+</body>
+</html>

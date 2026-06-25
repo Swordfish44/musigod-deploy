@@ -1,5 +1,6 @@
 const { captureException, withSentry } = require('./_sentry')
 const { log, safeLogAuditEvent, correlationId, safeErrorMessage } = require('./_fulfillment')
+const { syncCatalogToGraph } = require('./graph-sync')
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
@@ -70,6 +71,11 @@ module.exports = withSentry(async function handler(req, res) {
     audit_id: auditId,
     status: 'QUEUED',
   }))
+
+  // Sync to rights graph (non-blocking)
+  syncCatalogToGraph(audit.artist_id || auditId, inserted).catch(err =>
+    log('warn', 'GRAPH_SYNC_FAILED', { audit_id: auditId, message: err.message })
+  )
   try {
     await sbPost('catalog_enrichment_v1', 'public', enrichmentRows)
     log('info', 'CATALOG_ENRICHMENT_QUEUED', { request_id: requestId, audit_id: auditId, queued: enrichmentRows.length })
@@ -215,3 +221,4 @@ function getRawBody(req) {
     req.on('error', reject)
   })
 }
+
