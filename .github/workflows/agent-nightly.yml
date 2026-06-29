@@ -14,6 +14,7 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
+  id-token: write
 
 jobs:
   pick-and-build:
@@ -61,8 +62,6 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          allowed_tools: "Edit,Read,Write,Bash(git*),Bash(npm*)"
-          max_turns: "40"
           prompt: |
             Read CLAUDE.md first and follow it exactly — it is non-negotiable,
             especially the "Money and consent" section.
@@ -78,6 +77,7 @@ jobs:
             yourself under any circumstance. In the PR description, summarize
             what changed, why, and explicitly call out if this PR touches
             money, consent, or legal state.
+          claude_args: "--max-turns 40 --allowedTools Edit,Read,Write,Bash(git*),Bash(npm*)"
 
       - name: Label the issue as in-review
         if: steps.pick.outputs.found == 'true'
