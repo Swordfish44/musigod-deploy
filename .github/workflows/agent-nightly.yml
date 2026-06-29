@@ -35,24 +35,34 @@ jobs:
               labels: "agent-ready",
               sort: "created",
               direction: "asc",
-              per_page: 1
+              per_page: 10
             });
             if (issues.data.length === 0) {
               core.setOutput("found", "false");
               return;
             }
-            const issue = issues.data[0];
+            const safe = issues.data.find(i =>
+              !i.labels.some(l => l.name === "needs-human-merge")
+            );
+            if (!safe) {
+              core.info("Only needs-human-merge issues found — skipping nightly run.");
+              core.setOutput("found", "false");
+              return;
+            }
+            const issue = safe;
             core.setOutput("found", "true");
             core.setOutput("number", issue.number);
             core.setOutput("title", issue.title);
             core.setOutput("body", issue.body || "");
-            core.setOutput("needs_human_merge", issue.labels.some(l => l.name === "needs-human-merge") ? "true" : "false");
+            core.setOutput("needs_human_merge", "false");
 
       - name: Run Claude Code on the issue
         if: steps.pick.outputs.found == 'true'
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          allowed_tools: "Edit,Read,Write,Bash(git*),Bash(npm*)"
+          max_turns: "40"
           prompt: |
             Read CLAUDE.md first and follow it exactly — it is non-negotiable,
             especially the "Money and consent" section.
@@ -68,7 +78,6 @@ jobs:
             yourself under any circumstance. In the PR description, summarize
             what changed, why, and explicitly call out if this PR touches
             money, consent, or legal state.
-          claude_args: "--max-turns 40 --allowedTools Edit,Read,Write,Bash(git*),Bash(npm*)"
 
       - name: Label the issue as in-review
         if: steps.pick.outputs.found == 'true'
