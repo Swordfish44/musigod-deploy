@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: release/fulfillment-layer-v1
+          ref: master
 
       - name: Find oldest agent-ready issue
         id: pick
@@ -43,10 +43,11 @@ jobs:
               return;
             }
             const safe = issues.data.find(i =>
-              !i.labels.some(l => l.name === "needs-human-merge")
+              !i.labels.some(l => l.name === "needs-human-merge") &&
+              !i.labels.some(l => l.name === "agent-in-review")
             );
             if (!safe) {
-              core.info("Only needs-human-merge issues found — skipping nightly run.");
+              core.info("No safe issues found (all are needs-human-merge or agent-in-review) — skipping.");
               core.setOutput("found", "false");
               return;
             }
@@ -55,7 +56,9 @@ jobs:
             core.setOutput("number", issue.number);
             core.setOutput("title", issue.title);
             core.setOutput("body", issue.body || "");
-            core.setOutput("needs_human_merge", "false");
+            core.setOutput("needs_human_merge",
+              issue.labels.some(l => l.name === "needs-human-merge") ? "true" : "false"
+            );
 
       - name: Run Claude Code on the issue
         if: steps.pick.outputs.found == 'true'
@@ -72,7 +75,7 @@ jobs:
 
             Implement this on a new branch named agent/issue-${{ steps.pick.outputs.number }}.
             Write or update tests where applicable. Commit with a clear message.
-            Open a PR against release/fulfillment-layer-v1 that references
+            Open a PR against master that references
             "Closes #${{ steps.pick.outputs.number }}". Do not merge the PR
             yourself under any circumstance. In the PR description, summarize
             what changed, why, and explicitly call out if this PR touches
