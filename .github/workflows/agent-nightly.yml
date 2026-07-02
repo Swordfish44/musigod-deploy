@@ -4,8 +4,8 @@ name: Agent Nightly Build
 # Issues labeled "needs-human-merge" (money/consent/legal) get a PR but the
 # workflow will not approve or merge it under any condition.
 on:
-  schedule:
-    - cron: "0 9 * * *"   # 9:00 UTC ≈ 4-5am Detroit — work shows up by morning
+  # schedule:  # DISABLED — nightly auto-runs turned off (was burning tokens)
+  #    - cron: "0 9 * * *"   # 9:00 UTC ≈ 4-5am Detroit — work shows up by morning
   workflow_dispatch: {}     # manual trigger button in the Actions tab
 
 permissions:
