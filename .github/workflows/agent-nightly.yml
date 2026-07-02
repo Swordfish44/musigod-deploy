@@ -1,10 +1,8 @@
 name: Agent Nightly Build
-
 # Runs every night and on demand. Picks up the oldest open issue labeled
 # "agent-ready", does the work headlessly, opens a PR. Never auto-merges.
 # Issues labeled "needs-human-merge" (money/consent/legal) get a PR but the
 # workflow will not approve or merge it under any condition.
-
 on:
   schedule:
     - cron: "0 9 * * *"   # 9:00 UTC ≈ 4-5am Detroit — work shows up by morning
@@ -16,9 +14,20 @@ permissions:
   issues: write
   id-token: write
 
+# Never let two runs overlap (a slow run + the next nightly, or manual + scheduled).
+# A queued run waits instead of double-spending. Set cancel-in-progress: true if
+# you'd rather a new run kill a stuck one.
+concurrency:
+  group: agent-nightly
+  cancel-in-progress: false
+
 jobs:
   pick-and-build:
     runs-on: ubuntu-latest
+    # HARD wall-clock cap. This is the real cost ceiling — it holds even if the
+    # --max-turns bug (issue #1177) causes that flag to be ignored. Nothing can
+    # run longer than this. Raise it only if legit work genuinely needs more.
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,6 +48,7 @@ jobs:
               per_page: 10
             });
             if (issues.data.length === 0) {
+              core.info("No agent-ready issues — nothing to do. Exiting cheap.");
               core.setOutput("found", "false");
               return;
             }
@@ -47,7 +57,7 @@ jobs:
               !i.labels.some(l => l.name === "agent-in-review")
             );
             if (!safe) {
-              core.info("No safe issues found (all are needs-human-merge or agent-in-review) — skipping.");
+              core.info("No safe issues (all needs-human-merge or agent-in-review) — skipping.");
               core.setOutput("found", "false");
               return;
             }
@@ -69,21 +79,35 @@ jobs:
             Read CLAUDE.md first and follow it exactly — it is non-negotiable,
             especially the "Money and consent" section.
 
-            Work issue #${{ steps.pick.outputs.number }}: "${{ steps.pick.outputs.title }}"
+            You have a limited turn budget. Work efficiently. Do not over-explore
+            the repo or re-read files you have already read.
 
+            Work issue #${{ steps.pick.outputs.number }}: "${{ steps.pick.outputs.title }}"
             ${{ steps.pick.outputs.body }}
 
             Implement this on a new branch named agent/issue-${{ steps.pick.outputs.number }}.
-            Write or update tests where applicable. Commit with a clear message.
-            Open a PR against master that references
-            "Closes #${{ steps.pick.outputs.number }}". Do not merge the PR
-            yourself under any circumstance. In the PR description, summarize
-            what changed, why, and explicitly call out if this PR touches
-            money, consent, or legal state.
-          claude_args: "--max-turns 40 --allowedTools Edit,Read,Write,Bash(git*),Bash(npm*)"
 
-      - name: Label the issue as in-review
-        if: steps.pick.outputs.found == 'true'
+            IMPORTANT: As soon as you have made your first commit, open a DRAFT pull
+            request against master that references "Closes #${{ steps.pick.outputs.number }}",
+            then keep pushing commits to that same branch. Opening the draft PR early
+            guarantees your work is never lost if you run out of turns.
+
+            Write or update tests where applicable. Use clear commit messages.
+            When the work is complete, mark the PR ready for review and summarize in
+            the PR description what changed, why, and explicitly call out if this PR
+            touches money, consent, or legal state.
+
+            Do not merge the PR yourself under any circumstance.
+          claude_args: |
+            --model claude-sonnet-5
+            --max-turns 8
+            --allowedTools Edit,Read,Write,Bash(git*),Bash(npm*)
+
+      - name: Move issue out of the pick queue (success OR failure)
+        # always() so a stuck/too-big issue gets labeled after ONE attempt instead
+        # of being re-picked and re-failing every single night forever. If you WANT
+        # automatic retries, remove `always() &&` below.
+        if: always() && steps.pick.outputs.found == 'true'
         uses: actions/github-script@v7
         with:
           script: |
