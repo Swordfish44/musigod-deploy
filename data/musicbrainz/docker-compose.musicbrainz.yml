@@ -1,0 +1,35 @@
+version: '3.9'
+
+# Local MusicBrainz staging database.
+# This compose file is intentionally isolated from production.
+# Port 55432 is chosen to avoid conflict with any local Postgres on 5432.
+#
+# Start:  docker compose -f data/musicbrainz/docker-compose.musicbrainz.yml up -d
+# Stop:   docker compose -f data/musicbrainz/docker-compose.musicbrainz.yml down
+# Status: docker compose -f data/musicbrainz/docker-compose.musicbrainz.yml ps
+
+services:
+  musicbrainz_staging:
+    image: postgres:16
+    container_name: musigod_mb_staging
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       musicbrainz_staging
+      POSTGRES_USER:     musicbrainz
+      POSTGRES_PASSWORD: local_musicbrainz_only
+    ports:
+      - "55432:5432"
+    volumes:
+      - mb_postgres_data:/var/lib/postgresql/data
+      - ./staging:/staging:ro    # mount staging SQL scripts read-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U musicbrainz -d musicbrainz_staging"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mb_postgres_data:
+    driver: local
+    # Data is persisted under the Docker-managed volume — NOT in the repo tree.
+    # Run `docker volume rm musigod-deploy_mb_postgres_data` to wipe and start fresh.

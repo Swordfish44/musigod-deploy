@@ -1,3 +1,14 @@
 .vercel
 .env*.local
 .env.codex.local
+
+# MusicBrainz local staging — dumps and extracted data must never be committed
+data/musicbrainz/dumps/
+data/musicbrainz/staging/*.sql
+data/musicbrainz/staging/*.dump
+data/musicbrainz/staging/*.tar
+data/musicbrainz/staging/*.gz
+data/musicbrainz/staging/*.zip
+data/musicbrainz/postgres-data/
+*.mbdump
+*.mbdump.tar.bz2
