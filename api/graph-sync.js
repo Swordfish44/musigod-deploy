@@ -158,6 +158,10 @@ async function syncCatalogToGraph(artistId, tracks) {
 /**
  * Called from enrich-artist.js after enrichment completes.
  * Patches existing work/recording nodes with ISWC, ISRC, MusicBrainz IDs.
+ *
+ * Supports two incoming track shapes:
+ *   enrichArtistCatalog() → camelCase: trackTitle, isrcs[], recordingMBID
+ *   submit-catalog / bulk import → snake_case: title, isrc, catalog_id, recording_mbid
  */
 async function syncEnrichmentToGraph(artistId, enrichedTracks) {
   if (!enrichedTracks?.length) return
@@ -165,52 +169,68 @@ async function syncEnrichmentToGraph(artistId, enrichedTracks) {
   let patched = 0
   for (const track of enrichedTracks) {
     try {
-      // Find work node by title fingerprint or catalog_id
-      const workNodeId = await findNodeByExternalId(
-        track.catalog_id || fingerprint(track.title),
-        'musigod_catalog'
-      )
-      if (!workNodeId) continue
+      // Normalise field names across both incoming shapes.
+      const title         = track.trackTitle      || track.title        || null
+      const catalogId     = track.catalog_id      || null
+      const iswc          = track.iswc            || null
+      const isrc          = (track.isrcs && track.isrcs[0]) || track.isrc || null
+      const recordingMbid = track.recording_mbid  || track.recordingMBID || null
 
-      // Patch the composition detail record
-      const patch = {}
-      if (track.iswc)            patch.iswc = track.iswc
-      if (track.musicbrainz_id)  patch.musicbrainz_id = track.musicbrainz_id
-      if (track.ascap_id)        patch.ascap_id = track.ascap_id
-      if (track.bmi_id)          patch.bmi_id = track.bmi_id
+      // ── Work node lookup: ISWC → catalog_id → title fingerprint ─────────────
+      // These are tried in priority order; the first hit wins.
+      // ISWC is the most reliable cross-source identifier for a composition.
+      let workNodeId = null
+      if (iswc)                 workNodeId = await findNodeByExternalId(iswc, 'iswc')
+      if (!workNodeId && catalogId) workNodeId = await findNodeByExternalId(catalogId, 'musigod_catalog')
+      if (!workNodeId && title)     workNodeId = await findNodeByExternalId(fingerprint(title), 'musigod_catalog')
 
-      if (Object.keys(patch).length) {
-        await graphFetch(`works_compositions_v1?node_id=eq.${workNodeId}`, {
-          method: 'PATCH',
-          body: patch,
-          schema: 'works',
-        })
-      }
-
-      // Patch recording node with ISRC
-      if (track.isrc) {
-        const recNodeId = await findNodeByExternalId(
-          `rec_${track.catalog_id}`,
-          'musigod_catalog'
-        )
-        if (recNodeId) {
-          await graphFetch(`works_recordings_v1?node_id=eq.${recNodeId}`, {
+      if (workNodeId) {
+        const workPatch = {}
+        if (iswc)                 workPatch.iswc             = iswc
+        if (track.musicbrainz_id) workPatch.musicbrainz_id  = track.musicbrainz_id
+        if (track.ascap_id)       workPatch.ascap_id         = track.ascap_id
+        if (track.bmi_id)         workPatch.bmi_id           = track.bmi_id
+        if (Object.keys(workPatch).length) {
+          await graphFetch(`works_compositions_v1?node_id=eq.${workNodeId}`, {
             method: 'PATCH',
-            body: { isrc: track.isrc.toUpperCase() },
+            body: workPatch,
             schema: 'works',
           })
-          // Also update the node's external_id to the ISRC
-          await graphFetch(`graph_nodes_v1?id=eq.${recNodeId}`, {
+        }
+      }
+
+      // ── Recording node: ISRC namespace → rec_{catalogId} → title fingerprint ─
+      // Patch with ISRC and/or recording MBID (Finding 1 + 2 fix).
+      // ISRC goes into works_recordings_v1.isrc — NOT into the node's external_id.
+      // Recording MBID goes into works_recordings_v1.musicbrainz_recording_id,
+      // bridging catalog_enriched_tracks_v1.recording_mbid to the formal graph table.
+      // Work and recording patches are independent: a missing work node does NOT
+      // prevent the recording node from being updated.
+      if (isrc || recordingMbid) {
+        let recNodeId = null
+        if (isrc)                     recNodeId = await findNodeByExternalId(isrc.toUpperCase(), 'isrc')
+        if (!recNodeId && catalogId)  recNodeId = await findNodeByExternalId(`rec_${catalogId}`, 'musigod_catalog')
+        if (!recNodeId && title)      recNodeId = await findNodeByExternalId(fingerprint(title), 'musigod_catalog')
+
+        if (recNodeId) {
+          const recPatch = {}
+          if (isrc)          recPatch.isrc                     = isrc.toUpperCase()
+          if (recordingMbid) recPatch.musicbrainz_recording_id = recordingMbid
+          await graphFetch(`works_recordings_v1?node_id=eq.${recNodeId}`, {
             method: 'PATCH',
-            body: { external_id: track.isrc.toUpperCase(), external_id_ns: 'isrc' },
-            schema: 'graph',
+            body: recPatch,
+            schema: 'works',
           })
+          // NOTE: we intentionally do NOT touch graph_nodes_v1.external_id or
+          // external_id_ns. The MBID and ISRC are stored in works_recordings_v1
+          // columns. Changing the node's primary lookup key would permanently break
+          // future findNodeByExternalId calls for this node.
         }
       }
 
       patched++
     } catch (err) {
-      console.error(`[graph-sync] enrichment patch failed: ${track.title}`, err.message)
+      console.error(`[graph-sync] enrichment patch failed: ${track.trackTitle || track.title || '?'}`, err.message)
     }
   }
 
