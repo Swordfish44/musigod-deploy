@@ -201,8 +201,8 @@ async function syncEnrichmentToGraph(artistId, enrichedTracks) {
 
       // ── Recording node: ISRC namespace → rec_{catalogId} → title fingerprint ─
       // Patch with ISRC and/or recording MBID (Finding 1 + 2 fix).
-      // ISRC goes into works_recordings_v1.isrc — NOT into the node's external_id.
-      // Recording MBID goes into works_recordings_v1.musicbrainz_recording_id,
+      // ISRC goes into works.recordings.isrc — NOT into the node's external_id.
+      // Recording MBID goes into works.recordings.musicbrainz_recording_id,
       // bridging catalog_enriched_tracks_v1.recording_mbid to the formal graph table.
       // Work and recording patches are independent: a missing work node does NOT
       // prevent the recording node from being updated.
@@ -216,13 +216,13 @@ async function syncEnrichmentToGraph(artistId, enrichedTracks) {
           const recPatch = {}
           if (isrc)          recPatch.isrc                     = isrc.toUpperCase()
           if (recordingMbid) recPatch.musicbrainz_recording_id = recordingMbid
-          await graphFetch(`works_recordings_v1?node_id=eq.${recNodeId}`, {
+          await graphFetch(`recordings?node_id=eq.${recNodeId}`, {
             method: 'PATCH',
             body: recPatch,
             schema: 'works',
           })
           // NOTE: we intentionally do NOT touch graph_nodes_v1.external_id or
-          // external_id_ns. The MBID and ISRC are stored in works_recordings_v1
+          // external_id_ns. The MBID and ISRC are stored in works.recordings
           // columns. Changing the node's primary lookup key would permanently break
           // future findNodeByExternalId calls for this node.
         }
@@ -291,7 +291,7 @@ async function syncTrackToGraph({ track, artistNodeId, creatorNodeId, usNodeId }
   })
 
   // 4. Insert recording detail record
-  await graphFetch('works_recordings_v1', {
+  await graphFetch('recordings', {
     method: 'POST',
     body: {
       node_id: recNodeId,

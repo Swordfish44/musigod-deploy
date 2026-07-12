@@ -48,7 +48,7 @@ function makeMockFetch(calls) {
     // Any PATCH to works_compositions_v1
     if (method === 'PATCH' && url.includes('works_compositions_v1')) return ok(null);
     // Any PATCH to works_recordings_v1
-    if (method === 'PATCH' && url.includes('works_recordings_v1'))   return ok(null);
+    if (method === 'PATCH' && url.includes('/v1/recordings'))   return ok(null);
     // Any PATCH to graph_nodes_v1 (should NOT be called after fix)
     if (method === 'PATCH' && url.includes('graph_nodes_v1'))        return ok(null);
     // Unmatched non-GET → fail loudly so tests catch unexpected calls
@@ -93,7 +93,7 @@ async function test_no_node_external_id_overwrite() {
 // ─── Test 2: ISRC written to works_recordings_v1 (regression guard) ──────────
 
 async function test_isrc_written_to_recordings_table() {
-  console.log('\n[2] Finding 2 — isrc still written to works_recordings_v1.isrc');
+  console.log('\n[2] Finding 2 — isrc written to works.recordings.isrc via /v1/recordings');
 
   const calls = [];
   global.fetch = makeMockFetch(calls);
@@ -102,8 +102,8 @@ async function test_isrc_written_to_recordings_table() {
   await syncEnrichmentToGraph('test-artist', [baseTrack({ isrc: 'usabc1234567' })]);
 
   const recPatch = calls.find(c =>
-    c.method === 'PATCH' && c.url.includes('works_recordings_v1'));
-  assert(!!recPatch, 'PATCH to works_recordings_v1 was made');
+    c.method === 'PATCH' && c.url.includes('/v1/recordings'));
+  assert(!!recPatch, 'PATCH to /v1/recordings (works.recordings) was made');
   assert(recPatch?.body?.isrc === 'USABC1234567',
     `isrc uppercased correctly (got "${recPatch?.body?.isrc}")`);
 }
@@ -123,7 +123,7 @@ async function test_snake_case_recording_mbid_bridges() {
   ]);
 
   const recPatch = calls.find(c =>
-    c.method === 'PATCH' && c.url.includes('works_recordings_v1'));
+    c.method === 'PATCH' && c.url.includes('/v1/recordings'));
   assert(recPatch?.body?.musicbrainz_recording_id === mbid,
     `musicbrainz_recording_id set from snake_case field (got "${recPatch?.body?.musicbrainz_recording_id}")`);
   assert(recPatch?.body?.isrc === 'USABC1234567',
@@ -145,7 +145,7 @@ async function test_camelcase_recordingMBID_bridges() {
   ]);
 
   const recPatch = calls.find(c =>
-    c.method === 'PATCH' && c.url.includes('works_recordings_v1'));
+    c.method === 'PATCH' && c.url.includes('/v1/recordings'));
   assert(recPatch?.body?.musicbrainz_recording_id === mbid,
     `musicbrainz_recording_id set from camelCase field (got "${recPatch?.body?.musicbrainz_recording_id}")`);
 }
@@ -153,7 +153,7 @@ async function test_camelcase_recordingMBID_bridges() {
 // ─── Test 5: recording_mbid without ISRC still patches (no ISRC required) ────
 
 async function test_mbid_only_patches() {
-  console.log('\n[5] Finding 1 — recording_mbid patches works_recordings_v1 even without ISRC');
+  console.log('\n[5] Finding 1 — recording_mbid patches works.recordings even without ISRC');
 
   const calls = [];
   global.fetch = makeMockFetch(calls);
@@ -165,8 +165,8 @@ async function test_mbid_only_patches() {
   ]);
 
   const recPatch = calls.find(c =>
-    c.method === 'PATCH' && c.url.includes('works_recordings_v1'));
-  assert(!!recPatch, 'PATCH to works_recordings_v1 made when only recording_mbid present');
+    c.method === 'PATCH' && c.url.includes('/v1/recordings'));
+  assert(!!recPatch, 'PATCH to /v1/recordings (works.recordings) made when only recording_mbid present');
   assert(recPatch?.body?.musicbrainz_recording_id === mbid,
     `musicbrainz_recording_id set correctly`);
   assert(!recPatch?.body?.isrc, 'isrc not included in patch when not provided');
@@ -201,7 +201,7 @@ async function test_external_id_ns_never_changed_to_isrc() {
 // ─── Test 7: no ISRC and no MBID → works_recordings_v1 not patched ───────────
 
 async function test_no_isrc_no_mbid_no_patch() {
-  console.log('\n[7] Edge case — no isrc, no recording_mbid → works_recordings_v1 not patched');
+  console.log('\n[7] Edge case — no isrc, no recording_mbid → works.recordings not patched');
 
   const calls = [];
   global.fetch = makeMockFetch(calls);
@@ -212,14 +212,14 @@ async function test_no_isrc_no_mbid_no_patch() {
   ]);
 
   const recPatch = calls.find(c =>
-    c.method === 'PATCH' && c.url.includes('works_recordings_v1'));
-  assert(!recPatch, 'works_recordings_v1 not patched when no isrc or recording_mbid');
+    c.method === 'PATCH' && c.url.includes('/v1/recordings'));
+  assert(!recPatch, 'works.recordings not patched when no isrc or recording_mbid');
 }
 
 // ─── Test 8: single PATCH (not two) when both ISRC and MBID present ──────────
 
 async function test_single_patch_when_both_present() {
-  console.log('\n[8] Efficiency — single PATCH to works_recordings_v1 when both isrc and mbid present');
+  console.log('\n[8] Efficiency — single PATCH to works.recordings when both isrc and mbid present');
 
   const calls = [];
   global.fetch = makeMockFetch(calls);
@@ -233,9 +233,9 @@ async function test_single_patch_when_both_present() {
   ]);
 
   const recPatches = calls.filter(c =>
-    c.method === 'PATCH' && c.url.includes('works_recordings_v1'));
+    c.method === 'PATCH' && c.url.includes('/v1/recordings'));
   assert(recPatches.length === 1,
-    `exactly 1 PATCH to works_recordings_v1 (got ${recPatches.length})`);
+    `exactly 1 PATCH to /v1/recordings (works.recordings) — got ${recPatches.length}`);
   assert(!!recPatches[0]?.body?.isrc && !!recPatches[0]?.body?.musicbrainz_recording_id,
     'single PATCH contains both isrc and musicbrainz_recording_id');
 }
@@ -275,7 +275,7 @@ function makeMockFetchEnrich(calls) {
       return ok([{ id: ENRICH_REC_NODE_UUID }]);
     }
     if (method === 'PATCH' && url.includes('works_compositions_v1')) return ok(null);
-    if (method === 'PATCH' && url.includes('works_recordings_v1'))   return ok(null);
+    if (method === 'PATCH' && url.includes('/v1/recordings'))   return ok(null);
     if (method === 'PATCH' && url.includes('graph_nodes_v1'))        return ok(null);
     // All other GETs (iswc lookup, etc.) return empty — not found
     if (method === 'GET' && url.includes('graph_nodes_v1')) return ok([]);
@@ -307,14 +307,14 @@ async function test_camelcase_trackTitle_normalised() {
   assert(!!workLookup, 'work node lookup attempted via title fingerprint (not a no-op)');
 
   const recPatch = calls.find(c =>
-    c.method === 'PATCH' && c.url.includes('works_recordings_v1'));
+    c.method === 'PATCH' && c.url.includes('/v1/recordings'));
   assert(!!recPatch, 'recording node patched from enrichArtistCatalog camelCase shape');
 }
 
 // ─── Test 10: isrcs[0] used as isrc — ISRC propagated ───────────────────────
 
 async function test_isrcs_array_normalised() {
-  console.log('\n[10] Field mismatch fix — isrcs[0] normalised to isrc, written to works_recordings_v1');
+  console.log('\n[10] Field mismatch fix — isrcs[0] normalised to isrc, written to works.recordings');
 
   const calls = [];
   global.fetch = makeMockFetchEnrich(calls);
@@ -327,8 +327,8 @@ async function test_isrcs_array_normalised() {
   }]);
 
   const recPatch = calls.find(c =>
-    c.method === 'PATCH' && c.url.includes('works_recordings_v1'));
-  assert(!!recPatch, 'PATCH to works_recordings_v1 when ISRC provided via isrcs[]');
+    c.method === 'PATCH' && c.url.includes('/v1/recordings'));
+  assert(!!recPatch, 'PATCH to /v1/recordings (works.recordings) when ISRC provided via isrcs[]');
   assert(recPatch?.body?.isrc === 'USABC9999999',
     `isrcs[0] uppercased correctly (got "${recPatch?.body?.isrc}")`);
 }
@@ -351,7 +351,7 @@ async function test_no_catalog_id_uses_title_fingerprint() {
     if (method === 'GET' && url.includes('rebelrap') && url.includes('musigod_catalog')) {
       return ok([{ id: ENRICH_REC_NODE_UUID }]);
     }
-    if (method === 'PATCH' && url.includes('works_recordings_v1')) return ok(null);
+    if (method === 'PATCH' && url.includes('/v1/recordings')) return ok(null);
     if (method === 'PATCH' && url.includes('works_compositions_v1')) return ok(null);
     if (method === 'GET' && url.includes('graph_nodes_v1')) return ok([]);
     return { ok: false, status: 404, text: async () => 'unexpected' };
@@ -370,7 +370,7 @@ async function test_no_catalog_id_uses_title_fingerprint() {
   assert(!!fingerLookup, 'title fingerprint fallback attempted for recording node when ISRC ns returns empty');
 
   const recPatch = calls.find(c =>
-    c.method === 'PATCH' && c.url.includes('works_recordings_v1'));
+    c.method === 'PATCH' && c.url.includes('/v1/recordings'));
   assert(!!recPatch, 'recording patch succeeds via fingerprint fallback');
   assert(recPatch?.body?.musicbrainz_recording_id === 'eeeeeeee-ffff-0000-1111-333333333333',
     'musicbrainz_recording_id written via fingerprint-found node');
@@ -395,7 +395,7 @@ async function test_recording_patch_independent_of_work_node() {
       // All other GETs (work lookups via iswc/musigod_catalog) → not found
       return ok([]);
     }
-    if (method === 'PATCH' && url.includes('works_recordings_v1'))  return ok(null);
+    if (method === 'PATCH' && url.includes('/v1/recordings'))  return ok(null);
     if (method === 'PATCH' && url.includes('works_compositions_v1')) return ok(null);
     return { ok: false, status: 404, text: async () => 'unexpected' };
   };
@@ -413,19 +413,107 @@ async function test_recording_patch_independent_of_work_node() {
   assert(!workPatch, 'work patch not called when work node not found (expected)');
 
   const recPatch = calls.find(c =>
-    c.method === 'PATCH' && c.url.includes('works_recordings_v1'));
+    c.method === 'PATCH' && c.url.includes('/v1/recordings'));
   assert(!!recPatch, 'recording patch still fires even when work node lookup returns null');
   assert(recPatch?.body?.musicbrainz_recording_id === 'eeeeeeee-ffff-0000-1111-444444444444',
     'musicbrainz_recording_id still written despite work node miss');
+}
+
+// ─── Tests 13-14: Confirmed base table name regression ───────────────────────
+//
+// works.works_recordings_v1 does NOT exist in production.
+// The confirmed base table is works.recordings.
+// public.works_recordings_v1 is a VIEW over works.recordings (read via PostgREST
+// default schema, no Accept-Profile header).
+//
+// These tests prove that graph-sync.js never sends requests to works_recordings_v1
+// and always targets the correct /rest/v1/recordings path with schema:'works'.
+
+// ─── Test 13: syncEnrichmentToGraph URL never references works_recordings_v1 ──
+
+async function test_enrichment_never_hits_works_recordings_v1() {
+  console.log('\n[13] Base table — syncEnrichmentToGraph targets /v1/recordings, never works_recordings_v1');
+
+  const calls = [];
+  global.fetch = makeMockFetch(calls);
+  const { syncEnrichmentToGraph } = loadFreshGraphSync();
+
+  await syncEnrichmentToGraph('test-artist', [
+    baseTrack({ isrc: 'USABC1234567', recordingMBID: 'cccccccc-dddd-eeee-ffff-000000000013' }),
+  ]);
+
+  const wrongCalls = calls.filter(c => c.url.includes('works_recordings_v1'));
+  assert(wrongCalls.length === 0,
+    `no call references works_recordings_v1 (nonexistent relation) — got ${wrongCalls.length}`);
+
+  const correctPatch = calls.filter(c =>
+    c.method === 'PATCH' && c.url.includes('/v1/recordings'));
+  assert(correctPatch.length === 1,
+    `exactly 1 PATCH to /v1/recordings (confirmed base table) — got ${correctPatch.length}`);
+}
+
+// ─── Test 14: syncCatalogToGraph POST targets recordings, not works_recordings_v1
+
+async function test_catalog_sync_uses_recordings_not_works_recordings_v1() {
+  console.log('\n[14] Base table — syncCatalogToGraph POSTs to /v1/recordings, never to works_recordings_v1');
+
+  const calls = [];
+  const WORK_UUID = 'cccccccc-0000-0000-0000-000000000014';
+  const REC_UUID  = 'dddddddd-0000-0000-0000-000000000014';
+  let upsertCount = 0;
+
+  global.fetch = async (url, opts = {}) => {
+    const method = opts.method || 'GET';
+    const body   = opts.body ? JSON.parse(opts.body) : null;
+    calls.push({ url, method, body });
+
+    if (url.includes('/rpc/graph_upsert_node')) {
+      upsertCount++;
+      return ok(upsertCount === 1 ? WORK_UUID : REC_UUID);
+    }
+    if (url.includes('/rpc/graph_upsert_edge'))  return ok(null);
+    if (method === 'GET' && url.includes('graph_nodes_v1')) return ok([]);
+    if (method === 'POST' && url.includes('works_compositions_v1')) return ok(null);
+    if (method === 'POST' && url.includes('/v1/recordings'))  return ok(null);
+    if (method === 'POST' && url.includes('works_recordings_v1')) return ok(null); // trap wrong target
+    return { ok: false, status: 404, text: async () => `unexpected: ${method} ${url}` };
+  };
+
+  const { syncCatalogToGraph } = loadFreshGraphSync();
+  await syncCatalogToGraph('artist-id-14', [{
+    catalog_id:   'cat-track-14',
+    track_title:  'Test Catalog Track',
+    isrc:         'USXXX1234514',
+    release_date: '2020-01-01',
+  }]);
+
+  const wrongPosts = calls.filter(c =>
+    c.method === 'POST' && c.url.includes('works_recordings_v1'));
+  assert(wrongPosts.length === 0,
+    `no POST to works_recordings_v1 (nonexistent relation) — got ${wrongPosts.length}`);
+
+  const correctPost = calls.find(c =>
+    c.method === 'POST' && c.url.includes('/v1/recordings'));
+  assert(!!correctPost, 'POST to /v1/recordings (confirmed base table) was made');
+
+  if (correctPost) {
+    assert(correctPost.body?.node_id === REC_UUID,
+      `POST body node_id is recording node UUID (got "${correctPost.body?.node_id}")`);
+    assert(correctPost.body?.isrc === 'USXXX1234514',
+      `POST body isrc uppercased correctly (got "${correctPost.body?.isrc}")`);
+    assert('composition_node_id' in (correctPost.body || {}),
+      'POST body contains composition_node_id field');
+  }
 }
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
 
 (async () => {
   console.log('=== graph-sync identity fix: unit tests ===');
-  console.log('Finding 2: external_id_ns overwrite removed (api/graph-sync.js:190-209)');
-  console.log('Finding 1: recording_mbid bridges to works_recordings_v1.musicbrainz_recording_id');
-  console.log('Task C:    enrichArtistCatalog() camelCase field-name mismatch fixed\n');
+  console.log('Finding 2: external_id_ns overwrite removed');
+  console.log('Finding 1: recording_mbid bridges to works.recordings.musicbrainz_recording_id');
+  console.log('Task C:    enrichArtistCatalog() camelCase field-name mismatch fixed');
+  console.log('Schema:    confirmed base table works.recordings — no calls to nonexistent works_recordings_v1\n');
 
   // Suppress console output from the module under test
   const origLog   = console.log;
@@ -447,6 +535,8 @@ async function test_recording_patch_independent_of_work_node() {
     await test_isrcs_array_normalised();
     await test_no_catalog_id_uses_title_fingerprint();
     await test_recording_patch_independent_of_work_node();
+    await test_enrichment_never_hits_works_recordings_v1();
+    await test_catalog_sync_uses_recordings_not_works_recordings_v1();
   } finally {
     console.log  = origLog;
     console.error = origError;
