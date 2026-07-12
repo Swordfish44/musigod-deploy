@@ -191,7 +191,7 @@ async function syncEnrichmentToGraph(artistId, enrichedTracks) {
         if (track.ascap_id)       workPatch.ascap_id         = track.ascap_id
         if (track.bmi_id)         workPatch.bmi_id           = track.bmi_id
         if (Object.keys(workPatch).length) {
-          await graphFetch(`works_compositions_v1?node_id=eq.${workNodeId}`, {
+          await graphFetch(`compositions?node_id=eq.${workNodeId}`, {
             method: 'PATCH',
             body: workPatch,
             schema: 'works',
@@ -260,7 +260,7 @@ async function syncTrackToGraph({ track, artistNodeId, creatorNodeId, usNodeId }
   })
 
   // 2. Insert composition detail record
-  await graphFetch('works_compositions_v1', {
+  await graphFetch('compositions', {
     method: 'POST',
     body: {
       node_id: workNodeId,
