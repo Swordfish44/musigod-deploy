@@ -60,27 +60,71 @@ A companion migration (`20260709_graph_recording_mbid_bridge.sql`) adds an index
 | File | Status | Description |
 |---|---|---|
 | `api/graph-sync.js` | **Modified** | (1) Removed 6-line `PATCH graph_nodes_v1` block; (2) added `musicbrainz_recording_id` bridge; (3) fixed field-name mismatch — normalises both camelCase and snake_case shapes, multi-strategy node lookup |
-| `supabase/migrations/20260709_graph_recording_mbid_bridge.sql` | **New** | Additive: index on `works.works_recordings_v1(musicbrainz_recording_id)` |
+| `supabase/migrations/20260709_graph_recording_mbid_bridge.sql` | **Deleted** | Removed — see Schema Investigation below |
 | `tests/graph-sync-identity.test.js` | **New** | 24 unit tests: Findings 1+2 (8 tests) + Task C camelCase payload regression (16 tests) |
 | `scripts/dry-run-mbid-identity-check.js` | **New** | Read-only production diagnostic script |
 | `docs/musicbrainz-identity-fix-report.md` | **New** | This report |
 
 ---
 
-## Migration SQL
+## Schema Investigation — Migration Removed
 
-File: `supabase/migrations/20260709_graph_recording_mbid_bridge.sql`
+### Why the migration was deleted
+
+The migration created an index `ON works.works_recordings_v1 (musicbrainz_recording_id)`. It was removed for two compounding reasons:
+
+**Reason 1 — unconfirmed relation type.**  
+`works.works_recordings_v1` and `public.works_recordings_v1` are both applied via Supabase SQL Editor and are not version-controlled in `supabase/migrations/`. Neither relation's `CREATE TABLE` or `CREATE VIEW` statement exists in the repository. PostgreSQL cannot create an index on a view. If either or both of these relations are views (which is plausible — `public.works_recordings_v1` has columns like `version_title`, `duration_seconds`, `master_rights_holder`, `neighboring_rights_registered` that `graph-sync.js` never writes, consistent with a view), the `CREATE INDEX` would fail silently or throw.
+
+**Reason 2 — the index is not needed for any current code path.**  
+- `syncEnrichmentToGraph` patches `works_recordings_v1` filtered by `node_id` (the primary key), not by `musicbrainz_recording_id`.
+- `resolve-rights.js` queries `public.works_recordings_v1` by `isrc` and `composition_node_id`, never by `musicbrainz_recording_id`.
+- `findNodeByExternalId` queries `graph.graph_nodes_v1`, a completely different table.
+- `catalog_enriched_tracks_v1.recording_mbid` already has a partial index (`catalog_enriched_tracks_v1_recording_mbid_idx`) from migration `20260619_catalog_enriched_tracks_v1.sql`.
+
+The index was premature optimization for a future MB bulk import path that is not yet implemented. It should be added when that path is built, against the confirmed base table name.
+
+### What the owner must run to confirm the actual schema
+
+Run this in Supabase SQL Editor **before** writing any future index migration for `musicbrainz_recording_id`:
 
 ```sql
-CREATE INDEX IF NOT EXISTS works_recordings_v1_musicbrainz_recording_id_idx
-  ON works.works_recordings_v1 (musicbrainz_recording_id)
-  WHERE musicbrainz_recording_id IS NOT NULL;
+-- Step 1: Determine relation type for all candidate names
+SELECT
+  n.nspname  AS schema,
+  c.relname  AS relation,
+  CASE c.relkind
+    WHEN 'r' THEN 'BASE TABLE'
+    WHEN 'v' THEN 'VIEW'
+    WHEN 'm' THEN 'MATERIALIZED VIEW'
+    ELSE c.relkind::text
+  END        AS kind
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname IN ('works', 'public')
+  AND c.relname IN ('works_recordings_v1', 'recordings')
+ORDER BY n.nspname, c.relname;
 
-NOTIFY pgrst, 'reload schema';
+-- Step 2: If either is a view, see its definition
+SELECT pg_get_viewdef('works.works_recordings_v1'::regclass, true);
+SELECT pg_get_viewdef('public.works_recordings_v1'::regclass, true);
+
+-- Step 3: Check existing indexes on the confirmed base table
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE schemaname = 'works'   -- or 'public' if base table is there
+  AND tablename IN ('works_recordings_v1', 'recordings');
 ```
 
-**Apply via:** Supabase SQL Editor (project `uykzkrnoetcldeuxzqyy`).  
-**Risk:** Zero — additive index only. No data changed. Can be rolled back with `DROP INDEX` if needed.
+Once the base table is confirmed, the correct index migration is:
+
+```sql
+-- Replace <schema> and <tablename> with confirmed values from Step 1 above
+CREATE INDEX IF NOT EXISTS <tablename>_musicbrainz_recording_id_idx
+  ON <schema>.<tablename> (musicbrainz_recording_id)
+  WHERE musicbrainz_recording_id IS NOT NULL;
+NOTIFY pgrst, 'reload schema';
+```
 
 ---
 
@@ -254,9 +298,9 @@ node scripts/dry-run-mbid-identity-check.js
 
 | Risk | Severity | Status |
 |---|---|---|
-| `syncEnrichmentToGraph` field name mismatch — tracks from `enrichArtistCatalog()` use `trackTitle`/`isrcs[]`/`recordingMBID` but the function expected `title`/`isrc`/`catalog_id`. The sync was a no-op for all enrichment runs. | High | **Fixed** in this PR — field normalisation added, multi-strategy lookup, independent patches. |
+| `syncEnrichmentToGraph` field name mismatch — tracks from `enrichArtistCatalog()` use `trackTitle`/`isrcs[]`/`recordingMBID` but the function expected `title`/`isrc`/`catalog_id`. The sync was a no-op for all enrichment runs. | High | **Fixed** — field normalisation added, multi-strategy lookup, independent patches. |
 | Historical enriched tracks have no `musicbrainz_recording_id` in `works_recordings_v1` — all prior enrichment runs were no-ops. | Medium | **Backfill needed** — re-run `enrich-artist.js` for each artist after deploy. Enrichment is idempotent. |
-| `works_recordings_v1.musicbrainz_recording_id` index — not yet applied (migration must be run via SQL Editor). Until it is, MBID lookups in `works_recordings_v1` at scale are full-scans. | Medium | **Pending** — migration ready, awaiting owner apply. |
+| `works.works_recordings_v1` and `public.works_recordings_v1` are not version-controlled — the relation types (table vs view) and the true base table name are unknown from the repo. An index on `musicbrainz_recording_id` is deferred until the owner confirms the base table via the verification query in the Schema Investigation section. | Medium | **Deferred** — no current code path queries by `musicbrainz_recording_id`. Low urgency until MB bulk import is built. |
 | Existing recording nodes created in `musigod_catalog` namespace that have since been enriched: if a future code path re-triggers `syncEnrichmentToGraph` with `catalog_id` present, the old guard is now gone. | Low | **Fixed** by this PR — the new code never overwrites the node key regardless of inputs. |
 | `.env.local` contains empty placeholder credentials. The dry-run script and any local Supabase scripts will silently fail without real credentials. | Low | **Known limitation** — credentials exist only in Vercel env. Run `vercel env pull .env.local` first. |
 
@@ -308,9 +352,9 @@ Untracked files:
 ## Approval Checklist (owner to verify before commit)
 
 - [ ] Review `api/graph-sync.js` diff — confirm field normalisation logic and multi-strategy lookup
-- [ ] Apply `20260709_graph_recording_mbid_bridge.sql` in Supabase SQL Editor
-- [ ] Confirm SQL Editor `NOTIFY pgrst, 'reload schema'` completes without error
+- [ ] Run the schema verification query (see Schema Investigation) in Supabase SQL Editor to confirm relation types for `works.works_recordings_v1` and `public.works_recordings_v1`
 - [ ] Run `node tests/graph-sync-identity.test.js` locally — confirm 24/24 pass
 - [ ] Run `node scripts/dry-run-mbid-identity-check.js` after `vercel env pull` — confirm zero damaged nodes
-- [ ] Authorize commit + deploy
+- [ ] Authorize commit (migration deletion already in working tree — no SQL Editor step needed for this PR)
 - [ ] After deploy: re-trigger `enrich-artist.js` for Esham (and any other onboarded artists) to backfill `musicbrainz_recording_id` in `works_recordings_v1`
+- [ ] When MB bulk import is implemented: write and apply the correct index migration using confirmed base table name from the schema verification query
