@@ -101,31 +101,27 @@ module.exports = async function handler(req, res) {
       },
     });
 
-    await sbPatch(job_id, { progress_pct: 88, progress_label: 'Generating registration CSVs…' });
-
-    // Sync enrichment data to rights graph (non-blocking)
-    syncEnrichmentToGraph(artistName, catalog.enrichedTracks).catch(err =>
-      console.warn('[enrich] graph sync failed:', err.message)
-    );
+    await sbPatch(job_id, { progress_pct: 88, progress_label: 'Syncing to rights graph and persisting…' });
 
     const gapsReport = generateGapsReport(catalog.enrichedTracks);
 
-    // Persist per-track rows. This is the step that was missing entirely —
-    // previously only the CSV-formatted output below was saved (as a JSONB
-    // blob on this one job row), never per-track rows. Never let a
-    // persistence failure fail the whole job; the MB/Discogs/Genius calls
-    // already succeeded by this point.
+    // Graph sync and persist run concurrently — both must complete before the
+    // response is sent. syncEnrichmentToGraph now upserts works.recordings rows
+    // (create-or-update) so must be awaited, not fire-and-forget.
     let persistResult = { persisted: 0, failed: 0, errors: [] };
-    try {
-      persistResult = await persistEnrichedTracks(catalog.enrichedTracks, {
-        artistName: artistName,
+    await Promise.all([
+      syncEnrichmentToGraph(artistName, catalog.enrichedTracks).catch(err =>
+        console.warn('[enrich] graph sync failed:', err.message)
+      ),
+      persistEnrichedTracks(catalog.enrichedTracks, {
+        artistName,
         artistMbid: catalog.mbid,
         jobId: job_id,
-      });
-    } catch (persistErr) {
-      console.error(`[enrich] persistEnrichedTracks failed for job_id=${job_id}:`, persistErr.message);
-      persistResult = { persisted: 0, failed: catalog.enrichedTracks.length, errors: [{ message: persistErr.message }] };
-    }
+      }).then(r => { persistResult = r; }).catch(persistErr => {
+        console.error(`[enrich] persistEnrichedTracks failed for job_id=${job_id}:`, persistErr.message);
+        persistResult = { persisted: 0, failed: catalog.enrichedTracks.length, errors: [{ message: persistErr.message }] };
+      }),
+    ]);
 
     await sbPatch(job_id, {
       status:         'DONE',
