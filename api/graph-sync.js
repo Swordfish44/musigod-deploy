@@ -158,6 +158,10 @@ async function syncCatalogToGraph(artistId, tracks) {
 /**
  * Called from enrich-artist.js after enrichment completes.
  * Patches existing work/recording nodes with ISWC, ISRC, MusicBrainz IDs.
+ *
+ * Supports two incoming track shapes:
+ *   enrichArtistCatalog() → camelCase: trackTitle, isrcs[], recordingMBID
+ *   submit-catalog / bulk import → snake_case: title, isrc, catalog_id, recording_mbid
  */
 async function syncEnrichmentToGraph(artistId, enrichedTracks) {
   if (!enrichedTracks?.length) return
@@ -165,56 +169,109 @@ async function syncEnrichmentToGraph(artistId, enrichedTracks) {
   let patched = 0
   for (const track of enrichedTracks) {
     try {
-      // Find work node by title fingerprint or catalog_id
-      const workNodeId = await findNodeByExternalId(
-        track.catalog_id || fingerprint(track.title),
-        'musigod_catalog'
-      )
-      if (!workNodeId) continue
+      // Normalise field names across both incoming shapes.
+      const title         = track.trackTitle      || track.title        || null
+      const catalogId     = track.catalog_id      || null
+      const iswc          = track.iswc            || null
+      const isrc          = (track.isrcs && track.isrcs[0]) || track.isrc || null
+      const recordingMbid = track.recording_mbid  || track.recordingMBID || null
 
-      // Patch the composition detail record
-      const patch = {}
-      if (track.iswc)            patch.iswc = track.iswc
-      if (track.musicbrainz_id)  patch.musicbrainz_id = track.musicbrainz_id
-      if (track.ascap_id)        patch.ascap_id = track.ascap_id
-      if (track.bmi_id)          patch.bmi_id = track.bmi_id
+      // ── Work node lookup: ISWC → catalog_id → title fingerprint ─────────────
+      // These are tried in priority order; the first hit wins.
+      // ISWC is the most reliable cross-source identifier for a composition.
+      let workNodeId = null
+      if (iswc)                 workNodeId = await findNodeByExternalId(iswc, 'iswc')
+      if (!workNodeId && catalogId) workNodeId = await findNodeByExternalId(catalogId, 'musigod_catalog')
+      // Only try title fingerprint when we have a stable work identifier (ISWC or
+      // catalogId); without one, fingerprint matches are unreliable and hit Supabase
+      // unnecessarily for every enrichment-only track (e.g., MusicBrainz backfills).
+      if (!workNodeId && title && (iswc || catalogId)) workNodeId = await findNodeByExternalId(fingerprint(title), 'musigod_catalog')
 
-      if (Object.keys(patch).length) {
-        await graphFetch(`works_compositions_v1?node_id=eq.${workNodeId}`, {
-          method: 'PATCH',
-          body: patch,
-          schema: 'works',
-        })
-      }
-
-      // Patch recording node with ISRC
-      if (track.isrc) {
-        const recNodeId = await findNodeByExternalId(
-          `rec_${track.catalog_id}`,
-          'musigod_catalog'
-        )
-        if (recNodeId) {
-          await graphFetch(`works_recordings_v1?node_id=eq.${recNodeId}`, {
+      if (workNodeId) {
+        const workPatch = {}
+        if (iswc)                 workPatch.iswc             = iswc
+        if (track.musicbrainz_id) workPatch.musicbrainz_id  = track.musicbrainz_id
+        if (track.ascap_id)       workPatch.ascap_id         = track.ascap_id
+        if (track.bmi_id)         workPatch.bmi_id           = track.bmi_id
+        if (Object.keys(workPatch).length) {
+          await graphFetch(`compositions?node_id=eq.${workNodeId}`, {
             method: 'PATCH',
-            body: { isrc: track.isrc.toUpperCase() },
+            body: workPatch,
             schema: 'works',
-          })
-          // Also update the node's external_id to the ISRC
-          await graphFetch(`graph_nodes_v1?id=eq.${recNodeId}`, {
-            method: 'PATCH',
-            body: { external_id: track.isrc.toUpperCase(), external_id_ns: 'isrc' },
-            schema: 'graph',
           })
         }
       }
 
+      // ── Recording: upsert graph node + works.recordings row ─────────────────
+      // Identity priority: ISRC > MusicBrainz recording ID (no title-only writes).
+      //
+      // Duplicate-row guard: if an ISRC is now known but the recording was
+      // previously keyed by MBID or catalog namespace (e.g., no ISRC on the
+      // first enrichment run, or submitted through submit-catalog before
+      // enrichment), reuse the existing node_id rather than creating a new
+      // ISRC-keyed node. Without this guard, two works.recordings rows would
+      // result: one MBID-keyed with isrc=NULL, one ISRC-keyed — both valid
+      // under the PK/unique constraints but representing the same recording.
+      // resolution=merge-duplicates only resolves on the PK (node_id), so it
+      // cannot catch the second row on its own.
+      if (isrc || recordingMbid) {
+        const normalIsrc = isrc ? isrc.toUpperCase() : null
+        let recNodeId = null
+
+        if (normalIsrc) {
+          // Guard: check for a prior node keyed by MBID (MBID-first → ISRC-later).
+          if (recordingMbid) {
+            recNodeId = await findNodeByExternalId(recordingMbid, 'musicbrainz_recording')
+          }
+          // Guard: check for a prior node keyed by catalog_id (catalog submission → enrichment).
+          if (!recNodeId && catalogId) {
+            recNodeId = await findNodeByExternalId(`rec_${catalogId}`, 'musigod_catalog')
+          }
+          // No prior node found — create one keyed by ISRC (stable canonical key).
+          if (!recNodeId) {
+            recNodeId = await upsertNode({
+              node_type: 'recording',
+              label: title || '',
+              external_id: normalIsrc,
+              external_id_ns: 'isrc',
+              properties: { title: title || null, isrc: normalIsrc, musicbrainz_recording_id: recordingMbid || null },
+            })
+          }
+        } else {
+          // No ISRC — key by MBID. If MusicBrainz later provides an ISRC, the
+          // next enrichment run finds this node via the MBID guard above.
+          recNodeId = await upsertNode({
+            node_type: 'recording',
+            label: title || '',
+            external_id: recordingMbid,
+            external_id_ns: 'musicbrainz_recording',
+            properties: { title: title || null, isrc: null, musicbrainz_recording_id: recordingMbid },
+          })
+        }
+
+        const recBody = { node_id: recNodeId }
+        if (title)         recBody.title                    = title
+        if (normalIsrc)    recBody.isrc                     = normalIsrc
+        if (recordingMbid) recBody.musicbrainz_recording_id = recordingMbid
+        if (workNodeId)    recBody.composition_node_id      = workNodeId
+
+        await graphFetch('recordings', {
+          method: 'POST',
+          body: recBody,
+          prefer: 'resolution=merge-duplicates,return=minimal',
+          schema: 'works',
+        })
+      }
+
       patched++
     } catch (err) {
-      console.error(`[graph-sync] enrichment patch failed: ${track.title}`, err.message)
+      console.error(`[graph-sync] enrichment patch failed: ${track.trackTitle || track.title || '?'}`, err.message)
     }
   }
 
+  const failed = enrichedTracks.length - patched
   console.log(`[graph-sync] enrichment synced: ${patched}/${enrichedTracks.length} tracks patched`)
+  return { synced: patched, failed }
 }
 
 // ============================================================
@@ -240,7 +297,7 @@ async function syncTrackToGraph({ track, artistNodeId, creatorNodeId, usNodeId }
   })
 
   // 2. Insert composition detail record
-  await graphFetch('works_compositions_v1', {
+  await graphFetch('compositions', {
     method: 'POST',
     body: {
       node_id: workNodeId,
@@ -271,7 +328,7 @@ async function syncTrackToGraph({ track, artistNodeId, creatorNodeId, usNodeId }
   })
 
   // 4. Insert recording detail record
-  await graphFetch('works_recordings_v1', {
+  await graphFetch('recordings', {
     method: 'POST',
     body: {
       node_id: recNodeId,
@@ -439,7 +496,7 @@ async function upsertEdge({
 async function findNodeByExternalId(externalId, ns) {
   if (!externalId) return null
   const rows = await graphFetch(
-    `graph_nodes_v1?external_id=eq.${encodeURIComponent(externalId)}&external_id_ns=eq.${encodeURIComponent(ns)}&select=id&limit=1`,
+    `nodes?external_id=eq.${encodeURIComponent(externalId)}&external_id_ns=eq.${encodeURIComponent(ns)}&select=id&limit=1`,
     { schema: 'graph' }
   )
   return rows?.[0]?.id || null
