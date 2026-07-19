@@ -73,8 +73,8 @@ function makeMockFetch({ calls = [], workNodeId = null, rpcUuids = [REC_NODE_UUI
       return { ok: true, text: async () => JSON.stringify(uuid) };
     }
 
-    // graph_nodes_v1 GET — returns existing work node or empty
-    if (url.includes('/rest/v1/graph_nodes_v1')) {
+    // graph.nodes GET (findNodeByExternalId) — returns existing node or empty
+    if (url.includes('/rest/v1/nodes') && (opts.method === 'GET' || !opts.method)) {
       const row = workNodeId ? [{ id: workNodeId }] : [];
       return { ok: true, text: async () => JSON.stringify(row) };
     }
@@ -418,8 +418,8 @@ async function test7_mbid_first_isrc_later_reuses_same_node() {
       mbidNodeCreated = true;
       return { ok: true, text: async () => JSON.stringify(MBID_UUID) };
     }
-    // graph_nodes_v1 GET — return MBID node only after it was created in run 1
-    if (url.includes('/rest/v1/graph_nodes_v1')) {
+    // graph.nodes GET (findNodeByExternalId) — return MBID node only after it was created in run 1
+    if (url.includes('/rest/v1/nodes') && (opts.method === 'GET' || !opts.method)) {
       if (mbidNodeCreated && url.includes(encodeURIComponent(mbid)) && url.includes('musicbrainz_recording')) {
         return { ok: true, text: async () => JSON.stringify([{ id: MBID_UUID }]) };
       }
@@ -487,7 +487,7 @@ async function test8_catalog_keyed_first_isrc_on_enrichment_reuses_same_node() {
     if (url.includes('/rpc/graph_upsert_node')) {
       return { ok: true, text: async () => JSON.stringify(CATALOG_UUID) };
     }
-    if (url.includes('/rest/v1/graph_nodes_v1')) {
+    if (url.includes('/rest/v1/nodes') && (opts.method === 'GET' || !opts.method)) {
       // Catalog-keyed recording node (rec_cat-track-00000008 in musigod_catalog)
       if (url.includes(`rec_${catalogId}`) && url.includes('musigod_catalog')) {
         return { ok: true, text: async () => JSON.stringify([{ id: CATALOG_UUID }]) };
@@ -525,6 +525,535 @@ async function test8_catalog_keyed_first_isrc_on_enrichment_reuses_same_node() {
     `ISRC correctly written to existing catalog row (got "${postCalls[0]?.body?.isrc}")`);
 }
 
+// ── Test 9: MBID-only (no ISRC, no catalog_id) — idempotent, no duplicate rows ─
+//
+// When a track has only a recordingMBID (no ISRC, no catalog_id), the code
+// takes the else-MBID-keyed path directly without any findNodeByExternalId
+// guard. Two enrichment runs must produce the same node_id in both POST
+// bodies — no duplicate rows.
+
+async function test9_mbid_only_no_isrc_no_catalogid_idempotent() {
+  console.log('\n[9] MBID-only (no ISRC, no catalog_id) — idempotent across two runs');
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
+
+  const MBID_UUID = 'eeeeeeee-9999-0000-0000-000000000009';
+  const mbid = 'mbid-only-0000-0000-0000-000000000009';
+  const calls = [];
+  const origFetch = global.fetch;
+  global.fetch = makeMockFetch({ calls, rpcUuids: [MBID_UUID, MBID_UUID] });
+
+  const { syncEnrichmentToGraph } = loadFreshGraphSync();
+  const track = { trackTitle: 'MBID Only Track', isrcs: [], recordingMBID: mbid };
+
+  await syncEnrichmentToGraph('TestArtist', [track]);
+  await syncEnrichmentToGraph('TestArtist', [track]);
+
+  global.fetch = origFetch;
+
+  const rpcCalls   = calls.filter(c => c.url.includes('/rpc/graph_upsert_node'));
+  const getLookups = calls.filter(c => c.url.includes('/rest/v1/nodes') && c.method === 'GET');
+  const postCalls  = calls.filter(c => c.url.endsWith('/rest/v1/recordings') && c.method === 'POST');
+  const nodeIds    = postCalls.map(c => c.body?.node_id);
+
+  assert(getLookups.length === 0,
+    `no graph.nodes lookups — MBID-only path skips findNodeByExternalId (got ${getLookups.length})`);
+  assert(rpcCalls.length === 2,
+    `graph_upsert_node called once per run (got ${rpcCalls.length})`);
+
+  const extIds = rpcCalls.map(c => c.body?.p_external_id);
+  assert(extIds.every(id => id === mbid),
+    `both upsertNode calls use MBID as external_id (got ${JSON.stringify(extIds)})`);
+  assert(rpcCalls[0]?.body?.p_external_ns === 'musicbrainz_recording',
+    `node keyed with musicbrainz_recording namespace (got "${rpcCalls[0]?.body?.p_external_ns}")`);
+
+  assert(postCalls.length === 2,
+    `POST to recordings twice — one per run (got ${postCalls.length})`);
+  assert(nodeIds[0] === MBID_UUID && nodeIds[1] === MBID_UUID,
+    `same node_id on both runs — no duplicate row (got ${JSON.stringify(nodeIds)})`);
+  assert(postCalls.every(c => (c.headers?.['Prefer'] || '').includes('resolution=merge-duplicates')),
+    'all POST calls carry resolution=merge-duplicates');
+  assert(postCalls.every(c => !c.body?.isrc),
+    'isrc field absent from both POST bodies (no ISRC on this track)');
+  assert(postCalls.every(c => c.body?.musicbrainz_recording_id === mbid),
+    `MBID written to musicbrainz_recording_id on both runs (got ${JSON.stringify(postCalls.map(c => c.body?.musicbrainz_recording_id))})`);
+}
+
+// ── Test 10: Worker path (run-enrichment-job.js) calls and awaits graph sync ─
+//
+// Verifies that the n8n/worker handler (run-enrichment-job.js) calls
+// syncEnrichmentToGraph and awaits it before sending the DONE response.
+
+async function test10_worker_path_calls_and_awaits_graph_sync() {
+  console.log('\n[10] Worker path — run-enrichment-job.js calls and awaits syncEnrichmentToGraph');
+
+  const realSetTimeout = global.setTimeout;
+  let syncCompleted = false;
+  let syncDoneAtResJson = null;
+
+  const fakeCatalog = {
+    enrichedTracks: [trackWithIsrcAndMbid()],
+    mbid: 'mb-fake-artist',
+    totalReleases: 1,
+    processedReleases: 1,
+    totalTracks: 1,
+    generatedAt: new Date().toISOString(),
+  };
+
+  const modPaths = {
+    enrichCatalog: require.resolve('../lib/enrich-catalog'),
+    graphSync:     require.resolve('../api/graph-sync'),
+    persistTracks: require.resolve('../lib/persist-enriched-tracks'),
+    generateFiles: require.resolve('../lib/generate-registration-files'),
+    runJob:        require.resolve('../api/run-enrichment-job'),
+  };
+
+  const savedCache = {};
+  for (const [k, p] of Object.entries(modPaths)) {
+    savedCache[k] = require.cache[p];
+    delete require.cache[p];
+  }
+
+  require.cache[modPaths.enrichCatalog] = {
+    id: modPaths.enrichCatalog, filename: modPaths.enrichCatalog, loaded: true,
+    exports: { enrichArtistCatalog: async () => fakeCatalog },
+  };
+  require.cache[modPaths.graphSync] = {
+    id: modPaths.graphSync, filename: modPaths.graphSync, loaded: true,
+    exports: {
+      syncEnrichmentToGraph: async () => {
+        await new Promise(r => realSetTimeout(r, 15));
+        syncCompleted = true;
+      },
+      syncCatalogToGraph: async () => {},
+      syncArtistToGraph:  async () => {},
+    },
+  };
+  require.cache[modPaths.persistTracks] = {
+    id: modPaths.persistTracks, filename: modPaths.persistTracks, loaded: true,
+    exports: { persistEnrichedTracks: async () => ({ persisted: 1, failed: 0, errors: [] }) },
+  };
+  require.cache[modPaths.generateFiles] = {
+    id: modPaths.generateFiles, filename: modPaths.generateFiles, loaded: true,
+    exports: {
+      generateASCAPCSV:         () => '',
+      generateBMICSV:           () => '',
+      generateMLCCSV:           () => '',
+      generateMasterCatalogCSV: () => '',
+      generateGapsReport:       () => ({ gaps: [] }),
+    },
+  };
+
+  const handler = require('../api/run-enrichment-job');
+
+  const origFetch = global.fetch;
+  global.fetch = async () => ({ ok: true, json: async () => null, text: async () => '' });
+
+  const savedN8n   = process.env.N8N_ENRICH_TOKEN;
+  const savedAdmin = process.env.AUDIT_ADMIN_KEY;
+  delete process.env.N8N_ENRICH_TOKEN;
+  delete process.env.AUDIT_ADMIN_KEY;
+
+  let responseCode = null;
+  const res = {
+    setHeader: () => {},
+    status: (code) => ({
+      json: (data) => {
+        responseCode = code;
+        syncDoneAtResJson = syncCompleted;
+        return data;
+      },
+      end: () => {},
+    }),
+  };
+  const req = {
+    method: 'POST',
+    headers: {},
+    body: { job_id: 'job-test-10', artistName: 'TestArtist', maxReleases: 1 },
+  };
+
+  try {
+    await handler(req, res);
+  } finally {
+    for (const [k, p] of Object.entries(modPaths)) {
+      if (savedCache[k]) require.cache[p] = savedCache[k];
+      else delete require.cache[p];
+    }
+    global.fetch = origFetch;
+    if (savedN8n !== undefined) process.env.N8N_ENRICH_TOKEN = savedN8n;
+    else delete process.env.N8N_ENRICH_TOKEN;
+    if (savedAdmin !== undefined) process.env.AUDIT_ADMIN_KEY = savedAdmin;
+    else delete process.env.AUDIT_ADMIN_KEY;
+  }
+
+  assert(responseCode === 200,
+    `worker handler returns 200 (got ${responseCode})`);
+  assert(syncCompleted === true,
+    'syncEnrichmentToGraph fully completed before handler returned');
+  assert(syncDoneAtResJson === true,
+    'sync was done when res.json() fired — not fire-and-forget');
+}
+
+// ── Test 11: Worker path — ERROR returned (not DONE) when graph sync throws ──
+//
+// Verifies that if syncEnrichmentToGraph throws, the worker handler does NOT
+// write status=DONE to Supabase and does NOT return HTTP 200. The production
+// n8n path must fail loudly so the caller knows graph persistence did not occur.
+
+async function test11_worker_error_not_done_on_graph_sync_failure() {
+  console.log('\n[11] Worker path — ERROR (not DONE) when syncEnrichmentToGraph throws');
+
+  const fakeCatalog = {
+    enrichedTracks: [trackWithIsrcAndMbid()],
+    mbid: 'mb-fake-artist',
+    totalReleases: 1,
+    processedReleases: 1,
+    totalTracks: 1,
+    generatedAt: new Date().toISOString(),
+  };
+
+  const modPaths = {
+    enrichCatalog: require.resolve('../lib/enrich-catalog'),
+    graphSync:     require.resolve('../api/graph-sync'),
+    persistTracks: require.resolve('../lib/persist-enriched-tracks'),
+    generateFiles: require.resolve('../lib/generate-registration-files'),
+    runJob:        require.resolve('../api/run-enrichment-job'),
+  };
+
+  const savedCache = {};
+  for (const [k, p] of Object.entries(modPaths)) {
+    savedCache[k] = require.cache[p];
+    delete require.cache[p];
+  }
+
+  let syncCalled = false;
+
+  require.cache[modPaths.enrichCatalog] = {
+    id: modPaths.enrichCatalog, filename: modPaths.enrichCatalog, loaded: true,
+    exports: { enrichArtistCatalog: async () => fakeCatalog },
+  };
+  require.cache[modPaths.graphSync] = {
+    id: modPaths.graphSync, filename: modPaths.graphSync, loaded: true,
+    exports: {
+      syncEnrichmentToGraph: async () => {
+        syncCalled = true;
+        throw new Error('simulated graph sync failure');
+      },
+      syncCatalogToGraph: async () => {},
+      syncArtistToGraph:  async () => {},
+    },
+  };
+  require.cache[modPaths.persistTracks] = {
+    id: modPaths.persistTracks, filename: modPaths.persistTracks, loaded: true,
+    exports: { persistEnrichedTracks: async () => ({ persisted: 1, failed: 0, errors: [] }) },
+  };
+  require.cache[modPaths.generateFiles] = {
+    id: modPaths.generateFiles, filename: modPaths.generateFiles, loaded: true,
+    exports: {
+      generateASCAPCSV:         () => '',
+      generateBMICSV:           () => '',
+      generateMLCCSV:           () => '',
+      generateMasterCatalogCSV: () => '',
+      generateGapsReport:       () => ({ gaps: [] }),
+    },
+  };
+
+  const handler = require('../api/run-enrichment-job');
+
+  const sbPatchBodies = [];
+  const origFetch = global.fetch;
+  global.fetch = async (url, opts) => {
+    if (url.includes('catalog_enrichments_v1') && opts?.method === 'PATCH') {
+      sbPatchBodies.push(JSON.parse(opts.body));
+    }
+    return { ok: true, json: async () => null, text: async () => '' };
+  };
+
+  const savedN8n   = process.env.N8N_ENRICH_TOKEN;
+  const savedAdmin = process.env.AUDIT_ADMIN_KEY;
+  delete process.env.N8N_ENRICH_TOKEN;
+  delete process.env.AUDIT_ADMIN_KEY;
+
+  let responseCode = null;
+  let responseBody = null;
+  const res = {
+    setHeader: () => {},
+    status: (code) => ({
+      json: (data) => {
+        responseCode = code;
+        responseBody = data;
+        return data;
+      },
+      end: () => {},
+    }),
+  };
+  const req = {
+    method: 'POST',
+    headers: {},
+    body: { job_id: 'job-test-11', artistName: 'TestArtist', maxReleases: 1 },
+  };
+
+  try {
+    await handler(req, res);
+  } finally {
+    for (const [k, p] of Object.entries(modPaths)) {
+      if (savedCache[k]) require.cache[p] = savedCache[k];
+      else delete require.cache[p];
+    }
+    global.fetch = origFetch;
+    if (savedN8n !== undefined) process.env.N8N_ENRICH_TOKEN = savedN8n;
+    else delete process.env.N8N_ENRICH_TOKEN;
+    if (savedAdmin !== undefined) process.env.AUDIT_ADMIN_KEY = savedAdmin;
+    else delete process.env.AUDIT_ADMIN_KEY;
+  }
+
+  assert(syncCalled === true,
+    'syncEnrichmentToGraph was called on the worker path');
+  assert(responseCode === 500,
+    `handler returns 500 on graph sync failure (got ${responseCode})`);
+  assert(responseBody?.status === 'ERROR',
+    `response body status is ERROR (got "${responseBody?.status}")`);
+  assert(responseBody?.status !== 'DONE',
+    'response body status is NOT DONE');
+
+  const donePatches = sbPatchBodies.filter(b => b.status === 'DONE');
+  assert(donePatches.length === 0,
+    `Supabase never patched with status=DONE on graph sync failure (got ${donePatches.length})`);
+
+  const errorPatches = sbPatchBodies.filter(b => b.status === 'ERROR');
+  assert(errorPatches.length >= 1,
+    `Supabase patched with status=ERROR (got ${errorPatches.length})`);
+}
+
+// ── Test 12: enrich-artist.js UI path captures graph stats in DONE result ─────
+//
+// Verifies that when syncEnrichmentToGraph returns partial failures (e.g., all
+// node upserts fail because the RPC is missing), enrich-artist.js includes
+// graphSynced and graphSyncFailed in the DONE result rather than discarding them.
+
+async function test12_enrich_artist_captures_graph_stats_in_done() {
+  console.log('\n[12] enrich-artist.js — graphSynced/graphSyncFailed captured in DONE result');
+
+  const fakeCatalog = {
+    enrichedTracks: [trackWithIsrcAndMbid(), trackWithIsrcAndMbid({ isrcs: ['USABC0100002'] })],
+    mbid: 'mb-test-artist-12',
+    totalReleases: 1,
+    processedReleases: 1,
+    totalTracks: 2,
+    generatedAt: new Date().toISOString(),
+  };
+
+  const modPaths = {
+    enrichCatalog: require.resolve('../lib/enrich-catalog'),
+    graphSync:     require.resolve('../api/graph-sync'),
+    persistTracks: require.resolve('../lib/persist-enriched-tracks'),
+    generateFiles: require.resolve('../lib/generate-registration-files'),
+    enrichArtist:  require.resolve('../api/enrich-artist'),
+  };
+
+  const savedCache = {};
+  for (const [k, p] of Object.entries(modPaths)) {
+    savedCache[k] = require.cache[p];
+    delete require.cache[p];
+  }
+
+  require.cache[modPaths.enrichCatalog] = {
+    id: modPaths.enrichCatalog, filename: modPaths.enrichCatalog, loaded: true,
+    exports: { enrichArtistCatalog: async () => fakeCatalog },
+  };
+  require.cache[modPaths.graphSync] = {
+    id: modPaths.graphSync, filename: modPaths.graphSync, loaded: true,
+    exports: {
+      syncEnrichmentToGraph: async () => ({ synced: 0, failed: 2 }),
+      syncCatalogToGraph:    async () => {},
+      syncArtistToGraph:     async () => {},
+    },
+  };
+  require.cache[modPaths.persistTracks] = {
+    id: modPaths.persistTracks, filename: modPaths.persistTracks, loaded: true,
+    exports: { persistEnrichedTracks: async () => ({ persisted: 2, failed: 0, errors: [] }) },
+  };
+  require.cache[modPaths.generateFiles] = {
+    id: modPaths.generateFiles, filename: modPaths.generateFiles, loaded: true,
+    exports: {
+      generateASCAPCSV:         () => '',
+      generateBMICSV:           () => '',
+      generateMLCCSV:           () => '',
+      generateMasterCatalogCSV: () => '',
+      generateGapsReport:       () => ({ gaps: [] }),
+    },
+  };
+
+  const handler = require('../api/enrich-artist');
+
+  const sbPatchBodies = [];
+  const origFetch = global.fetch;
+  global.fetch = async (url, opts) => {
+    if (url.includes('catalog_enrichments_v1') && opts?.method === 'POST') {
+      return { ok: true, json: async () => [{ id: 'job-test-12' }], text: async () => JSON.stringify([{ id: 'job-test-12' }]) };
+    }
+    if (url.includes('catalog_enrichments_v1') && opts?.method === 'PATCH') {
+      sbPatchBodies.push(JSON.parse(opts.body));
+    }
+    return { ok: true, json: async () => null, text: async () => '' };
+  };
+
+  const savedAuditKey = process.env.AUDIT_ADMIN_KEY;
+  delete process.env.AUDIT_ADMIN_KEY;
+
+  let responseCode = null;
+  let responseBody = null;
+  const res = {
+    setHeader: () => {},
+    status: (code) => ({
+      json: (data) => { responseCode = code; responseBody = data; return data; },
+      end:  () => {},
+    }),
+  };
+  const req = {
+    method:  'POST',
+    headers: {},
+    body:    { artistName: 'TestArtist12', maxReleases: 1 },
+  };
+
+  try {
+    await handler(req, res);
+  } finally {
+    for (const [k, p] of Object.entries(modPaths)) {
+      if (savedCache[k]) require.cache[p] = savedCache[k];
+      else delete require.cache[p];
+    }
+    global.fetch = origFetch;
+    if (savedAuditKey !== undefined) process.env.AUDIT_ADMIN_KEY = savedAuditKey;
+    else delete process.env.AUDIT_ADMIN_KEY;
+  }
+
+  assert(responseCode === 200, `handler returns 200 (got ${responseCode})`);
+
+  const donePatches = sbPatchBodies.filter(b => b.status === 'DONE');
+  assert(donePatches.length >= 1, 'Supabase patched with status=DONE');
+
+  const donePatch = donePatches[0];
+  assert(donePatch?.result?.graphSynced === 0,
+    `result.graphSynced is 0 (got ${donePatch?.result?.graphSynced})`);
+  assert(donePatch?.result?.graphSyncFailed === 2,
+    `result.graphSyncFailed is 2 (got ${donePatch?.result?.graphSyncFailed})`);
+}
+
+// ── Test 13: enrich-artist.js UI path still returns DONE when graph sync fails ─
+//
+// When syncEnrichmentToGraph throws (catastrophic failure, not per-track), the
+// enrich-artist.js UI path must still return DONE — graph sync is non-fatal on
+// this path — but graphSyncFailed must reflect the full track count.
+
+async function test13_enrich_artist_done_with_failed_stats_on_graph_throw() {
+  console.log('\n[13] enrich-artist.js — DONE returned even when graph sync throws; graphSyncFailed reflects track count');
+
+  const fakeCatalog = {
+    enrichedTracks: [trackWithIsrcAndMbid()],
+    mbid: 'mb-test-artist-13',
+    totalReleases: 1,
+    processedReleases: 1,
+    totalTracks: 1,
+    generatedAt: new Date().toISOString(),
+  };
+
+  const modPaths = {
+    enrichCatalog: require.resolve('../lib/enrich-catalog'),
+    graphSync:     require.resolve('../api/graph-sync'),
+    persistTracks: require.resolve('../lib/persist-enriched-tracks'),
+    generateFiles: require.resolve('../lib/generate-registration-files'),
+    enrichArtist:  require.resolve('../api/enrich-artist'),
+  };
+
+  const savedCache = {};
+  for (const [k, p] of Object.entries(modPaths)) {
+    savedCache[k] = require.cache[p];
+    delete require.cache[p];
+  }
+
+  require.cache[modPaths.enrichCatalog] = {
+    id: modPaths.enrichCatalog, filename: modPaths.enrichCatalog, loaded: true,
+    exports: { enrichArtistCatalog: async () => fakeCatalog },
+  };
+  require.cache[modPaths.graphSync] = {
+    id: modPaths.graphSync, filename: modPaths.graphSync, loaded: true,
+    exports: {
+      syncEnrichmentToGraph: async () => { throw new Error('catastrophic graph failure'); },
+      syncCatalogToGraph:    async () => {},
+      syncArtistToGraph:     async () => {},
+    },
+  };
+  require.cache[modPaths.persistTracks] = {
+    id: modPaths.persistTracks, filename: modPaths.persistTracks, loaded: true,
+    exports: { persistEnrichedTracks: async () => ({ persisted: 1, failed: 0, errors: [] }) },
+  };
+  require.cache[modPaths.generateFiles] = {
+    id: modPaths.generateFiles, filename: modPaths.generateFiles, loaded: true,
+    exports: {
+      generateASCAPCSV:         () => '',
+      generateBMICSV:           () => '',
+      generateMLCCSV:           () => '',
+      generateMasterCatalogCSV: () => '',
+      generateGapsReport:       () => ({ gaps: [] }),
+    },
+  };
+
+  const handler = require('../api/enrich-artist');
+
+  const sbPatchBodies = [];
+  const origFetch = global.fetch;
+  global.fetch = async (url, opts) => {
+    if (url.includes('catalog_enrichments_v1') && opts?.method === 'POST') {
+      return { ok: true, json: async () => [{ id: 'job-test-13' }], text: async () => JSON.stringify([{ id: 'job-test-13' }]) };
+    }
+    if (url.includes('catalog_enrichments_v1') && opts?.method === 'PATCH') {
+      sbPatchBodies.push(JSON.parse(opts.body));
+    }
+    return { ok: true, json: async () => null, text: async () => '' };
+  };
+
+  const savedAuditKey = process.env.AUDIT_ADMIN_KEY;
+  delete process.env.AUDIT_ADMIN_KEY;
+
+  let responseCode = null;
+  let responseBody = null;
+  const res = {
+    setHeader: () => {},
+    status: (code) => ({
+      json: (data) => { responseCode = code; responseBody = data; return data; },
+      end:  () => {},
+    }),
+  };
+  const req = {
+    method:  'POST',
+    headers: {},
+    body:    { artistName: 'TestArtist13', maxReleases: 1 },
+  };
+
+  try {
+    await handler(req, res);
+  } finally {
+    for (const [k, p] of Object.entries(modPaths)) {
+      if (savedCache[k]) require.cache[p] = savedCache[k];
+      else delete require.cache[p];
+    }
+    global.fetch = origFetch;
+    if (savedAuditKey !== undefined) process.env.AUDIT_ADMIN_KEY = savedAuditKey;
+    else delete process.env.AUDIT_ADMIN_KEY;
+  }
+
+  assert(responseCode === 200, `handler still returns 200 when graph sync throws (got ${responseCode})`);
+
+  const donePatches = sbPatchBodies.filter(b => b.status === 'DONE');
+  assert(donePatches.length >= 1, 'Supabase patched with status=DONE despite graph sync throw');
+
+  const donePatch = donePatches[0];
+  assert(donePatch?.result?.graphSynced === 0,
+    `result.graphSynced is 0 (got ${donePatch?.result?.graphSynced})`);
+  assert(donePatch?.result?.graphSyncFailed === 1,
+    `result.graphSyncFailed equals track count (1) on catastrophic throw (got ${donePatch?.result?.graphSyncFailed})`);
+}
+
 // ── Runner ───────────────────────────────────────────────────────────────────
 
 (async () => {
@@ -539,6 +1068,11 @@ async function test8_catalog_keyed_first_isrc_on_enrichment_reuses_same_node() {
   await test6_existing_rows_updated_safely();
   await test7_mbid_first_isrc_later_reuses_same_node();
   await test8_catalog_keyed_first_isrc_on_enrichment_reuses_same_node();
+  await test9_mbid_only_no_isrc_no_catalogid_idempotent();
+  await test10_worker_path_calls_and_awaits_graph_sync();
+  await test11_worker_error_not_done_on_graph_sync_failure();
+  await test12_enrich_artist_captures_graph_stats_in_done();
+  await test13_enrich_artist_done_with_failed_stats_on_graph_throw();
 
   console.log(`\n${'─'.repeat(50)}`);
   const total = passed + failed;

@@ -269,7 +269,9 @@ async function syncEnrichmentToGraph(artistId, enrichedTracks) {
     }
   }
 
+  const failed = enrichedTracks.length - patched
   console.log(`[graph-sync] enrichment synced: ${patched}/${enrichedTracks.length} tracks patched`)
+  return { synced: patched, failed }
 }
 
 // ============================================================
@@ -494,7 +496,7 @@ async function upsertEdge({
 async function findNodeByExternalId(externalId, ns) {
   if (!externalId) return null
   const rows = await graphFetch(
-    `graph_nodes_v1?external_id=eq.${encodeURIComponent(externalId)}&external_id_ns=eq.${encodeURIComponent(ns)}&select=id&limit=1`,
+    `nodes?external_id=eq.${encodeURIComponent(externalId)}&external_id_ns=eq.${encodeURIComponent(ns)}&select=id&limit=1`,
     { schema: 'graph' }
   )
   return rows?.[0]?.id || null

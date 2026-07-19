@@ -109,10 +109,14 @@ module.exports = async function handler(req, res) {
     // response is sent. syncEnrichmentToGraph now upserts works.recordings rows
     // (create-or-update) so must be awaited, not fire-and-forget.
     let persistResult = { persisted: 0, failed: 0, errors: [] };
+    let graphResult   = { synced: 0, failed: 0 };
     await Promise.all([
-      syncEnrichmentToGraph(artistName, catalog.enrichedTracks).catch(err =>
-        console.warn('[enrich] graph sync failed:', err.message)
-      ),
+      syncEnrichmentToGraph(artistName, catalog.enrichedTracks)
+        .then(r => { if (r) graphResult = r; })
+        .catch(err => {
+          console.error('[enrich] graph sync failed:', err.message);
+          graphResult = { synced: 0, failed: catalog.enrichedTracks.length };
+        }),
       persistEnrichedTracks(catalog.enrichedTracks, {
         artistName,
         artistMbid: catalog.mbid,
@@ -134,8 +138,10 @@ module.exports = async function handler(req, res) {
         processedReleases: catalog.processedReleases,
         totalTracks:       catalog.totalTracks,
         gapsReport,
-        tracksPersisted:   persistResult.persisted,
+        tracksPersisted:     persistResult.persisted,
         tracksPersistFailed: persistResult.failed,
+        graphSynced:         graphResult.synced,
+        graphSyncFailed:     graphResult.failed,
         files: {
           ascap:  { filename: `${artistName}_ASCAP_Registration.csv`,  content: generateASCAPCSV(catalog.enrichedTracks, publisherName, publisherIPI) },
           bmi:    { filename: `${artistName}_BMI_Registration.csv`,    content: generateBMICSV(catalog.enrichedTracks, publisherName, publisherIPI) },

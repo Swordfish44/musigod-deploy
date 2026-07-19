@@ -41,7 +41,7 @@ function makeMockFetch(calls) {
     // graph_upsert_node RPC — upsert recording node (new path)
     if (url.includes('/rpc/graph_upsert_node')) return ok(REC_NODE_UUID);
 
-    if (method === 'GET' && url.includes('graph_nodes_v1')) {
+    if (method === 'GET' && url.includes('/rest/v1/nodes')) {
       // Work node lookup: external_id=eq.my-catalog-id (no rec_ prefix).
       // Must NOT match the recording catalog guard (external_id=eq.rec_my-catalog-id)
       // which also contains 'my-catalog-id' as a substring.
@@ -273,12 +273,12 @@ function makeMockFetchEnrich(calls) {
     if (url.includes('/rpc/graph_upsert_node')) return ok(ENRICH_REC_NODE_UUID);
 
     // Work node via title fingerprint in musigod_catalog (only when catalogId present)
-    if (method === 'GET' && url.includes('graph_nodes_v1') &&
+    if (method === 'GET' && url.includes('/rest/v1/nodes') &&
         url.includes('rebelrap') && url.includes('musigod_catalog')) {
       return ok([{ id: ENRICH_WORK_NODE_UUID }]);
     }
     // All other GETs (iswc lookup, etc.) → not found
-    if (method === 'GET' && url.includes('graph_nodes_v1')) return ok([]);
+    if (method === 'GET' && url.includes('/rest/v1/nodes')) return ok([]);
 
     if (method === 'PATCH' && url.includes('/v1/compositions')) return ok(null);
     if (method === 'POST'  && url.includes('/v1/recordings'))   return ok(null);
@@ -390,7 +390,7 @@ async function test_recording_upsert_independent_of_work_node() {
 
     if (url.includes('/rpc/graph_upsert_node')) return ok(ENRICH_REC_NODE_UUID);
     // All work-node GETs → not found
-    if (method === 'GET' && url.includes('graph_nodes_v1')) return ok([]);
+    if (method === 'GET' && url.includes('/rest/v1/nodes')) return ok([]);
     if (method === 'POST'  && url.includes('/v1/recordings'))  return ok(null);
     if (method === 'PATCH' && url.includes('/v1/compositions')) return ok(null);
     return { ok: false, status: 404, text: async () => 'unexpected' };
@@ -466,7 +466,7 @@ async function test_catalog_sync_uses_recordings_not_works_recordings_v1() {
       return ok(upsertCount === 1 ? WORK_UUID : REC_UUID);
     }
     if (url.includes('/rpc/graph_upsert_edge'))  return ok(null);
-    if (method === 'GET' && url.includes('graph_nodes_v1')) return ok([]);
+    if (method === 'GET' && url.includes('/rest/v1/nodes')) return ok([]);
     if (method === 'POST' && url.includes('/v1/compositions')) return ok(null);
     if (method === 'POST' && url.includes('/v1/recordings'))  return ok(null);
     if (method === 'POST' && url.includes('works_recordings_v1')) return ok(null); // trap wrong target
@@ -555,7 +555,7 @@ async function test_catalog_sync_uses_compositions_not_works_compositions_v1() {
       return ok(upsertCount === 1 ? WORK_UUID : REC_UUID);
     }
     if (url.includes('/rpc/graph_upsert_edge'))  return ok(null);
-    if (method === 'GET' && url.includes('graph_nodes_v1')) return ok([]);
+    if (method === 'GET' && url.includes('/rest/v1/nodes')) return ok([]);
     if (method === 'POST' && url.includes('/v1/compositions')) return ok(null);
     if (method === 'POST' && url.includes('/v1/recordings'))  return ok(null);
     if (method === 'POST' && url.includes('works_compositions_v1')) return ok(null); // trap wrong target
@@ -591,6 +591,107 @@ async function test_catalog_sync_uses_compositions_not_works_compositions_v1() {
   }
 }
 
+// ─── Test 17: syncCatalogToGraph uses canonical edge types (no recorded_as/performed_by) ──
+
+async function test_catalog_sync_canonical_edge_types() {
+  console.log('\n[17] syncCatalogToGraph: has_recording (work→rec) and performed (artist→rec), no recorded_as/performed_by');
+
+  const ARTIST_UUID  = 'eeeeeeee-1700-0000-0000-000000000017';
+  const CREATOR_UUID = 'ffffffff-1700-0000-0000-000000000017';
+  const WORK_UUID    = 'aaaaaaaa-1700-0000-0000-000000000017';
+  const REC_UUID     = 'bbbbbbbb-1700-0000-0000-000000000017';
+  const edgeBodies   = [];
+  let nodeUpsertCount = 0;
+
+  global.fetch = async (url, opts = {}) => {
+    const method = opts.method || 'GET';
+    const body   = opts.body ? JSON.parse(opts.body) : null;
+
+    if (url.includes('/rpc/graph_upsert_node')) {
+      nodeUpsertCount++;
+      return ok(nodeUpsertCount === 1 ? WORK_UUID : REC_UUID);
+    }
+    if (url.includes('/rpc/graph_upsert_edge')) {
+      edgeBodies.push(body);
+      return ok(null);
+    }
+    if (method === 'GET' && url.includes('/rest/v1/nodes')) {
+      if (url.includes('external_id=eq.artist-id-17') && url.includes('musigod_artist') && !url.includes('creator_')) {
+        return ok([{ id: ARTIST_UUID }]);
+      }
+      if (url.includes('external_id=eq.creator_artist-id-17')) {
+        return ok([{ id: CREATOR_UUID }]);
+      }
+      return ok([]);
+    }
+    if (method === 'POST' && url.includes('/v1/compositions')) return ok(null);
+    if (method === 'POST' && url.includes('/v1/recordings'))   return ok(null);
+    return { ok: false, status: 404, text: async () => `unexpected: ${method} ${url}` };
+  };
+
+  const { syncCatalogToGraph } = loadFreshGraphSync();
+  await syncCatalogToGraph('artist-id-17', [{
+    catalog_id:  'cat-edge-17',
+    track_title: 'Edge Type Test',
+  }]);
+
+  const hasRecEdge = edgeBodies.find(b => b?.p_edge_type === 'has_recording');
+  assert(!!hasRecEdge, 'has_recording edge created');
+  if (hasRecEdge) {
+    assert(hasRecEdge.p_from_node_id === WORK_UUID,
+      `has_recording: from_node_id is work UUID (${hasRecEdge.p_from_node_id})`);
+    assert(hasRecEdge.p_to_node_id === REC_UUID,
+      `has_recording: to_node_id is recording UUID (${hasRecEdge.p_to_node_id})`);
+  }
+
+  const performedEdge = edgeBodies.find(b => b?.p_edge_type === 'performed');
+  assert(!!performedEdge, 'performed edge created');
+  if (performedEdge) {
+    assert(performedEdge.p_from_node_id === ARTIST_UUID,
+      `performed: from_node_id is artist UUID (${performedEdge.p_from_node_id})`);
+    assert(performedEdge.p_to_node_id === REC_UUID,
+      `performed: to_node_id is recording UUID (${performedEdge.p_to_node_id})`);
+  }
+
+  const invalidEdges = edgeBodies.filter(b =>
+    b?.p_edge_type === 'recorded_as' || b?.p_edge_type === 'performed_by');
+  assert(invalidEdges.length === 0,
+    `no recorded_as or performed_by edge calls (got ${invalidEdges.length})`);
+}
+
+// ─── Test 18: RPC missing (404) — syncEnrichmentToGraph returns failed stats, does not throw ──
+
+async function test_rpc_missing_returns_failed_stats_not_throw() {
+  console.log('\n[18] RPC missing (404) — syncEnrichmentToGraph returns {synced:0, failed:N}, does not throw');
+
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
+
+  global.fetch = async (url, opts = {}) => {
+    if (url.includes('/rpc/graph_upsert_node')) {
+      return { ok: false, status: 404, text: async () => JSON.stringify({ message: 'function graph.graph_upsert_node() does not exist' }) };
+    }
+    if ((opts.method === 'GET' || !opts.method) && url.includes('/rest/v1/nodes')) return ok([]);
+    return { ok: false, status: 404, text: async () => '{"error":"unexpected"}' };
+  };
+
+  const { syncEnrichmentToGraph } = loadFreshGraphSync();
+
+  let result;
+  let threw = false;
+  try {
+    result = await syncEnrichmentToGraph('artist-rpc-missing', [
+      { trackTitle: 'Track One', isrcs: ['USRPC0000001'], recordingMBID: 'mbid-rpc-0001' },
+      { trackTitle: 'Track Two', isrcs: ['USRPC0000002'], recordingMBID: 'mbid-rpc-0002' },
+    ]);
+  } catch (e) {
+    threw = true;
+  }
+
+  assert(!threw,             'syncEnrichmentToGraph does NOT throw when RPC is missing');
+  assert(result?.synced === 0, `synced count is 0 (got ${result?.synced})`);
+  assert(result?.failed === 2, `failed count equals track count: 2 (got ${result?.failed})`);
+}
+
 // ─── Runner ───────────────────────────────────────────────────────────────────
 
 (async () => {
@@ -619,6 +720,8 @@ async function test_catalog_sync_uses_compositions_not_works_compositions_v1() {
     await test_catalog_sync_uses_recordings_not_works_recordings_v1();
     await test_enrichment_never_hits_works_compositions_v1();
     await test_catalog_sync_uses_compositions_not_works_compositions_v1();
+    await test_catalog_sync_canonical_edge_types();
+    await test_rpc_missing_returns_failed_stats_not_throw();
   } finally {
     // nothing to restore
   }

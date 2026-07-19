@@ -12,6 +12,7 @@ const {
   generateGapsReport,
 } = require('../lib/generate-registration-files');
 const { persistEnrichedTracks } = require('../lib/persist-enriched-tracks');
+const { syncEnrichmentToGraph } = require('./graph-sync');
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -98,6 +99,10 @@ module.exports = async function handler(req, res) {
       persistResult = { persisted: 0, failed: catalog.enrichedTracks.length, errors: [{ message: persistErr.message }] };
     }
 
+    // Graph sync — awaited before DONE. If this throws, the outer catch writes ERROR.
+    await sbPatch(job_id, { status: 'RUNNING', progress_pct: 95, progress_label: 'Syncing to rights graph…' });
+    const graphStats = await syncEnrichmentToGraph(artistName, catalog.enrichedTracks);
+
     const result = {
       artistName,
       mbid:              catalog.mbid,
@@ -107,6 +112,8 @@ module.exports = async function handler(req, res) {
       gapsReport,
       tracksPersisted:     persistResult.persisted,
       tracksPersistFailed: persistResult.failed,
+      graphSynced:         graphStats?.synced ?? 0,
+      graphSyncFailed:     graphStats?.failed ?? 0,
       files: {
         ascap:  { filename: `${artistName}_ASCAP_Registration.csv`,  content: ascapCSV },
         bmi:    { filename: `${artistName}_BMI_Registration.csv`,    content: bmiCSV },
