@@ -129,6 +129,56 @@ covering the application layer (`syncEnrichmentToGraph`, `syncCatalogToGraph`).
 
 ---
 
+## Smoke test results — 2026-07-19
+
+### JS application layer (153 assertions, 0 failures)
+
+All five runnable test suites executed via `node tests/<file>`. Two integration
+suites (`ai-consent-ledger.test.js`, `partner-resolve-rights.test.js`) require
+a live Supabase service-role key and are unrelated to the recording identity fix;
+they were skipped.
+
+| Suite | Assertions | Result |
+|-------|-----------|--------|
+| `graph-sync-identity.test.js` | 56 | ✅ 56/56 passed |
+| `graph-sync-enrichment-upsert.test.js` | 61 | ✅ 61/61 passed |
+| `enrich-catalog-budget.test.js` | 36 | ✅ 36/36 passed |
+| `ai-consent-ledger.test.js` | — | SKIP (integration, unrelated feature) |
+| `partner-resolve-rights.test.js` | — | SKIP (integration, unrelated feature) |
+| **Total** | **153** | **✅ 153/153 passed** |
+
+### Idempotency — application layer proven
+
+The following tests directly prove that running the same enrichment twice produces
+**zero additional recording nodes and zero duplicate graph edges** on the second run:
+
+| Test | Key assertion |
+|------|--------------|
+| Upsert-2: Repeated enrichment idempotent | `graph_upsert_node` called twice; **same node_id returned both times**; both `works.recordings` POSTs carry `Prefer: resolution=merge-duplicates` |
+| Upsert-4: No duplicate rows across 3 runs | Same `node_id` on all 3 POST bodies; DB-level merge-duplicates active |
+| Upsert-7: MBID-first then ISRC-later | Second run reuses the MBID-keyed node; **no new node created** |
+| Upsert-8: Catalog-keyed node reused on ISRC discovery | `upsertNode` not called on run 2 — existing node found and reused |
+| Upsert-9: MBID-only (the root-cause scenario) | Two runs, **same node_id on both**; `isrcs` array empty, no ISRC path; no fallback lookup needed; `merge-duplicates` on both recordings rows |
+| Identity-2/3/4: ISRC/MBID/catalog guard | `external_id_ns` never overwritten; node identity stable across enrichment cycles |
+
+Upsert-9 is the scenario that caused the original production incident (track
+`4bcf28eb-…` with no ISRC and no catalog_id). The application layer is proven
+idempotent for all three identity tiers.
+
+### SQL function layer — pending migration application
+
+`07_Recording_Identity_Tests.sql` (T-01 through T-10) and `05_Smoke_Test.sql`
+Part F prove SQL-layer idempotency for `fn_sync_track_to_graph`. These tests:
+- **Cannot run until `07_Recording_Identity_Fix.sql` STEP 1 + STEP 2 are applied**
+  in the Supabase SQL Editor.
+- Are fully written and wrapped in `ROLLBACK` transactions (safe to run on production).
+- Must all show `PASS` in the Messages tab before this PR is merged.
+
+**Merge gate**: run T-01 through T-10 in Supabase SQL Editor after STEP 2 is
+applied. All must pass. This PR must not be merged before that confirmation.
+
+---
+
 ## Historical duplicate nodes — remediation plan (future)
 
 > Do NOT execute any of the steps below in this migration. These are
