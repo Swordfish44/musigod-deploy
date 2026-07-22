@@ -1,14 +1,26 @@
 'use strict';
 // tests/graph-sync-enrichment-upsert.test.js
-// Regression suite for the syncEnrichmentToGraph upsert redesign.
+// Regression suite for the syncEnrichmentToGraph upsert path.
+//
+// After the v2 RPC redesign, the JS layer passes all three identity keys
+// (p_isrc, p_recording_mbid, p_catalog_track_id) to a single public RPC.
+// The RPC owns lookup + upsert atomically inside Postgres — no graph-schema
+// REST calls (Accept-Profile: graph) are made from JS at all.
 //
 // Tests:
-//   1. Empty works.recordings — syncEnrichmentToGraph creates new rows
-//   2. Repeated enrichment is idempotent (same node_id returned, merge-duplicates used)
-//   3. ISRC and musicbrainz_recording_id remain separate fields
-//   4. No duplicate rows (upsertNode idempotency + merge-duplicates)
-//   5. syncEnrichmentToGraph is awaited before res.json() fires (enrich-artist.js)
-//   6. Existing rows are updated safely when works.recordings already has matching node
+//   1-4.  Core correctness and idempotency via public RPC
+//   5.    syncEnrichmentToGraph awaited before res.json() (enrich-artist.js)
+//   6.    Existing rows updated safely; ISRC/MBID preserved by COALESCE
+//   7.    MBID-first → ISRC-later: single RPC call with both params, no JS guard
+//   8.    Catalog-keyed → ISRC on enrichment: single RPC call, no JS guard
+//   9.    MBID-only (no ISRC, no catalogId): direct RPC, no graph.nodes GET
+//   10.   Worker path calls and awaits graph sync
+//   11.   Worker path returns ERROR (not DONE) when graph sync throws
+//   12.   enrich-artist.js captures graphSynced/graphSyncFailed in DONE result
+//   13.   enrich-artist.js still returns DONE when graph sync throws
+//   14.   catalog_track_id-only (third identity tier, no ISRC/MBID)
+//   15.   All three identifiers: single RPC call with all params
+//   16.   Unauthorized (RPC 403): failed count incremented, syncEnrichmentToGraph does not throw
 
 let passed = 0;
 let failed = 0;
@@ -22,7 +34,6 @@ function assert(cond, label) {
 
 const SB = 'https://uykzkrnoetcldeuxzqyy.supabase.co';
 
-// Fixed UUIDs used across tests
 const REC_NODE_UUID  = 'aaaaaaaa-0000-0000-0000-000000000001';
 const WORK_NODE_UUID = 'bbbbbbbb-0000-0000-0000-000000000002';
 
@@ -33,86 +44,59 @@ function loadFreshGraphSync() {
   return require('../api/graph-sync');
 }
 
-// ── Fetch call tracker ────────────────────────────────────────────────────────
-
-function makeCallTracker() {
-  const calls = [];
-  return {
-    calls,
-    async fetch(url, opts = {}) {
-      const body = opts.body ? JSON.parse(opts.body) : undefined;
-      calls.push({ url, method: opts.method || 'GET', headers: opts.headers || {}, body });
-      return this._dispatch(url, opts);
-    },
-    _dispatch() { throw new Error('Base makeCallTracker has no dispatch — use makeMockFetch'); },
-  };
-}
-
-// ── Standard mock fetch for syncEnrichmentToGraph tests ─────────────────────
+// ── Standard mock fetch ───────────────────────────────────────────────────────
 //
-// Returns:
-//   graph_upsert_node RPC  → REC_NODE_UUID (for recording) or WORK_NODE_UUID (when title fingerprint present)
-//   graph_nodes_v1 GET     → [] by default (no existing work node)
-//   recordings POST        → null (minimal return)
-//   compositions PATCH     → null (minimal return)
-//
-// Options:
-//   workNodeId  — if truthy, graph_nodes_v1 GET returns this UUID (simulates existing work node)
-//   rpcUuids    — array of UUIDs returned sequentially by graph_upsert_node calls
+// After the v2 RPC fix, syncEnrichmentToGraph makes exactly ONE type of fetch
+// call: POST /rpc/rpc_upsert_recording_enrichment. No graph.nodes GETs, no
+// compositions PATCHes, no graph_upsert_node calls.
 
-function makeMockFetch({ calls = [], workNodeId = null, rpcUuids = [REC_NODE_UUID] } = {}) {
+function makeMockFetch({ calls = [], rpcUuids = [REC_NODE_UUID] } = {}) {
   let rpcCallIndex = 0;
   return async (url, opts = {}) => {
     const body = opts.body ? JSON.parse(opts.body) : undefined;
     calls.push({ url, method: opts.method || 'GET', headers: opts.headers || {}, body });
 
-    // graph_upsert_node RPC — returns next UUID in sequence (same UUID for idempotency tests)
-    if (url.includes('/rpc/graph_upsert_node')) {
+    if (url.includes('/rpc/rpc_upsert_recording_enrichment')) {
       const uuid = rpcUuids[Math.min(rpcCallIndex, rpcUuids.length - 1)];
       rpcCallIndex++;
-      return { ok: true, text: async () => JSON.stringify(uuid) };
+      return { ok: true, text: async () => JSON.stringify({ node_id: uuid }) };
     }
 
-    // graph.nodes GET (findNodeByExternalId) — returns existing node or empty
+    // graph.nodes GET must NOT be called from enrichment path after v2 fix
     if (url.includes('/rest/v1/nodes') && (opts.method === 'GET' || !opts.method)) {
-      const row = workNodeId ? [{ id: workNodeId }] : [];
-      return { ok: true, text: async () => JSON.stringify(row) };
+      throw new Error(`REGRESSION: graph.nodes GET from enrichment path — lookup must be inside RPC: ${url}`);
     }
 
-    // recordings POST (works schema)
+    if (url.includes('/rpc/graph_upsert_node')) {
+      throw new Error('REGRESSION: graph_upsert_node called from enrichment path');
+    }
     if (url.endsWith('/rest/v1/recordings') && opts.method === 'POST') {
-      return { ok: true, text: async () => '' };
-    }
-
-    // compositions PATCH (works schema)
-    if (url.includes('/rest/v1/compositions') && opts.method === 'PATCH') {
-      return { ok: true, text: async () => '' };
+      throw new Error('REGRESSION: direct POST to /v1/recordings from enrichment path');
     }
 
     throw new Error(`Unexpected fetch in test: ${opts.method || 'GET'} ${url}`);
   };
 }
 
-// ── Shared track fixtures ─────────────────────────────────────────────────────
+// ── Shared track fixture ──────────────────────────────────────────────────────
 
 function trackWithIsrcAndMbid(overrides = {}) {
   return {
-    trackTitle:            'Test Track',
-    isrcs:                 ['USABC0100001'],
-    recordingMBID:         'mbid-rec-0000-0000-0000-000000000001',
-    iswc:                  null,
-    catalog_id:            null,
-    writers:               [],
-    enriched:              true,
-    enrichmentSource:      'musicbrainz',
+    trackTitle:       'Test Track',
+    isrcs:            ['USABC0100001'],
+    recordingMBID:    'mbid-rec-0000-0000-0000-000000000001',
+    catalog_id:       null,
+    writers:          [],
+    enriched:         true,
+    enrichmentSource: 'musicbrainz',
     ...overrides,
   };
 }
 
-// ── Test 1: Empty works.recordings receives new recording rows ───────────────
+// ── Test 1: RPC called with correct identity params ───────────────────────────
 
-async function test1_creates_new_recording_rows() {
-  console.log('\n[1] Empty works.recordings — syncEnrichmentToGraph creates new rows');
+async function test1_rpc_called_with_isrc_and_mbid() {
+  console.log('\n[1] RPC called with p_isrc and p_recording_mbid — no p_recording_patch or p_external_id');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
   const calls = [];
@@ -124,60 +108,58 @@ async function test1_creates_new_recording_rows() {
 
   global.fetch = origFetch;
 
-  const rpcCalls = calls.filter(c => c.url.includes('/rpc/graph_upsert_node'));
-  const recPostCalls = calls.filter(c => c.url.endsWith('/rest/v1/recordings') && c.method === 'POST');
+  const rpcCalls = calls.filter(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
+  assert(rpcCalls.length === 1, `rpc_upsert_recording_enrichment called once (got ${rpcCalls.length})`);
 
-  assert(rpcCalls.length >= 1, `graph_upsert_node RPC called at least once (got ${rpcCalls.length})`);
-  assert(recPostCalls.length === 1, `POST to works.recordings called once (got ${recPostCalls.length})`);
-  assert(recPostCalls[0]?.body?.node_id === REC_NODE_UUID,
-    `recording row node_id matches upsertNode return (got "${recPostCalls[0]?.body?.node_id}")`);
-  assert(recPostCalls[0]?.body?.isrc === 'USABC0100001',
-    `recording row has ISRC (got "${recPostCalls[0]?.body?.isrc}")`);
-  assert(recPostCalls[0]?.body?.musicbrainz_recording_id === 'mbid-rec-0000-0000-0000-000000000001',
-    `recording row has MBID (got "${recPostCalls[0]?.body?.musicbrainz_recording_id}")`);
+  const b = rpcCalls[0]?.body;
+  assert(b?.p_isrc === 'USABC0100001',
+    `p_isrc is normalized ISRC (got "${b?.p_isrc}")`);
+  assert(b?.p_recording_mbid === 'mbid-rec-0000-0000-0000-000000000001',
+    `p_recording_mbid is MBID (got "${b?.p_recording_mbid}")`);
+  assert(!('p_external_id' in (b || {})),
+    'p_external_id not present in new RPC body');
+  assert(!('p_existing_node_id' in (b || {})),
+    'p_existing_node_id not present in new RPC body');
+  assert(!('p_recording_patch' in (b || {})),
+    'p_recording_patch not present in new RPC body');
+
+  const nodeCalls = calls.filter(c => c.url.includes('/rest/v1/nodes'));
+  assert(nodeCalls.length === 0,
+    `no graph.nodes GET calls from JS (got ${nodeCalls.length})`);
 }
 
-// ── Test 2: Repeated enrichment is idempotent ────────────────────────────────
+// ── Test 2: Repeated enrichment is idempotent ─────────────────────────────────
 
 async function test2_repeated_enrichment_is_idempotent() {
-  console.log('\n[2] Repeated enrichment is idempotent — same node_id, merge-duplicates on every run');
+  console.log('\n[2] Repeated enrichment is idempotent — p_isrc identical on both runs');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
   const calls = [];
-  // upsertNode always returns the same UUID (idempotent by external_id + external_id_ns)
   const origFetch = global.fetch;
-  global.fetch = makeMockFetch({ calls, rpcUuids: [REC_NODE_UUID, REC_NODE_UUID, REC_NODE_UUID] });
+  global.fetch = makeMockFetch({ calls, rpcUuids: [REC_NODE_UUID, REC_NODE_UUID] });
 
   const { syncEnrichmentToGraph } = loadFreshGraphSync();
   const track = trackWithIsrcAndMbid();
 
   await syncEnrichmentToGraph('TestArtist', [track]);
-  await syncEnrichmentToGraph('TestArtist', [track]); // second run — must be safe
+  await syncEnrichmentToGraph('TestArtist', [track]);
 
   global.fetch = origFetch;
 
-  const rpcCalls    = calls.filter(c => c.url.includes('/rpc/graph_upsert_node'));
-  const recPostCalls = calls.filter(c => c.url.endsWith('/rest/v1/recordings') && c.method === 'POST');
+  const rpcCalls = calls.filter(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
+  assert(rpcCalls.length === 2, `RPC called once per run (got ${rpcCalls.length})`);
 
-  // graph_upsert_node called twice (once per enrichment run)
-  assert(rpcCalls.length === 2, `graph_upsert_node called twice across two runs (got ${rpcCalls.length})`);
-
-  // Both POST calls use merge-duplicates — PostgREST handles idempotency at DB level
-  const preferHeaders = recPostCalls.map(c => c.headers?.['Prefer'] || '');
-  assert(recPostCalls.length === 2, `POST to recordings called twice (got ${recPostCalls.length})`);
-  assert(preferHeaders.every(h => h.includes('resolution=merge-duplicates')),
-    `all recordings POST calls carry Prefer: resolution=merge-duplicates`);
-
-  // Both calls use the same node_id — same row is targeted, no new row created
-  const nodeIds = recPostCalls.map(c => c.body?.node_id);
-  assert(nodeIds[0] === REC_NODE_UUID && nodeIds[1] === REC_NODE_UUID,
-    `same node_id on both runs — same DB row targeted (got ${nodeIds})`);
+  const isrcs = rpcCalls.map(c => c.body?.p_isrc);
+  assert(isrcs[0] === 'USABC0100001' && isrcs[1] === 'USABC0100001',
+    `same p_isrc on both runs (got ${JSON.stringify(isrcs)})`);
+  assert(rpcCalls.every(c => c.body?.p_recording_mbid === 'mbid-rec-0000-0000-0000-000000000001'),
+    'same p_recording_mbid on both runs');
 }
 
-// ── Test 3: ISRC and MBID are separate fields ────────────────────────────────
+// ── Test 3: ISRC and MBID are distinct params ─────────────────────────────────
 
-async function test3_isrc_and_mbid_are_separate_fields() {
-  console.log('\n[3] ISRC and musicbrainz_recording_id remain separate, distinct columns');
+async function test3_isrc_and_mbid_are_distinct_params() {
+  console.log('\n[3] ISRC and MBID are separate RPC params — not conflated');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
   const calls = [];
@@ -194,54 +176,43 @@ async function test3_isrc_and_mbid_are_separate_fields() {
 
   global.fetch = origFetch;
 
-  const post = calls.find(c => c.url.endsWith('/rest/v1/recordings') && c.method === 'POST');
-  assert(post !== undefined, 'recordings POST was called');
-  assert(post?.body?.isrc === 'USXYZ9999999',
-    `isrc field set to ISRC value (got "${post?.body?.isrc}")`);
-  assert(post?.body?.musicbrainz_recording_id === 'mbid-distinct-0000-0000-000000000003',
-    `musicbrainz_recording_id field set to MBID (got "${post?.body?.musicbrainz_recording_id}")`);
-  assert(post?.body?.isrc !== post?.body?.musicbrainz_recording_id,
-    'ISRC and MBID are different values in different fields — not conflated');
-  assert(!String(post?.body?.isrc || '').startsWith('mbid-'),
-    'isrc column does not contain a MusicBrainz ID');
-  assert(!String(post?.body?.musicbrainz_recording_id || '').startsWith('US'),
-    'musicbrainz_recording_id column does not contain an ISRC');
+  const rpcCall = calls.find(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
+  assert(rpcCall !== undefined, 'rpc_upsert_recording_enrichment was called');
+  assert(rpcCall?.body?.p_isrc === 'USXYZ9999999',
+    `p_isrc set to ISRC value (got "${rpcCall?.body?.p_isrc}")`);
+  assert(rpcCall?.body?.p_recording_mbid === 'mbid-distinct-0000-0000-000000000003',
+    `p_recording_mbid set to MBID (got "${rpcCall?.body?.p_recording_mbid}")`);
+  assert(rpcCall?.body?.p_isrc !== rpcCall?.body?.p_recording_mbid,
+    'ISRC and MBID are different values — not conflated');
+  assert(!String(rpcCall?.body?.p_isrc || '').startsWith('mbid-'), 'p_isrc does not contain a MusicBrainz ID');
+  assert(!String(rpcCall?.body?.p_recording_mbid || '').startsWith('US'), 'p_recording_mbid does not contain an ISRC');
 }
 
-// ── Test 4: No duplicate rows ────────────────────────────────────────────────
+// ── Test 4: No duplicate rows — same p_isrc on all runs ──────────────────────
 
 async function test4_no_duplicate_rows() {
-  console.log('\n[4] No duplicate rows — upsertNode idempotency + merge-duplicates prevents doubles');
+  console.log('\n[4] No duplicate rows — same p_isrc on all 3 runs; DB ON CONFLICT handles dedup');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
   const calls = [];
   const origFetch = global.fetch;
-  // Always return same UUID — simulates DB idempotency of graph_upsert_node
   global.fetch = makeMockFetch({ calls, rpcUuids: [REC_NODE_UUID, REC_NODE_UUID, REC_NODE_UUID] });
 
   const { syncEnrichmentToGraph } = loadFreshGraphSync();
   const track = trackWithIsrcAndMbid({ isrcs: ['USDUP0000001'] });
 
-  // Three enrichment runs on the same track
   await syncEnrichmentToGraph('TestArtist', [track]);
   await syncEnrichmentToGraph('TestArtist', [track]);
   await syncEnrichmentToGraph('TestArtist', [track]);
 
   global.fetch = origFetch;
 
-  const recPostCalls = calls.filter(c => c.url.endsWith('/rest/v1/recordings') && c.method === 'POST');
-  assert(recPostCalls.length === 3, `3 POST calls made across 3 runs (got ${recPostCalls.length})`);
+  const rpcCalls = calls.filter(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
+  assert(rpcCalls.length === 3, `3 RPC calls across 3 runs (got ${rpcCalls.length})`);
 
-  // All use the same node_id — they target the same row (update, not insert)
-  const uniqueNodeIds = [...new Set(recPostCalls.map(c => c.body?.node_id))];
-  assert(uniqueNodeIds.length === 1 && uniqueNodeIds[0] === REC_NODE_UUID,
-    `all 3 POST calls target the same node_id — only 1 row exists (got ${uniqueNodeIds})`);
-
-  // All carry merge-duplicates — PostgREST ON CONFLICT DO UPDATE, not raw INSERT
-  const allMergeDuplicates = recPostCalls.every(c =>
-    (c.headers?.['Prefer'] || '').includes('resolution=merge-duplicates')
-  );
-  assert(allMergeDuplicates, 'all POST calls carry resolution=merge-duplicates (DB-level deduplication)');
+  const uniqueIsrcs = [...new Set(rpcCalls.map(c => c.body?.p_isrc))];
+  assert(uniqueIsrcs.length === 1 && uniqueIsrcs[0] === 'USDUP0000001',
+    `all 3 RPC calls use same p_isrc (got ${JSON.stringify(uniqueIsrcs)})`);
 }
 
 // ── Test 5: syncEnrichmentToGraph is awaited before res.json() ───────────────
@@ -249,11 +220,10 @@ async function test4_no_duplicate_rows() {
 async function test5_sync_awaited_before_response() {
   console.log('\n[5] syncEnrichmentToGraph is awaited before the HTTP response is sent');
 
-  // Capture real setTimeout before any fast-sleep patches
   const realSetTimeout = global.setTimeout;
 
   let syncCompleted  = false;
-  let syncDoneAtResJson = null; // value of syncCompleted when res.json() fires
+  let syncDoneAtResJson = null;
 
   const fakeCatalog = {
     enrichedTracks: [trackWithIsrcAndMbid()],
@@ -265,7 +235,6 @@ async function test5_sync_awaited_before_response() {
     generatedAt: new Date().toISOString(),
   };
 
-  // ── Module injection ──────────────────────────────────────────────────────
   const modPaths = {
     enrichCatalog:  require.resolve('../lib/enrich-catalog'),
     graphSync:      require.resolve('../api/graph-sync'),
@@ -289,7 +258,6 @@ async function test5_sync_awaited_before_response() {
     id: modPaths.graphSync, filename: modPaths.graphSync, loaded: true,
     exports: {
       syncEnrichmentToGraph: async () => {
-        // 15ms real delay — long enough that fire-and-forget would NOT be done at res.json()
         await new Promise(r => realSetTimeout(r, 15));
         syncCompleted = true;
       },
@@ -316,24 +284,20 @@ async function test5_sync_awaited_before_response() {
 
   const handler = require('../api/enrich-artist');
 
-  // Mock Supabase fetch for sbPost / sbPatch
   const origFetch = global.fetch;
   global.fetch = async (url) => {
-    // sbPost — must return [{ id }]
     if (url.includes('catalog_enrichments_v1') && !url.includes('?'))
       return { ok: true, json: async () => [{ id: 'job-test-5' }], text: async () => JSON.stringify([{ id: 'job-test-5' }]) };
-    // sbPatch and any other Supabase calls
     return { ok: true, json: async () => null, text: async () => '' };
   };
 
-  // Mock req / res
   let responseCode = null;
   const res = {
     setHeader: () => {},
     status: (code) => ({
       json: (data) => {
         responseCode = code;
-        syncDoneAtResJson = syncCompleted; // snapshot: was sync done when response fired?
+        syncDoneAtResJson = syncCompleted;
         return data;
       },
       end: () => {},
@@ -352,25 +316,21 @@ async function test5_sync_awaited_before_response() {
   }
 
   assert(responseCode === 200, `handler returns 200 (got ${responseCode})`);
-  assert(syncCompleted === true,
-    'syncEnrichmentToGraph fully completed before handler returned');
-  assert(syncDoneAtResJson === true,
-    'syncEnrichmentToGraph was done when res.json() was called (not fire-and-forget)');
+  assert(syncCompleted === true, 'syncEnrichmentToGraph fully completed before handler returned');
+  assert(syncDoneAtResJson === true, 'syncEnrichmentToGraph was done when res.json() was called');
 }
 
-// ── Test 6: Existing rows are updated safely ──────────────────────────────────
+// ── Test 6: Existing rows updated safely ─────────────────────────────────────
 
 async function test6_existing_rows_updated_safely() {
-  console.log('\n[6] Existing works.recordings row — MBID written safely without clobbering ISRC');
+  console.log('\n[6] Existing works.recordings row — MBID added via RPC; ISRC preserved by COALESCE in DB');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
   const calls = [];
   const origFetch = global.fetch;
-  // Simulate: recording node already exists in graph (upsertNode returns its UUID)
   global.fetch = makeMockFetch({ calls, rpcUuids: [REC_NODE_UUID] });
 
   const { syncEnrichmentToGraph } = loadFreshGraphSync();
-  // Track that already has an ISRC in the graph; enrichment discovered the MBID
   await syncEnrichmentToGraph('TestArtist', [
     trackWithIsrcAndMbid({
       isrcs:         ['USEXI0000006'],
@@ -380,67 +340,39 @@ async function test6_existing_rows_updated_safely() {
 
   global.fetch = origFetch;
 
-  const post = calls.find(c => c.url.endsWith('/rest/v1/recordings') && c.method === 'POST');
-  assert(post !== undefined, 'recordings POST called for existing row');
-  assert(post?.body?.node_id === REC_NODE_UUID,
-    `uses same node_id as existing row (got "${post?.body?.node_id}")`);
-  assert(post?.body?.isrc === 'USEXI0000006',
-    `ISRC preserved in POST body (got "${post?.body?.isrc}")`);
-  assert(post?.body?.musicbrainz_recording_id === 'mbid-existing-row-00000000000006',
-    `MBID added to existing row (got "${post?.body?.musicbrainz_recording_id}")`);
-  assert((post?.headers?.['Prefer'] || '').includes('resolution=merge-duplicates'),
-    'merge-duplicates prevents a second row being inserted for the existing node');
+  const rpcCall = calls.find(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
+  assert(rpcCall !== undefined, 'rpc_upsert_recording_enrichment called for existing row');
+  assert(rpcCall?.body?.p_isrc === 'USEXI0000006',
+    `p_isrc carries ISRC (got "${rpcCall?.body?.p_isrc}")`);
+  assert(rpcCall?.body?.p_recording_mbid === 'mbid-existing-row-00000000000006',
+    `p_recording_mbid carries MBID (got "${rpcCall?.body?.p_recording_mbid}")`);
 }
 
-// ── Test 7: MBID-only first run → ISRC discovered later → same node_id ───────
+// ── Test 7: MBID-first → ISRC-later — single RPC call, guard now in DB ───────
 //
-// Proves the duplicate-row guard: when a recording was first written with
-// only an MBID (no ISRC at the time), and a subsequent enrichment run
-// discovers the ISRC, the existing MBID-keyed node_id is reused rather than
-// creating a second ISRC-keyed row.
+// Previously the JS guard called findNodeByExternalId (GET /rest/v1/nodes with
+// Accept-Profile: graph) which 406'd. After v2 fix, JS just passes both ISRC
+// and MBID to the RPC; the DB resolves deduplication internally.
 
-async function test7_mbid_first_isrc_later_reuses_same_node() {
-  console.log('\n[7] Duplicate-row guard — MBID-first then ISRC-later reuses same node_id');
+async function test7_mbid_first_isrc_later_single_rpc_no_js_guard() {
+  console.log('\n[7] MBID-first → ISRC-later: single RPC call with both params; no JS graph.nodes lookup');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
-  const mbid     = 'mbid-transition-0000-0000-000000000007';
-  const MBID_UUID = 'cccccccc-7777-0000-0000-000000000007';
-  let mbidNodeCreated = false;
+  const mbid = 'mbid-transition-0000-0000-000000000007';
   const calls = [];
   const origFetch = global.fetch;
-
-  global.fetch = async (url, opts = {}) => {
-    const body = opts.body ? JSON.parse(opts.body) : undefined;
-    calls.push({ url, method: opts.method || 'GET', body });
-
-    // graph_upsert_node RPC — only fires on run 1 (MBID-only path)
-    if (url.includes('/rpc/graph_upsert_node')) {
-      mbidNodeCreated = true;
-      return { ok: true, text: async () => JSON.stringify(MBID_UUID) };
-    }
-    // graph.nodes GET (findNodeByExternalId) — return MBID node only after it was created in run 1
-    if (url.includes('/rest/v1/nodes') && (opts.method === 'GET' || !opts.method)) {
-      if (mbidNodeCreated && url.includes(encodeURIComponent(mbid)) && url.includes('musicbrainz_recording')) {
-        return { ok: true, text: async () => JSON.stringify([{ id: MBID_UUID }]) };
-      }
-      return { ok: true, text: async () => JSON.stringify([]) };
-    }
-    if (url.includes('/rest/v1/recordings') && opts.method === 'POST') {
-      return { ok: true, text: async () => '' };
-    }
-    throw new Error(`Unexpected: ${opts.method || 'GET'} ${url}`);
-  };
+  global.fetch = makeMockFetch({ calls, rpcUuids: [REC_NODE_UUID, REC_NODE_UUID] });
 
   const { syncEnrichmentToGraph } = loadFreshGraphSync();
 
-  // Run 1: MBID only — no ISRC known yet
+  // Run 1: MBID only — no ISRC yet
   await syncEnrichmentToGraph('TestArtist', [{
     trackTitle: 'Transition Track',
     isrcs: [],
     recordingMBID: mbid,
   }]);
 
-  // Run 2: ISRC now available (MusicBrainz added it)
+  // Run 2: ISRC now available — both ISRC and MBID passed to RPC
   await syncEnrichmentToGraph('TestArtist', [{
     trackTitle: 'Transition Track',
     isrcs: ['USTRT0000007'],
@@ -449,91 +381,72 @@ async function test7_mbid_first_isrc_later_reuses_same_node() {
 
   global.fetch = origFetch;
 
-  const rpcCalls  = calls.filter(c => c.url.includes('/rpc/graph_upsert_node'));
-  const postCalls = calls.filter(c => c.url.includes('/rest/v1/recordings') && c.method === 'POST');
-  const nodeIds   = postCalls.map(c => c.body?.node_id);
+  const rpcCalls = calls.filter(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
+  const nodeCalls = calls.filter(c => c.url.includes('/rest/v1/nodes'));
 
-  assert(rpcCalls.length === 1,
-    `upsertNode called only once (run 1 MBID-only) — not called again on run 2 (got ${rpcCalls.length})`);
-  assert(postCalls.length === 2,
-    `POST to recordings twice — one per run (got ${postCalls.length})`);
-  assert(nodeIds[0] === MBID_UUID && nodeIds[1] === MBID_UUID,
-    `both runs use the same node_id — no duplicate row created (got ${JSON.stringify(nodeIds)})`);
-  assert(postCalls[1]?.body?.isrc === 'USTRT0000007',
-    `run 2 POST body contains ISRC (got "${postCalls[1]?.body?.isrc}")`);
-  assert(postCalls[1]?.body?.musicbrainz_recording_id === mbid,
-    `run 2 POST body contains MBID (got "${postCalls[1]?.body?.musicbrainz_recording_id}")`);
+  assert(nodeCalls.length === 0,
+    `no graph.nodes GET calls — guard is inside RPC now (got ${nodeCalls.length})`);
+  assert(rpcCalls.length === 2,
+    `RPC called once per run (got ${rpcCalls.length})`);
+
+  // Run 1: MBID only
+  assert(rpcCalls[0]?.body?.p_recording_mbid === mbid,
+    `run 1: p_recording_mbid is MBID (got "${rpcCalls[0]?.body?.p_recording_mbid}")`);
+  assert(!rpcCalls[0]?.body?.p_isrc,
+    `run 1: p_isrc is null/empty — no ISRC yet (got "${rpcCalls[0]?.body?.p_isrc}")`);
+
+  // Run 2: both ISRC and MBID — RPC resolves existing node internally
+  assert(rpcCalls[1]?.body?.p_isrc === 'USTRT0000007',
+    `run 2: p_isrc set (got "${rpcCalls[1]?.body?.p_isrc}")`);
+  assert(rpcCalls[1]?.body?.p_recording_mbid === mbid,
+    `run 2: p_recording_mbid still present (got "${rpcCalls[1]?.body?.p_recording_mbid}")`);
 }
 
-// ── Test 8: Catalog-submitted first → enrichment with ISRC → same node_id ────
+// ── Test 8: Catalog-keyed → ISRC — single RPC call, no JS guard ──────────────
 //
-// Proves the duplicate-row guard for the cross-path case: a track submitted
-// through submit-catalog.js (keyed by rec_{catalog_id} in musigod_catalog ns)
-// and then enriched with an ISRC by enrich-artist.js reuses the catalog node.
+// Previously the JS guard called findNodeByExternalId to find the catalog-keyed
+// node, then passed p_existing_node_id. After v2 fix, JS passes both ISRC and
+// catalog_track_id to the RPC; the DB resolves deduplication internally.
 
-async function test8_catalog_keyed_first_isrc_on_enrichment_reuses_same_node() {
-  console.log('\n[8] Duplicate-row guard — catalog-keyed node reused when ISRC discovered on enrichment');
+async function test8_catalog_keyed_isrc_on_enrichment_single_rpc_no_js_guard() {
+  console.log('\n[8] Catalog-keyed node + ISRC on enrichment: single RPC call with p_isrc + p_catalog_track_id');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
-  const catalogId    = 'cat-track-00000008';
-  const CATALOG_UUID = 'dddddddd-8888-0000-0000-000000000008';
+  const catalogId = 'cat-track-00000008';
   const calls = [];
   const origFetch = global.fetch;
-
-  global.fetch = async (url, opts = {}) => {
-    const body = opts.body ? JSON.parse(opts.body) : undefined;
-    calls.push({ url, method: opts.method || 'GET', body });
-
-    if (url.includes('/rpc/graph_upsert_node')) {
-      return { ok: true, text: async () => JSON.stringify(CATALOG_UUID) };
-    }
-    if (url.includes('/rest/v1/nodes') && (opts.method === 'GET' || !opts.method)) {
-      // Catalog-keyed recording node (rec_cat-track-00000008 in musigod_catalog)
-      if (url.includes(`rec_${catalogId}`) && url.includes('musigod_catalog')) {
-        return { ok: true, text: async () => JSON.stringify([{ id: CATALOG_UUID }]) };
-      }
-      return { ok: true, text: async () => JSON.stringify([]) };
-    }
-    if (url.includes('/rest/v1/recordings') && opts.method === 'POST') {
-      return { ok: true, text: async () => '' };
-    }
-    throw new Error(`Unexpected: ${opts.method || 'GET'} ${url}`);
-  };
+  global.fetch = makeMockFetch({ calls, rpcUuids: [REC_NODE_UUID] });
 
   const { syncEnrichmentToGraph } = loadFreshGraphSync();
 
-  // Enrichment run: track has catalogId + ISRC (was previously in catalog submission)
   await syncEnrichmentToGraph('TestArtist', [{
-    trackTitle:  'Catalog Track',
-    catalog_id:  catalogId,
-    isrcs:       ['USCAT0000008'],
+    trackTitle:    'Catalog Track',
+    catalog_id:    catalogId,
+    isrcs:         ['USCAT0000008'],
     recordingMBID: null,
   }]);
 
   global.fetch = origFetch;
 
-  const rpcCalls  = calls.filter(c => c.url.includes('/rpc/graph_upsert_node'));
-  const postCalls = calls.filter(c => c.url.includes('/rest/v1/recordings') && c.method === 'POST');
+  const rpcCalls = calls.filter(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
+  const nodeCalls = calls.filter(c => c.url.includes('/rest/v1/nodes'));
 
-  assert(rpcCalls.length === 0,
-    `upsertNode NOT called — existing catalog-keyed node found and reused (got ${rpcCalls.length})`);
-  assert(postCalls.length === 1,
-    `POST to recordings once (got ${postCalls.length})`);
-  assert(postCalls[0]?.body?.node_id === CATALOG_UUID,
-    `POST uses catalog node UUID — no new ISRC-keyed row created (got "${postCalls[0]?.body?.node_id}")`);
-  assert(postCalls[0]?.body?.isrc === 'USCAT0000008',
-    `ISRC correctly written to existing catalog row (got "${postCalls[0]?.body?.isrc}")`);
+  assert(nodeCalls.length === 0,
+    `no graph.nodes GET calls — guard is inside RPC (got ${nodeCalls.length})`);
+  assert(rpcCalls.length === 1,
+    `rpc_upsert_recording_enrichment called once (got ${rpcCalls.length})`);
+  assert(rpcCalls[0]?.body?.p_isrc === 'USCAT0000008',
+    `p_isrc carries ISRC (got "${rpcCalls[0]?.body?.p_isrc}")`);
+  assert(rpcCalls[0]?.body?.p_catalog_track_id === catalogId,
+    `p_catalog_track_id carries catalogId (got "${rpcCalls[0]?.body?.p_catalog_track_id}")`);
+  assert(!('p_existing_node_id' in (rpcCalls[0]?.body || {})),
+    'p_existing_node_id absent from RPC body — guard is in DB');
 }
 
-// ── Test 9: MBID-only (no ISRC, no catalog_id) — idempotent, no duplicate rows ─
-//
-// When a track has only a recordingMBID (no ISRC, no catalog_id), the code
-// takes the else-MBID-keyed path directly without any findNodeByExternalId
-// guard. Two enrichment runs must produce the same node_id in both POST
-// bodies — no duplicate rows.
+// ── Test 9: MBID-only — idempotent, no graph.nodes GET ───────────────────────
 
 async function test9_mbid_only_no_isrc_no_catalogid_idempotent() {
-  console.log('\n[9] MBID-only (no ISRC, no catalog_id) — idempotent across two runs');
+  console.log('\n[9] MBID-only (no ISRC, no catalog_id) — idempotent; no graph.nodes GET');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
   const MBID_UUID = 'eeeeeeee-9999-0000-0000-000000000009';
@@ -550,38 +463,24 @@ async function test9_mbid_only_no_isrc_no_catalogid_idempotent() {
 
   global.fetch = origFetch;
 
-  const rpcCalls   = calls.filter(c => c.url.includes('/rpc/graph_upsert_node'));
-  const getLookups = calls.filter(c => c.url.includes('/rest/v1/nodes') && c.method === 'GET');
-  const postCalls  = calls.filter(c => c.url.endsWith('/rest/v1/recordings') && c.method === 'POST');
-  const nodeIds    = postCalls.map(c => c.body?.node_id);
+  const rpcCalls = calls.filter(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
+  const nodeCalls = calls.filter(c => c.url.includes('/rest/v1/nodes'));
 
-  assert(getLookups.length === 0,
-    `no graph.nodes lookups — MBID-only path skips findNodeByExternalId (got ${getLookups.length})`);
+  assert(nodeCalls.length === 0,
+    `no graph.nodes GETs — MBID-only path skips guard entirely (got ${nodeCalls.length})`);
   assert(rpcCalls.length === 2,
-    `graph_upsert_node called once per run (got ${rpcCalls.length})`);
+    `RPC called once per run (got ${rpcCalls.length})`);
 
-  const extIds = rpcCalls.map(c => c.body?.p_external_id);
-  assert(extIds.every(id => id === mbid),
-    `both upsertNode calls use MBID as external_id (got ${JSON.stringify(extIds)})`);
-  assert(rpcCalls[0]?.body?.p_external_ns === 'musicbrainz_recording',
-    `node keyed with musicbrainz_recording namespace (got "${rpcCalls[0]?.body?.p_external_ns}")`);
-
-  assert(postCalls.length === 2,
-    `POST to recordings twice — one per run (got ${postCalls.length})`);
-  assert(nodeIds[0] === MBID_UUID && nodeIds[1] === MBID_UUID,
-    `same node_id on both runs — no duplicate row (got ${JSON.stringify(nodeIds)})`);
-  assert(postCalls.every(c => (c.headers?.['Prefer'] || '').includes('resolution=merge-duplicates')),
-    'all POST calls carry resolution=merge-duplicates');
-  assert(postCalls.every(c => !c.body?.isrc),
-    'isrc field absent from both POST bodies (no ISRC on this track)');
-  assert(postCalls.every(c => c.body?.musicbrainz_recording_id === mbid),
-    `MBID written to musicbrainz_recording_id on both runs (got ${JSON.stringify(postCalls.map(c => c.body?.musicbrainz_recording_id))})`);
+  const mbids = rpcCalls.map(c => c.body?.p_recording_mbid);
+  assert(mbids.every(id => id === mbid),
+    `both calls use MBID as p_recording_mbid (got ${JSON.stringify(mbids)})`);
+  assert(rpcCalls.every(c => !c.body?.p_isrc),
+    'p_isrc absent on both runs (no ISRC on this track)');
+  assert(rpcCalls.every(c => !c.body?.p_catalog_track_id),
+    'p_catalog_track_id absent on both runs (no catalog_id on this track)');
 }
 
-// ── Test 10: Worker path (run-enrichment-job.js) calls and awaits graph sync ─
-//
-// Verifies that the n8n/worker handler (run-enrichment-job.js) calls
-// syncEnrichmentToGraph and awaits it before sending the DONE response.
+// ── Test 10: Worker path calls and awaits graph sync ─────────────────────────
 
 async function test10_worker_path_calls_and_awaits_graph_sync() {
   console.log('\n[10] Worker path — run-enrichment-job.js calls and awaits syncEnrichmentToGraph');
@@ -657,19 +556,11 @@ async function test10_worker_path_calls_and_awaits_graph_sync() {
   const res = {
     setHeader: () => {},
     status: (code) => ({
-      json: (data) => {
-        responseCode = code;
-        syncDoneAtResJson = syncCompleted;
-        return data;
-      },
+      json: (data) => { responseCode = code; syncDoneAtResJson = syncCompleted; return data; },
       end: () => {},
     }),
   };
-  const req = {
-    method: 'POST',
-    headers: {},
-    body: { job_id: 'job-test-10', artistName: 'TestArtist', maxReleases: 1 },
-  };
+  const req = { method: 'POST', headers: {}, body: { job_id: 'job-test-10', artistName: 'TestArtist', maxReleases: 1 } };
 
   try {
     await handler(req, res);
@@ -679,25 +570,18 @@ async function test10_worker_path_calls_and_awaits_graph_sync() {
       else delete require.cache[p];
     }
     global.fetch = origFetch;
-    if (savedN8n !== undefined) process.env.N8N_ENRICH_TOKEN = savedN8n;
+    if (savedN8n   !== undefined) process.env.N8N_ENRICH_TOKEN = savedN8n;
     else delete process.env.N8N_ENRICH_TOKEN;
-    if (savedAdmin !== undefined) process.env.AUDIT_ADMIN_KEY = savedAdmin;
+    if (savedAdmin !== undefined) process.env.AUDIT_ADMIN_KEY  = savedAdmin;
     else delete process.env.AUDIT_ADMIN_KEY;
   }
 
-  assert(responseCode === 200,
-    `worker handler returns 200 (got ${responseCode})`);
-  assert(syncCompleted === true,
-    'syncEnrichmentToGraph fully completed before handler returned');
-  assert(syncDoneAtResJson === true,
-    'sync was done when res.json() fired — not fire-and-forget');
+  assert(responseCode === 200, `worker handler returns 200 (got ${responseCode})`);
+  assert(syncCompleted === true, 'syncEnrichmentToGraph fully completed before handler returned');
+  assert(syncDoneAtResJson === true, 'sync was done when res.json() fired');
 }
 
-// ── Test 11: Worker path — ERROR returned (not DONE) when graph sync throws ──
-//
-// Verifies that if syncEnrichmentToGraph throws, the worker handler does NOT
-// write status=DONE to Supabase and does NOT return HTTP 200. The production
-// n8n path must fail loudly so the caller knows graph persistence did not occur.
+// ── Test 11: Worker path — ERROR returned when graph sync throws ──────────────
 
 async function test11_worker_error_not_done_on_graph_sync_failure() {
   console.log('\n[11] Worker path — ERROR (not DONE) when syncEnrichmentToGraph throws');
@@ -734,10 +618,7 @@ async function test11_worker_error_not_done_on_graph_sync_failure() {
   require.cache[modPaths.graphSync] = {
     id: modPaths.graphSync, filename: modPaths.graphSync, loaded: true,
     exports: {
-      syncEnrichmentToGraph: async () => {
-        syncCalled = true;
-        throw new Error('simulated graph sync failure');
-      },
+      syncEnrichmentToGraph: async () => { syncCalled = true; throw new Error('simulated graph sync failure'); },
       syncCatalogToGraph: async () => {},
       syncArtistToGraph:  async () => {},
     },
@@ -778,19 +659,11 @@ async function test11_worker_error_not_done_on_graph_sync_failure() {
   const res = {
     setHeader: () => {},
     status: (code) => ({
-      json: (data) => {
-        responseCode = code;
-        responseBody = data;
-        return data;
-      },
+      json: (data) => { responseCode = code; responseBody = data; return data; },
       end: () => {},
     }),
   };
-  const req = {
-    method: 'POST',
-    headers: {},
-    body: { job_id: 'job-test-11', artistName: 'TestArtist', maxReleases: 1 },
-  };
+  const req = { method: 'POST', headers: {}, body: { job_id: 'job-test-11', artistName: 'TestArtist', maxReleases: 1 } };
 
   try {
     await handler(req, res);
@@ -800,35 +673,25 @@ async function test11_worker_error_not_done_on_graph_sync_failure() {
       else delete require.cache[p];
     }
     global.fetch = origFetch;
-    if (savedN8n !== undefined) process.env.N8N_ENRICH_TOKEN = savedN8n;
+    if (savedN8n   !== undefined) process.env.N8N_ENRICH_TOKEN = savedN8n;
     else delete process.env.N8N_ENRICH_TOKEN;
-    if (savedAdmin !== undefined) process.env.AUDIT_ADMIN_KEY = savedAdmin;
+    if (savedAdmin !== undefined) process.env.AUDIT_ADMIN_KEY  = savedAdmin;
     else delete process.env.AUDIT_ADMIN_KEY;
   }
 
-  assert(syncCalled === true,
-    'syncEnrichmentToGraph was called on the worker path');
-  assert(responseCode === 500,
-    `handler returns 500 on graph sync failure (got ${responseCode})`);
-  assert(responseBody?.status === 'ERROR',
-    `response body status is ERROR (got "${responseBody?.status}")`);
-  assert(responseBody?.status !== 'DONE',
-    'response body status is NOT DONE');
+  assert(syncCalled === true, 'syncEnrichmentToGraph was called on worker path');
+  assert(responseCode === 500, `handler returns 500 on graph sync failure (got ${responseCode})`);
+  assert(responseBody?.status === 'ERROR', `response status is ERROR (got "${responseBody?.status}")`);
+  assert(responseBody?.status !== 'DONE', 'response status is NOT DONE');
 
   const donePatches = sbPatchBodies.filter(b => b.status === 'DONE');
-  assert(donePatches.length === 0,
-    `Supabase never patched with status=DONE on graph sync failure (got ${donePatches.length})`);
+  assert(donePatches.length === 0, `Supabase never patched with DONE on failure (got ${donePatches.length})`);
 
   const errorPatches = sbPatchBodies.filter(b => b.status === 'ERROR');
-  assert(errorPatches.length >= 1,
-    `Supabase patched with status=ERROR (got ${errorPatches.length})`);
+  assert(errorPatches.length >= 1, `Supabase patched with ERROR (got ${errorPatches.length})`);
 }
 
-// ── Test 12: enrich-artist.js UI path captures graph stats in DONE result ─────
-//
-// Verifies that when syncEnrichmentToGraph returns partial failures (e.g., all
-// node upserts fail because the RPC is missing), enrich-artist.js includes
-// graphSynced and graphSyncFailed in the DONE result rather than discarding them.
+// ── Test 12: enrich-artist.js captures graph stats in DONE result ─────────────
 
 async function test12_enrich_artist_captures_graph_stats_in_done() {
   console.log('\n[12] enrich-artist.js — graphSynced/graphSyncFailed captured in DONE result');
@@ -909,11 +772,7 @@ async function test12_enrich_artist_captures_graph_stats_in_done() {
       end:  () => {},
     }),
   };
-  const req = {
-    method:  'POST',
-    headers: {},
-    body:    { artistName: 'TestArtist12', maxReleases: 1 },
-  };
+  const req = { method: 'POST', headers: {}, body: { artistName: 'TestArtist12', maxReleases: 1 } };
 
   try {
     await handler(req, res);
@@ -939,14 +798,10 @@ async function test12_enrich_artist_captures_graph_stats_in_done() {
     `result.graphSyncFailed is 2 (got ${donePatch?.result?.graphSyncFailed})`);
 }
 
-// ── Test 13: enrich-artist.js UI path still returns DONE when graph sync fails ─
-//
-// When syncEnrichmentToGraph throws (catastrophic failure, not per-track), the
-// enrich-artist.js UI path must still return DONE — graph sync is non-fatal on
-// this path — but graphSyncFailed must reflect the full track count.
+// ── Test 13: enrich-artist.js returns DONE even when graph sync throws ─────────
 
 async function test13_enrich_artist_done_with_failed_stats_on_graph_throw() {
-  console.log('\n[13] enrich-artist.js — DONE returned even when graph sync throws; graphSyncFailed reflects track count');
+  console.log('\n[13] enrich-artist.js — DONE returned even when graph sync throws; graphSyncFailed = track count');
 
   const fakeCatalog = {
     enrichedTracks: [trackWithIsrcAndMbid()],
@@ -1024,11 +879,7 @@ async function test13_enrich_artist_done_with_failed_stats_on_graph_throw() {
       end:  () => {},
     }),
   };
-  const req = {
-    method:  'POST',
-    headers: {},
-    body:    { artistName: 'TestArtist13', maxReleases: 1 },
-  };
+  const req = { method: 'POST', headers: {}, body: { artistName: 'TestArtist13', maxReleases: 1 } };
 
   try {
     await handler(req, res);
@@ -1045,34 +896,146 @@ async function test13_enrich_artist_done_with_failed_stats_on_graph_throw() {
   assert(responseCode === 200, `handler still returns 200 when graph sync throws (got ${responseCode})`);
 
   const donePatches = sbPatchBodies.filter(b => b.status === 'DONE');
-  assert(donePatches.length >= 1, 'Supabase patched with status=DONE despite graph sync throw');
+  assert(donePatches.length >= 1, 'Supabase patched with DONE despite graph sync throw');
 
   const donePatch = donePatches[0];
-  assert(donePatch?.result?.graphSynced === 0,
-    `result.graphSynced is 0 (got ${donePatch?.result?.graphSynced})`);
+  assert(donePatch?.result?.graphSynced === 0, `result.graphSynced is 0 (got ${donePatch?.result?.graphSynced})`);
   assert(donePatch?.result?.graphSyncFailed === 1,
-    `result.graphSyncFailed equals track count (1) on catastrophic throw (got ${donePatch?.result?.graphSyncFailed})`);
+    `result.graphSyncFailed = track count (1) on catastrophic throw (got ${donePatch?.result?.graphSyncFailed})`);
+}
+
+// ── Test 14: catalog_track_id-only (third identity tier, no ISRC/MBID) ────────
+
+async function test14_catalog_track_id_only_triggers_rpc() {
+  console.log('\n[14] catalog_track_id-only (third tier) — RPC called with p_catalog_track_id, others null');
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
+
+  const calls = [];
+  const origFetch = global.fetch;
+  global.fetch = makeMockFetch({ calls });
+
+  const { syncEnrichmentToGraph } = loadFreshGraphSync();
+  await syncEnrichmentToGraph('TestArtist', [{
+    trackTitle:    'Catalog Only Track',
+    catalog_id:    'cat-only-0000014',
+    isrcs:         [],
+    recordingMBID: null,
+  }]);
+
+  global.fetch = origFetch;
+
+  const rpcCalls = calls.filter(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
+  const nodeCalls = calls.filter(c => c.url.includes('/rest/v1/nodes'));
+
+  assert(nodeCalls.length === 0, `no graph.nodes GETs (got ${nodeCalls.length})`);
+  assert(rpcCalls.length === 1, `RPC called once (got ${rpcCalls.length})`);
+  assert(rpcCalls[0]?.body?.p_catalog_track_id === 'cat-only-0000014',
+    `p_catalog_track_id carries catalogId (got "${rpcCalls[0]?.body?.p_catalog_track_id}")`);
+  assert(!rpcCalls[0]?.body?.p_isrc,
+    `p_isrc is null/empty (got "${rpcCalls[0]?.body?.p_isrc}")`);
+  assert(!rpcCalls[0]?.body?.p_recording_mbid,
+    `p_recording_mbid is null/empty (got "${rpcCalls[0]?.body?.p_recording_mbid}")`);
+}
+
+// ── Test 15: All three identifiers — single RPC call with all params ──────────
+
+async function test15_all_three_identifiers_single_rpc_call() {
+  console.log('\n[15] All three identifiers (ISRC + MBID + catalog_id) — single RPC call; DB resolves priority');
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
+
+  const calls = [];
+  const origFetch = global.fetch;
+  global.fetch = makeMockFetch({ calls });
+
+  const { syncEnrichmentToGraph } = loadFreshGraphSync();
+  await syncEnrichmentToGraph('TestArtist', [{
+    trackTitle:    'Full Identity Track',
+    catalog_id:    'cat-full-0000015',
+    isrcs:         ['USFULL000015'],
+    recordingMBID: 'mbid-full-0000-0000-0000-000000000015',
+  }]);
+
+  global.fetch = origFetch;
+
+  const rpcCalls = calls.filter(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
+  const nodeCalls = calls.filter(c => c.url.includes('/rest/v1/nodes'));
+
+  assert(nodeCalls.length === 0, `no graph.nodes GETs — no JS-level guard (got ${nodeCalls.length})`);
+  assert(rpcCalls.length === 1, `exactly 1 RPC call (got ${rpcCalls.length})`);
+
+  const b = rpcCalls[0]?.body;
+  assert(b?.p_isrc === 'USFULL000015',
+    `p_isrc present (got "${b?.p_isrc}")`);
+  assert(b?.p_recording_mbid === 'mbid-full-0000-0000-0000-000000000015',
+    `p_recording_mbid present (got "${b?.p_recording_mbid}")`);
+  assert(b?.p_catalog_track_id === 'cat-full-0000015',
+    `p_catalog_track_id present (got "${b?.p_catalog_track_id}")`);
+}
+
+// ── Test 16: Unauthorized RPC (403) — failed count incremented, no throw ──────
+//
+// If the RPC returns 403 (e.g., called with wrong key in production),
+// syncEnrichmentToGraph must catch the error per-track and return
+// { synced: 0, failed: N } rather than throwing to the caller.
+
+async function test16_unauthorized_rpc_increments_failed_count() {
+  console.log('\n[16] Unauthorized RPC (403) — syncEnrichmentToGraph returns failed stats, does not throw');
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
+
+  const origFetch = global.fetch;
+  global.fetch = async (url) => {
+    if (url.includes('/rpc/rpc_upsert_recording_enrichment')) {
+      return {
+        ok: false,
+        status: 403,
+        text: async () => JSON.stringify({ message: 'permission denied for function rpc_upsert_recording_enrichment', code: '42501' }),
+      };
+    }
+    return { ok: false, status: 404, text: async () => '{"error":"unexpected"}' };
+  };
+
+  const { syncEnrichmentToGraph } = loadFreshGraphSync();
+
+  let result;
+  let threw = false;
+  try {
+    result = await syncEnrichmentToGraph('test-artist', [
+      { trackTitle: 'Track A', isrcs: ['USUNAUTH0001'], recordingMBID: 'mbid-unauth-0001' },
+      { trackTitle: 'Track B', isrcs: ['USUNAUTH0002'], recordingMBID: 'mbid-unauth-0002' },
+    ]);
+  } catch (e) {
+    threw = true;
+  }
+
+  global.fetch = origFetch;
+
+  assert(!threw,              'syncEnrichmentToGraph does NOT throw on 403');
+  assert(result?.synced === 0, `synced count is 0 (got ${result?.synced})`);
+  assert(result?.failed === 2, `failed count equals track count (got ${result?.failed})`);
 }
 
 // ── Runner ───────────────────────────────────────────────────────────────────
 
 (async () => {
   console.log('=== graph-sync-enrichment-upsert.test.js ===');
-  console.log('Upsert path: upsertNode + POST recordings?merge-duplicates\n');
+  console.log('v2 RPC: identity lookup merged into SECURITY DEFINER function\n');
 
-  await test1_creates_new_recording_rows();
+  await test1_rpc_called_with_isrc_and_mbid();
   await test2_repeated_enrichment_is_idempotent();
-  await test3_isrc_and_mbid_are_separate_fields();
+  await test3_isrc_and_mbid_are_distinct_params();
   await test4_no_duplicate_rows();
   await test5_sync_awaited_before_response();
   await test6_existing_rows_updated_safely();
-  await test7_mbid_first_isrc_later_reuses_same_node();
-  await test8_catalog_keyed_first_isrc_on_enrichment_reuses_same_node();
+  await test7_mbid_first_isrc_later_single_rpc_no_js_guard();
+  await test8_catalog_keyed_isrc_on_enrichment_single_rpc_no_js_guard();
   await test9_mbid_only_no_isrc_no_catalogid_idempotent();
   await test10_worker_path_calls_and_awaits_graph_sync();
   await test11_worker_error_not_done_on_graph_sync_failure();
   await test12_enrich_artist_captures_graph_stats_in_done();
   await test13_enrich_artist_done_with_failed_stats_on_graph_throw();
+  await test14_catalog_track_id_only_triggers_rpc();
+  await test15_all_three_identifiers_single_rpc_call();
+  await test16_unauthorized_rpc_increments_failed_count();
 
   console.log(`\n${'─'.repeat(50)}`);
   const total = passed + failed;

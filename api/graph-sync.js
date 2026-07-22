@@ -157,11 +157,15 @@ async function syncCatalogToGraph(artistId, tracks) {
 
 /**
  * Called from enrich-artist.js after enrichment completes.
- * Patches existing work/recording nodes with ISWC, ISRC, MusicBrainz IDs.
+ * Upserts recording nodes with ISRC, MusicBrainz IDs, and catalog identity
+ * via a single SECURITY DEFINER RPC that owns lookup + upsert atomically.
  *
  * Supports two incoming track shapes:
  *   enrichArtistCatalog() → camelCase: trackTitle, isrcs[], recordingMBID
  *   submit-catalog / bulk import → snake_case: title, isrc, catalog_id, recording_mbid
+ *
+ * Identity priority (resolved inside the RPC, not here):
+ *   normalized ISRC → recording_mbid → catalog_track_id
  */
 async function syncEnrichmentToGraph(artistId, enrichedTracks) {
   if (!enrichedTracks?.length) return
@@ -172,94 +176,22 @@ async function syncEnrichmentToGraph(artistId, enrichedTracks) {
       // Normalise field names across both incoming shapes.
       const title         = track.trackTitle      || track.title        || null
       const catalogId     = track.catalog_id      || null
-      const iswc          = track.iswc            || null
       const isrc          = (track.isrcs && track.isrcs[0]) || track.isrc || null
       const recordingMbid = track.recording_mbid  || track.recordingMBID || null
+      const normalIsrc    = isrc ? isrc.toUpperCase() : null
 
-      // ── Work node lookup: ISWC → catalog_id → title fingerprint ─────────────
-      // These are tried in priority order; the first hit wins.
-      // ISWC is the most reliable cross-source identifier for a composition.
-      let workNodeId = null
-      if (iswc)                 workNodeId = await findNodeByExternalId(iswc, 'iswc')
-      if (!workNodeId && catalogId) workNodeId = await findNodeByExternalId(catalogId, 'musigod_catalog')
-      // Only try title fingerprint when we have a stable work identifier (ISWC or
-      // catalogId); without one, fingerprint matches are unreliable and hit Supabase
-      // unnecessarily for every enrichment-only track (e.g., MusicBrainz backfills).
-      if (!workNodeId && title && (iswc || catalogId)) workNodeId = await findNodeByExternalId(fingerprint(title), 'musigod_catalog')
-
-      if (workNodeId) {
-        const workPatch = {}
-        if (iswc)                 workPatch.iswc             = iswc
-        if (track.musicbrainz_id) workPatch.musicbrainz_id  = track.musicbrainz_id
-        if (track.ascap_id)       workPatch.ascap_id         = track.ascap_id
-        if (track.bmi_id)         workPatch.bmi_id           = track.bmi_id
-        if (Object.keys(workPatch).length) {
-          await graphFetch(`compositions?node_id=eq.${workNodeId}`, {
-            method: 'PATCH',
-            body: workPatch,
-            schema: 'works',
-          })
-        }
-      }
-
-      // ── Recording: upsert graph node + works.recordings row ─────────────────
-      // Identity priority: ISRC > MusicBrainz recording ID (no title-only writes).
-      //
-      // Duplicate-row guard: if an ISRC is now known but the recording was
-      // previously keyed by MBID or catalog namespace (e.g., no ISRC on the
-      // first enrichment run, or submitted through submit-catalog before
-      // enrichment), reuse the existing node_id rather than creating a new
-      // ISRC-keyed node. Without this guard, two works.recordings rows would
-      // result: one MBID-keyed with isrc=NULL, one ISRC-keyed — both valid
-      // under the PK/unique constraints but representing the same recording.
-      // resolution=merge-duplicates only resolves on the PK (node_id), so it
-      // cannot catch the second row on its own.
-      if (isrc || recordingMbid) {
-        const normalIsrc = isrc ? isrc.toUpperCase() : null
-        let recNodeId = null
-
-        if (normalIsrc) {
-          // Guard: check for a prior node keyed by MBID (MBID-first → ISRC-later).
-          if (recordingMbid) {
-            recNodeId = await findNodeByExternalId(recordingMbid, 'musicbrainz_recording')
-          }
-          // Guard: check for a prior node keyed by catalog_id (catalog submission → enrichment).
-          if (!recNodeId && catalogId) {
-            recNodeId = await findNodeByExternalId(`rec_${catalogId}`, 'musigod_catalog')
-          }
-          // No prior node found — create one keyed by ISRC (stable canonical key).
-          if (!recNodeId) {
-            recNodeId = await upsertNode({
-              node_type: 'recording',
-              label: title || '',
-              external_id: normalIsrc,
-              external_id_ns: 'isrc',
-              properties: { title: title || null, isrc: normalIsrc, musicbrainz_recording_id: recordingMbid || null },
-            })
-          }
-        } else {
-          // No ISRC — key by MBID. If MusicBrainz later provides an ISRC, the
-          // next enrichment run finds this node via the MBID guard above.
-          recNodeId = await upsertNode({
-            node_type: 'recording',
-            label: title || '',
-            external_id: recordingMbid,
-            external_id_ns: 'musicbrainz_recording',
-            properties: { title: title || null, isrc: null, musicbrainz_recording_id: recordingMbid },
-          })
-        }
-
-        const recBody = { node_id: recNodeId }
-        if (title)         recBody.title                    = title
-        if (normalIsrc)    recBody.isrc                     = normalIsrc
-        if (recordingMbid) recBody.musicbrainz_recording_id = recordingMbid
-        if (workNodeId)    recBody.composition_node_id      = workNodeId
-
-        await graphFetch('recordings', {
-          method: 'POST',
-          body: recBody,
-          prefer: 'resolution=merge-duplicates,return=minimal',
-          schema: 'works',
+      // ── Recording: upsert via public RPC (lookup + upsert atomic inside DB) ──
+      // The RPC resolves ISRC → MBID → catalog_track_id priority internally and
+      // queries graph.nodes directly (SECURITY DEFINER bypasses PostgREST schema
+      // routing). No graph-schema REST calls are made from JS.
+      if (normalIsrc || recordingMbid || catalogId) {
+        await upsertRecordingEnrichment({
+          label:             title || '',
+          isrc:              normalIsrc,
+          recording_mbid:    recordingMbid,
+          catalog_track_id:  catalogId,
+          node_properties:   { title: title || null, isrc: normalIsrc || null, musicbrainz_recording_id: recordingMbid || null },
+          composition_node_id: null,
         })
       }
 
@@ -490,6 +422,25 @@ async function upsertEdge({
       p_effective_from: effective_from,
       p_effective_until: effective_until,
     },
+  })
+}
+
+async function upsertRecordingEnrichment({
+  label, isrc = null, recording_mbid = null, catalog_track_id = null,
+  node_properties = null, composition_node_id = null,
+}) {
+  return graphFetch('rpc_upsert_recording_enrichment', {
+    method: 'POST',
+    rpc: true,
+    body: {
+      p_label:               label,
+      p_isrc:                isrc,
+      p_recording_mbid:      recording_mbid,
+      p_catalog_track_id:    catalog_track_id,
+      p_node_properties:     node_properties || {},
+      p_composition_node_id: composition_node_id,
+    },
+    schema: 'public',
   })
 }
 
