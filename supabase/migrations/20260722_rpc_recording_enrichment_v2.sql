@@ -18,10 +18,12 @@
 -- Prerequisite: 20260721_graph_rls_lockdown.sql must have been applied first.
 -- Idempotent: DROP IF EXISTS + CREATE OR REPLACE + REVOKE are all safe to re-run.
 
--- Wrap in an explicit transaction so DROP + CREATE + REVOKE + GRANT are atomic.
--- If the CREATE fails the DROP is rolled back — the old function is never lost.
--- NOTIFY queues inside the transaction and fires only on COMMIT.
-BEGIN;
+-- Do NOT wrap in BEGIN/COMMIT. Supabase SQL Editor wraps each run in its own
+-- implicit transaction; an explicit BEGIN inside it is a no-op (PG warns
+-- "there is already a transaction in progress"), and an explicit COMMIT
+-- prematurely commits the editor's outer transaction, leaving subsequent
+-- statements without a transaction to roll back into on failure.
+-- The editor's implicit transaction provides the same atomicity guarantee.
 
 -- Create new 6-param function FIRST so the old never disappears before the new exists.
 CREATE OR REPLACE FUNCTION public.rpc_upsert_recording_enrichment(
@@ -171,10 +173,7 @@ REVOKE EXECUTE ON FUNCTION public.rpc_upsert_recording_enrichment(TEXT,TEXT,TEXT
 GRANT EXECUTE ON FUNCTION public.rpc_upsert_recording_enrichment(TEXT,TEXT,TEXT,TEXT,JSONB,UUID)
   TO service_role;
 
--- NOTIFY queues here and fires on COMMIT below.
 NOTIFY pgrst, 'reload schema';
-
-COMMIT;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Post-apply verification
