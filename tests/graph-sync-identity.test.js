@@ -26,13 +26,13 @@ function assert(condition, label) {
 const WORK_NODE_UUID = 'aaaaaaaa-0000-0000-0000-000000000001';
 const REC_NODE_UUID  = 'bbbbbbbb-0000-0000-0000-000000000002';
 
-// Standard mock for tests 1-8, 13, 15:
+// Standard mock for tests 1-13 (syncEnrichmentToGraph only):
 //   rpc_upsert_recording_enrichment → { node_id: REC_NODE_UUID }
-//   graph_nodes_v1 GET              → work node by catalog_id; empty for everything else
-//   compositions PATCH              → null
-//   graph_nodes_v1 PATCH            → null  (trap — should never be called after fix)
-//   graph_upsert_node               → throw (trap — must not be called from enrichment path)
-//   recordings POST                 → throw (trap — must not be called from enrichment path)
+//   graph_nodes_v1 GET              → REGRESSION THROW (v2 fix: no JS-level lookup)
+//   compositions PATCH              → REGRESSION THROW (v2 fix: removed from enrichment path)
+//   graph_nodes_v1 PATCH            → null  (trap — should never be called after Finding 2 fix)
+//   graph_upsert_node               → 403   (trap — must not be called from enrichment path)
+//   recordings POST                 → 403   (trap — must not be called from enrichment path)
 function makeMockFetch(calls) {
   return async (url, opts = {}) => {
     const method = opts.method || 'GET';
@@ -42,20 +42,15 @@ function makeMockFetch(calls) {
     // Public RPC — single authorised entry point for enrichment recording writes.
     if (url.includes('/rpc/rpc_upsert_recording_enrichment')) return ok({ node_id: REC_NODE_UUID });
 
+    // graph.nodes GET must NOT happen from enrichment path after v2 fix.
+    // All identity lookup now runs inside the SECURITY DEFINER RPC.
     if (method === 'GET' && url.includes('/rest/v1/nodes')) {
-      // Work node lookup: external_id=eq.my-catalog-id (no rec_ prefix).
-      // Must NOT match the recording catalog guard (external_id=eq.rec_my-catalog-id)
-      // which also contains 'my-catalog-id' as a substring.
-      if (url.includes('external_id=eq.my-catalog-id') &&
-          !url.includes('rec_my-catalog-id') &&
-          url.includes('musigod_catalog')) {
-        return ok([{ id: WORK_NODE_UUID }]);
-      }
-      // All other lookups (iswc, MBID, rec_my-catalog-id, fingerprints) → not found
-      return ok([]);
+      throw new Error(`REGRESSION: graph.nodes GET from enrichment path — must be inside RPC: ${url}`);
     }
-    // Work composition PATCH (unchanged)
-    if (method === 'PATCH' && url.includes('/v1/compositions')) return ok(null);
+    // Compositions PATCH removed from syncEnrichmentToGraph in v2.
+    if (method === 'PATCH' && url.includes('/v1/compositions')) {
+      throw new Error('REGRESSION: compositions PATCH from enrichment path — removed in v2');
+    }
     // graph_nodes_v1 PATCH should NEVER be called after Finding 2 fix
     if (method === 'PATCH' && url.includes('graph_nodes_v1'))   return ok(null);
     // graph_upsert_node must NOT be called from the enrichment path after RLS patch
@@ -64,7 +59,7 @@ function makeMockFetch(calls) {
     // Direct recordings POST must NOT be called from the enrichment path after RLS patch
     if (method === 'POST' && url.includes('/v1/recordings'))
       return { ok: false, status: 403, text: async () => '{"error":"direct recordings POST must not be called from enrichment path"}' };
-    // Unmatched non-GET → fail loudly so tests catch unexpected calls
+    // Unmatched → fail loudly so tests catch unexpected calls
     return { ok: false, status: 404, text: async () => `{"error":"unexpected mock call: ${method} ${url}"}` };
   };
 }
@@ -103,10 +98,10 @@ async function test_no_node_external_id_overwrite() {
     console.error(`    → unexpectedly called: ${c.url} body=${JSON.stringify(c.body)}`));
 }
 
-// ─── Test 2: ISRC written to works.recordings (regression guard) ──────────────
+// ─── Test 2: ISRC written via p_isrc param (regression guard) ────────────────
 
 async function test_isrc_written_to_recordings_table() {
-  console.log('\n[2] Finding 2 — isrc written to works.recordings.isrc via rpc_upsert_recording_enrichment');
+  console.log('\n[2] Finding 2 — isrc uppercased and passed as p_isrc to rpc_upsert_recording_enrichment');
 
   const calls = [];
   global.fetch = makeMockFetch(calls);
@@ -116,14 +111,14 @@ async function test_isrc_written_to_recordings_table() {
 
   const rpcCall = calls.find(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
   assert(!!rpcCall, 'rpc_upsert_recording_enrichment was called');
-  assert(rpcCall?.body?.p_recording_patch?.isrc === 'USABC1234567',
-    `isrc uppercased correctly in p_recording_patch (got "${rpcCall?.body?.p_recording_patch?.isrc}")`);
+  assert(rpcCall?.body?.p_isrc === 'USABC1234567',
+    `isrc uppercased correctly in p_isrc (got "${rpcCall?.body?.p_isrc}")`);
 }
 
-// ─── Test 3: snake_case recording_mbid bridges to musicbrainz_recording_id ───
+// ─── Test 3: snake_case recording_mbid → p_recording_mbid ───────────────────
 
 async function test_snake_case_recording_mbid_bridges() {
-  console.log('\n[3] Finding 1 — snake_case recording_mbid → musicbrainz_recording_id in p_recording_patch');
+  console.log('\n[3] Finding 1 — snake_case recording_mbid → p_recording_mbid param');
 
   const calls = [];
   global.fetch = makeMockFetch(calls);
@@ -135,16 +130,16 @@ async function test_snake_case_recording_mbid_bridges() {
   ]);
 
   const rpcCall = calls.find(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
-  assert(rpcCall?.body?.p_recording_patch?.musicbrainz_recording_id === mbid,
-    `musicbrainz_recording_id set from snake_case field (got "${rpcCall?.body?.p_recording_patch?.musicbrainz_recording_id}")`);
-  assert(rpcCall?.body?.p_recording_patch?.isrc === 'USABC1234567',
-    'isrc also present in p_recording_patch');
+  assert(rpcCall?.body?.p_recording_mbid === mbid,
+    `p_recording_mbid set from snake_case field (got "${rpcCall?.body?.p_recording_mbid}")`);
+  assert(rpcCall?.body?.p_isrc === 'USABC1234567',
+    'p_isrc also present');
 }
 
-// ─── Test 4: camelCase recordingMBID (enrichArtistCatalog shape) also bridges
+// ─── Test 4: camelCase recordingMBID (enrichArtistCatalog shape) → p_recording_mbid
 
 async function test_camelcase_recordingMBID_bridges() {
-  console.log('\n[4] Finding 1 — camelCase recordingMBID (enrichArtistCatalog) → musicbrainz_recording_id in p_recording_patch');
+  console.log('\n[4] Finding 1 — camelCase recordingMBID → p_recording_mbid param');
 
   const calls = [];
   global.fetch = makeMockFetch(calls);
@@ -156,14 +151,14 @@ async function test_camelcase_recordingMBID_bridges() {
   ]);
 
   const rpcCall = calls.find(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
-  assert(rpcCall?.body?.p_recording_patch?.musicbrainz_recording_id === mbid,
-    `musicbrainz_recording_id set from camelCase field (got "${rpcCall?.body?.p_recording_patch?.musicbrainz_recording_id}")`);
+  assert(rpcCall?.body?.p_recording_mbid === mbid,
+    `p_recording_mbid set from camelCase recordingMBID (got "${rpcCall?.body?.p_recording_mbid}")`);
 }
 
-// ─── Test 5: recording_mbid without ISRC still upserts (no ISRC required) ────
+// ─── Test 5: recording_mbid without ISRC → p_recording_mbid, p_isrc null ─────
 
 async function test_mbid_only_upserts() {
-  console.log('\n[5] Finding 1 — recording_mbid upserts works.recordings even without ISRC');
+  console.log('\n[5] Finding 1 — recording_mbid triggers RPC even without ISRC; p_isrc is null');
 
   const calls = [];
   global.fetch = makeMockFetch(calls);
@@ -176,9 +171,9 @@ async function test_mbid_only_upserts() {
 
   const rpcCall = calls.find(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
   assert(!!rpcCall, 'rpc_upsert_recording_enrichment called when only recording_mbid present');
-  assert(rpcCall?.body?.p_recording_patch?.musicbrainz_recording_id === mbid,
-    `p_recording_patch.musicbrainz_recording_id set correctly (got "${rpcCall?.body?.p_recording_patch?.musicbrainz_recording_id}")`);
-  assert(!rpcCall?.body?.p_recording_patch?.isrc, 'isrc not included in p_recording_patch when not provided');
+  assert(rpcCall?.body?.p_recording_mbid === mbid,
+    `p_recording_mbid set correctly (got "${rpcCall?.body?.p_recording_mbid}")`);
+  assert(!rpcCall?.body?.p_isrc, 'p_isrc null/empty when no ISRC provided');
 }
 
 // ─── Test 6: node namespace never changed to isrc (full regression guard) ────
@@ -207,46 +202,51 @@ async function test_external_id_ns_never_changed_to_isrc() {
   assert(!externalIdPoison, 'external_id never overwritten on any node PATCH');
 }
 
-// ─── Test 7: no ISRC and no MBID → works.recordings not touched ──────────────
+// ─── Test 7: no ISRC, no MBID, no catalog_id → RPC not called ────────────────
+//
+// After v2: the guard is (normalIsrc || recordingMbid || catalogId). A track
+// with only work-level data (iswc) and no recording identity is skipped.
+// Note: baseTrack has catalog_id — use a bare object here to test the no-op.
 
 async function test_no_isrc_no_mbid_no_recording_write() {
-  console.log('\n[7] Edge case — no isrc, no recording_mbid → rpc_upsert_recording_enrichment not called');
+  console.log('\n[7] Edge case — no isrc, no recording_mbid, no catalog_id → RPC not called');
 
   const calls = [];
   global.fetch = makeMockFetch(calls);
   const { syncEnrichmentToGraph } = loadFreshGraphSync();
 
   await syncEnrichmentToGraph('test-artist', [
-    baseTrack({ iswc: 'T-123.456.789-C' }),  // only iswc, no isrc or mbid
+    { title: 'Work Only Track', iswc: 'T-123.456.789-C' },  // no catalog_id, no isrc, no mbid
   ]);
 
   const rpcCall = calls.find(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
-  assert(!rpcCall, 'rpc_upsert_recording_enrichment NOT called when no isrc or recording_mbid');
+  assert(!rpcCall, 'RPC not called when no isrc, no recording_mbid, and no catalog_id');
 }
 
-// ─── Test 8: single RPC call (not two) when both ISRC and MBID present ──────
+// ─── Test 8: single RPC call with both p_isrc and p_recording_mbid ───────────
 
 async function test_single_post_when_both_present() {
-  console.log('\n[8] Efficiency — single rpc_upsert_recording_enrichment call when both isrc and mbid present');
+  console.log('\n[8] Efficiency — single RPC call when both isrc and mbid present; both passed as params');
 
   const calls = [];
   global.fetch = makeMockFetch(calls);
   const { syncEnrichmentToGraph } = loadFreshGraphSync();
 
+  const mbid = 'cccccccc-dddd-eeee-ffff-000000000008';
   await syncEnrichmentToGraph('test-artist', [
     baseTrack({
       isrc:           'USABC1234567',
-      recording_mbid: 'cccccccc-dddd-eeee-ffff-000000000008',
+      recording_mbid: mbid,
     }),
   ]);
 
   const rpcCalls = calls.filter(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
   assert(rpcCalls.length === 1,
-    `exactly 1 call to rpc_upsert_recording_enrichment — got ${rpcCalls.length}`);
-  assert(
-    !!rpcCalls[0]?.body?.p_recording_patch?.isrc &&
-    !!rpcCalls[0]?.body?.p_recording_patch?.musicbrainz_recording_id,
-    'single call p_recording_patch contains both isrc and musicbrainz_recording_id');
+    `exactly 1 RPC call — got ${rpcCalls.length}`);
+  assert(rpcCalls[0]?.body?.p_isrc === 'USABC1234567',
+    `p_isrc present (got "${rpcCalls[0]?.body?.p_isrc}")`);
+  assert(rpcCalls[0]?.body?.p_recording_mbid === mbid,
+    `p_recording_mbid present (got "${rpcCalls[0]?.body?.p_recording_mbid}")`);
 }
 
 // ─── Tests 9-12: enrichArtistCatalog() camelCase payload shape ───────────────
@@ -256,8 +256,8 @@ async function test_single_post_when_both_present() {
 //   The old syncEnrichmentToGraph expected { title, isrc, catalog_id }
 //   → complete silent no-op. These tests prove the fix works.
 
-// Mock tuned to camelCase-shape inputs: all work GETs return empty (no catalogId on
-// enrichment-only tracks), RPC returns ENRICH_REC_NODE_UUID for recording upsert.
+// Mock for camelCase-shape enrichment tracks (tests 9-12).
+// After v2 fix: no graph.nodes GETs, no compositions PATCHes — only RPC calls.
 const ENRICH_WORK_NODE_UUID = 'eeeeeeee-0000-0000-0000-000000000099';
 const ENRICH_REC_NODE_UUID  = 'ffffffff-0000-0000-0000-000000000099';
 
@@ -267,20 +267,18 @@ function makeMockFetchEnrich(calls) {
     const body   = opts.body ? JSON.parse(opts.body) : null;
     calls.push({ url, method, body });
 
-    // Public RPC — single authorised entry point for enrichment recording writes.
+    // Public RPC — single entry point for enrichment recording writes.
     if (url.includes('/rpc/rpc_upsert_recording_enrichment')) return ok({ node_id: ENRICH_REC_NODE_UUID });
 
-    // Work node via title fingerprint in musigod_catalog (only when catalogId present)
-    if (method === 'GET' && url.includes('/rest/v1/nodes') &&
-        url.includes('rebelrap') && url.includes('musigod_catalog')) {
-      return ok([{ id: ENRICH_WORK_NODE_UUID }]);
+    // graph.nodes GET must NOT happen from enrichment path after v2 fix.
+    if (method === 'GET' && url.includes('/rest/v1/nodes')) {
+      throw new Error(`REGRESSION: graph.nodes GET from enrichment path: ${url}`);
     }
-    // All other GETs (iswc lookup, MBID guard, etc.) → not found
-    if (method === 'GET' && url.includes('/rest/v1/nodes')) return ok([]);
-
-    if (method === 'PATCH' && url.includes('/v1/compositions')) return ok(null);
+    // Compositions PATCH removed from enrichment path in v2.
+    if (method === 'PATCH' && url.includes('/v1/compositions')) {
+      throw new Error('REGRESSION: compositions PATCH from enrichment path — removed in v2');
+    }
     if (method === 'PATCH' && url.includes('graph_nodes_v1'))   return ok(null);
-    // graph_upsert_node and direct recordings POST must not be called from enrichment path
     if (url.includes('/rpc/graph_upsert_node'))
       return { ok: false, status: 403, text: async () => '{"error":"graph_upsert_node must not be called from enrichment path"}' };
     if (method === 'POST' && url.includes('/v1/recordings'))
@@ -289,10 +287,10 @@ function makeMockFetchEnrich(calls) {
   };
 }
 
-// ─── Test 9: trackTitle normalised — field-name mismatch fixed ───────────────
+// ─── Test 9: trackTitle normalised → p_label, isrcs[0] → p_isrc ─────────────
 
 async function test_camelcase_trackTitle_normalised() {
-  console.log('\n[9] Field mismatch fix — trackTitle normalised, recording upsert fires for camelCase shape');
+  console.log('\n[9] Field mismatch fix — trackTitle → p_label, isrcs[0] → p_isrc (camelCase shape)');
 
   const calls = [];
   global.fetch = makeMockFetchEnrich(calls);
@@ -303,27 +301,23 @@ async function test_camelcase_trackTitle_normalised() {
     isrcs:         ['USABC9999999'],
     recordingMBID: 'eeeeeeee-ffff-0000-1111-222222222222',
     iswc:          null,
-    // no catalog_id — enrichment-only track; work fingerprint lookup skipped (guard)
+    // no catalog_id — enrichment-only track
   }]);
 
-  // Work fingerprint lookup must NOT fire (no iswc, no catalogId — new guard)
-  const workFingerLookup = calls.find(c =>
-    c.method === 'GET' && c.url.includes('rebelrap') && c.url.includes('musigod_catalog'));
-  assert(!workFingerLookup, 'work fingerprint lookup skipped for enrichment-only track (no iswc/catalogId)');
-
-  // Recording upsert must fire with correctly normalised title
   const rpcCall = calls.find(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
   assert(!!rpcCall, 'rpc_upsert_recording_enrichment fires for enrichArtistCatalog camelCase shape');
-  assert(rpcCall?.body?.p_recording_patch?.title === 'Rebel Rap',
-    `title normalised from trackTitle in p_recording_patch (got "${rpcCall?.body?.p_recording_patch?.title}")`);
-  assert(rpcCall?.body?.p_recording_patch?.isrc === 'USABC9999999',
-    `isrcs[0] in p_recording_patch.isrc (got "${rpcCall?.body?.p_recording_patch?.isrc}")`);
+  assert(rpcCall?.body?.p_label === 'Rebel Rap',
+    `p_label set from trackTitle (got "${rpcCall?.body?.p_label}")`);
+  assert(rpcCall?.body?.p_isrc === 'USABC9999999',
+    `p_isrc set from isrcs[0] (got "${rpcCall?.body?.p_isrc}")`);
+  assert(!rpcCall?.body?.p_catalog_track_id,
+    'p_catalog_track_id null for enrichment-only track (no catalog_id)');
 }
 
-// ─── Test 10: isrcs[0] used as isrc — ISRC propagated ───────────────────────
+// ─── Test 10: isrcs[0] uppercased → p_isrc ───────────────────────────────────
 
 async function test_isrcs_array_normalised() {
-  console.log('\n[10] Field mismatch fix — isrcs[0] normalised to isrc, written via rpc_upsert_recording_enrichment');
+  console.log('\n[10] Field mismatch fix — isrcs[0] uppercased and passed as p_isrc');
 
   const calls = [];
   global.fetch = makeMockFetchEnrich(calls);
@@ -337,18 +331,17 @@ async function test_isrcs_array_normalised() {
 
   const rpcCall = calls.find(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
   assert(!!rpcCall, 'rpc_upsert_recording_enrichment called when ISRC provided via isrcs[]');
-  assert(rpcCall?.body?.p_recording_patch?.isrc === 'USABC9999999',
-    `isrcs[0] uppercased correctly in p_recording_patch (got "${rpcCall?.body?.p_recording_patch?.isrc}")`);
+  assert(rpcCall?.body?.p_isrc === 'USABC9999999',
+    `isrcs[0] uppercased correctly in p_isrc (got "${rpcCall?.body?.p_isrc}")`);
 }
 
-// ─── Test 11: No ISRC — uses MusicBrainz recording ID as external key ─────────
+// ─── Test 11: No ISRC — MBID passed as p_recording_mbid; RPC resolves key ────
 //
-// Old behavior: ISRC lookup fails → title fingerprint lookup → PATCH node.
-// New behavior: upsertNode with external_id = recordingMBID, external_id_ns =
-// 'musicbrainz_recording'. No lookup needed; upsert is the canonical path.
+// Old behavior: JS chose external_id = MBID, external_id_ns = 'musicbrainz_recording'.
+// New behavior: JS passes p_recording_mbid = MBID; the RPC resolves which key to use.
 
 async function test_mbid_as_external_key_when_no_isrc() {
-  console.log('\n[11] Field mismatch fix — MBID used as graph node key when no ISRC present');
+  console.log('\n[11] Field mismatch fix — MBID-only: p_recording_mbid set, p_isrc null, no graph.nodes GET');
 
   const calls = [];
   global.fetch = makeMockFetchEnrich(calls);
@@ -361,35 +354,28 @@ async function test_mbid_as_external_key_when_no_isrc() {
     recordingMBID: mbid,
   }]);
 
-  // RPC must be called with MBID as the external identity
   const rpcCall = calls.find(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
   assert(!!rpcCall, 'rpc_upsert_recording_enrichment called');
-  assert(rpcCall?.body?.p_external_id_ns === 'musicbrainz_recording',
-    `uses musicbrainz_recording namespace (got "${rpcCall?.body?.p_external_id_ns}")`);
-  assert(rpcCall?.body?.p_external_id === mbid,
-    `p_external_id is the MBID (got "${rpcCall?.body?.p_external_id}")`);
-  assert(rpcCall?.body?.p_recording_patch?.musicbrainz_recording_id === mbid,
-    'p_recording_patch.musicbrainz_recording_id written in correct column');
+  assert(rpcCall?.body?.p_recording_mbid === mbid,
+    `p_recording_mbid is the MBID (got "${rpcCall?.body?.p_recording_mbid}")`);
+  assert(!rpcCall?.body?.p_isrc,
+    `p_isrc is null when no ISRC (got "${rpcCall?.body?.p_isrc}")`);
+  assert(!('p_external_id' in (rpcCall?.body || {})),
+    'p_external_id absent from v2 RPC body');
+  assert(!('p_external_id_ns' in (rpcCall?.body || {})),
+    'p_external_id_ns absent from v2 RPC body');
 }
 
-// ─── Test 12: Recording upsert fires even when work node not found ────────────
+// ─── Test 12: Recording upsert fires (compositions PATCH no longer in path) ───
+//
+// In v2, syncEnrichmentToGraph never calls compositions PATCH. The recording
+// RPC always fires if a recording identifier is present, regardless of work node.
 
 async function test_recording_upsert_independent_of_work_node() {
-  console.log('\n[12] Field mismatch fix — recording upsert fires even when work node not found');
+  console.log('\n[12] Field mismatch fix — recording RPC fires; compositions PATCH absent from enrichment v2');
 
   const calls = [];
-  const mockNoWorkNode = async (url, opts = {}) => {
-    const method = opts.method || 'GET';
-    const body   = opts.body ? JSON.parse(opts.body) : null;
-    calls.push({ url, method, body });
-
-    if (url.includes('/rpc/rpc_upsert_recording_enrichment')) return ok({ node_id: ENRICH_REC_NODE_UUID });
-    // All work-node GETs → not found
-    if (method === 'GET' && url.includes('/rest/v1/nodes')) return ok([]);
-    if (method === 'PATCH' && url.includes('/v1/compositions')) return ok(null);
-    return { ok: false, status: 404, text: async () => 'unexpected' };
-  };
-  global.fetch = mockNoWorkNode;
+  global.fetch = makeMockFetchEnrich(calls);
   const { syncEnrichmentToGraph } = loadFreshGraphSync();
 
   const mbid = 'eeeeeeee-ffff-0000-1111-444444444444';
@@ -401,12 +387,12 @@ async function test_recording_upsert_independent_of_work_node() {
 
   const workPatch = calls.find(c =>
     c.method === 'PATCH' && c.url.includes('/v1/compositions'));
-  assert(!workPatch, 'work patch not called when work node not found (expected)');
+  assert(!workPatch, 'compositions PATCH absent from enrichment path in v2');
 
   const rpcCall = calls.find(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
-  assert(!!rpcCall, 'rpc_upsert_recording_enrichment still fires even when work node lookup returns null');
-  assert(rpcCall?.body?.p_recording_patch?.musicbrainz_recording_id === mbid,
-    'p_recording_patch.musicbrainz_recording_id still written despite work node miss');
+  assert(!!rpcCall, 'rpc_upsert_recording_enrichment fires');
+  assert(rpcCall?.body?.p_recording_mbid === mbid,
+    `p_recording_mbid correct (got "${rpcCall?.body?.p_recording_mbid}")`);
 }
 
 // ─── Tests 13-14: Confirmed base table name regression ───────────────────────
@@ -497,34 +483,39 @@ async function test_catalog_sync_uses_recordings_not_works_recordings_v1() {
 // works.works_compositions_v1 does NOT exist in production.
 // The confirmed base table is works.compositions.
 
-// ─── Test 15: syncEnrichmentToGraph PATCH targets /v1/compositions ────────────
+// ─── Test 15: syncEnrichmentToGraph — no compositions PATCH in v2 ─────────────
+//
+// In v2, the compositions PATCH section is removed from syncEnrichmentToGraph.
+// A track with iswc + catalog_id (but no ISRC/MBID) triggers the recording RPC
+// via catalog_track_id, but never PATCHes compositions.
 
 async function test_enrichment_never_hits_works_compositions_v1() {
-  console.log('\n[15] Base table — syncEnrichmentToGraph PATCHes /v1/compositions, never works_compositions_v1');
+  console.log('\n[15] v2 — compositions PATCH removed from enrichment path; RPC called for catalog_track_id');
 
   const calls = [];
   global.fetch = makeMockFetch(calls);
   const { syncEnrichmentToGraph } = loadFreshGraphSync();
 
-  // Track with iswc forces the work patch to fire.
-  // catalog_id 'my-catalog-id' → makeMockFetch returns WORK_NODE_UUID for work node.
-  // No isrc or recordingMBID → recording upsert path skipped (no RPC call).
+  // baseTrack has catalog_id 'my-catalog-id'; no isrc/mbid.
+  // v2: guard is (normalIsrc || recordingMbid || catalogId) → true (catalogId set).
   await syncEnrichmentToGraph('test-artist', [
     baseTrack({ iswc: 'T-123.456.789-C' }),
   ]);
 
   const wrongCalls = calls.filter(c => c.url.includes('works_compositions_v1'));
   assert(wrongCalls.length === 0,
-    `no call references works_compositions_v1 (nonexistent relation) — got ${wrongCalls.length}`);
+    `no call references works_compositions_v1 — got ${wrongCalls.length}`);
 
-  const correctPatch = calls.filter(c =>
+  const compositionPatches = calls.filter(c =>
     c.method === 'PATCH' && c.url.includes('/v1/compositions'));
-  assert(correctPatch.length === 1,
-    `exactly 1 PATCH to /v1/compositions (confirmed base table) — got ${correctPatch.length}`);
-  assert(correctPatch[0]?.body?.iswc === 'T-123.456.789-C',
-    `PATCH body carries iswc correctly (got "${correctPatch[0]?.body?.iswc}")`);
-  assert(correctPatch[0]?.url.includes(`node_id=eq.${WORK_NODE_UUID}`),
-    'PATCH targets the correct work node_id');
+  assert(compositionPatches.length === 0,
+    `compositions PATCH NOT called in v2 enrichment path — got ${compositionPatches.length}`);
+
+  const rpcCalls = calls.filter(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
+  assert(rpcCalls.length === 1,
+    `recording RPC called once for catalog_track_id identity — got ${rpcCalls.length}`);
+  assert(rpcCalls[0]?.body?.p_catalog_track_id === 'my-catalog-id',
+    `p_catalog_track_id set (got "${rpcCalls[0]?.body?.p_catalog_track_id}")`);
 }
 
 // ─── Test 16: syncCatalogToGraph POST targets /v1/compositions ────────────────

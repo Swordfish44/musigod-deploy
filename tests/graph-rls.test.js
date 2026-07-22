@@ -2,7 +2,9 @@
 // tests/graph-rls.test.js
 //
 // Authorization and idempotency tests for the graph RLS lockdown patch
-// (supabase/migrations/20260721_graph_rls_lockdown.sql).
+// (supabase/migrations/20260721_graph_rls_lockdown.sql) and the v2
+// recording enrichment RPC
+// (supabase/migrations/20260722_rpc_recording_enrichment_v2.sql).
 //
 // These tests cover two properties:
 //
@@ -11,8 +13,12 @@
 //   does NOT directly access graph.* or works.* tables via REST.
 //
 //   IDEMPOTENCY — calling syncEnrichmentToGraph twice with identical data
-//   produces the same result: same node_id used, COALESCE semantics so the
-//   second run does not clobber values written by the first.
+//   produces the same result: same identity keys passed, COALESCE semantics
+//   in the DB so the second run does not clobber values from the first.
+//
+// v2 design change: identity lookup (ISRC → MBID → catalog_track_id) moved
+// inside the SECURITY DEFINER function. JS no longer makes GET /rest/v1/nodes
+// calls from the enrichment path — any such call is a regression.
 //
 // Run: node tests/graph-rls.test.js
 
@@ -26,17 +32,17 @@ function assert(cond, label) {
 
 const SB_URL = 'https://uykzkrnoetcldeuxzqyy.supabase.co';
 const REC_UUID = 'aaaaaaaa-1111-0000-0000-000000000001';
-const WORK_UUID = 'bbbbbbbb-2222-0000-0000-000000000002';
 
 function loadFreshGraphSync() {
   delete require.cache[require.resolve('../api/graph-sync')];
   return require('../api/graph-sync');
 }
 
-// Standard mock: handles the public RPC and the guard GET calls (graph.nodes).
-// graph_upsert_node is deliberately absent — any call to it from the enrichment
-// path is an unexpected call and will throw so the test catches the regression.
-function makeRlsMock({ calls = [], existingNodeId = null, rpcNodeId = REC_UUID } = {}) {
+// Standard mock: handles the public RPC only.
+// GET /rest/v1/nodes throws — any JS-level graph.nodes lookup is a regression
+// (identity resolution now lives inside the SECURITY DEFINER function).
+// graph_upsert_node and direct table writes also throw.
+function makeRlsMock({ calls = [], rpcNodeId = REC_UUID } = {}) {
   return async (url, opts = {}) => {
     const body = opts.body ? JSON.parse(opts.body) : undefined;
     calls.push({ url, method: opts.method || 'GET', headers: opts.headers || {}, body });
@@ -46,14 +52,10 @@ function makeRlsMock({ calls = [], existingNodeId = null, rpcNodeId = REC_UUID }
       return { ok: true, text: async () => JSON.stringify({ node_id: rpcNodeId }) };
     }
 
-    // graph.nodes GET — used by duplicate-row guards in syncEnrichmentToGraph.
-    // service_role can still read this even after the lockdown.
+    // REGRESSION guards — these must never appear from the enrichment path in v2.
     if ((opts.method === 'GET' || !opts.method) && url.includes('/rest/v1/nodes')) {
-      const row = existingNodeId ? [{ id: existingNodeId }] : [];
-      return { ok: true, text: async () => JSON.stringify(row) };
+      throw new Error(`REGRESSION: graph.nodes GET called from enrichment path — lookup must be inside SECURITY DEFINER function (${url})`);
     }
-
-    // OLD enrichment paths — should NOT appear after the patch.
     if (url.includes('/rpc/graph_upsert_node')) {
       throw new Error(`REGRESSION: graph_upsert_node called from enrichment path (${url})`);
     }
@@ -61,7 +63,7 @@ function makeRlsMock({ calls = [], existingNodeId = null, rpcNodeId = REC_UUID }
       throw new Error(`REGRESSION: direct POST to /v1/recordings from enrichment path (${url})`);
     }
     if (opts.method === 'PATCH' && url.includes('/v1/compositions')) {
-      return { ok: true, text: async () => '' }; // composition patch is still allowed
+      throw new Error(`REGRESSION: direct PATCH to /v1/compositions from enrichment path (${url})`);
     }
 
     throw new Error(`Unexpected fetch: ${opts.method || 'GET'} ${url}`);
@@ -144,15 +146,15 @@ async function test_auth3_no_direct_write_to_graph_tables() {
     `no direct table writes to graph or works schemas (found ${directTableWrites.length})`);
 }
 
-// ── AUTH-4: guard reads (GET graph.nodes) carry service_role key ─────────────
+// ── AUTH-4: no JS-level guard GETs — lookup lives inside the DB ─────────────
 
-async function test_auth4_guard_reads_carry_service_role_key() {
-  console.log('\n[AUTH-4] Duplicate-row guard GETs to graph.nodes carry service_role key');
+async function test_auth4_no_js_guard_reads() {
+  console.log('\n[AUTH-4] No JS-level guard GETs — identity lookup is inside the SECURITY DEFINER function');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
 
   const calls = [];
   const mbid = 'mbid-auth4-0000';
-  global.fetch = makeRlsMock({ calls, existingNodeId: null });
+  global.fetch = makeRlsMock({ calls });
   const { syncEnrichmentToGraph } = loadFreshGraphSync();
 
   await syncEnrichmentToGraph('TestArtist', [{
@@ -160,24 +162,26 @@ async function test_auth4_guard_reads_carry_service_role_key() {
   }]);
 
   const guardGets = calls.filter(c =>
-    (c.method === 'GET' || !c.method) &&
-    c.url.includes('/rest/v1/nodes')
+    (c.method === 'GET' || !c.method) && c.url.includes('/rest/v1/nodes')
   );
-  assert(guardGets.length >= 1, 'at least one guard GET to graph.nodes was made');
-  const allHaveKey = guardGets.every(c =>
-    c.headers?.['Authorization'] === 'Bearer test-service-role-key'
-  );
-  assert(allHaveKey, 'all guard GETs carry the service_role Authorization header');
+  assert(guardGets.length === 0,
+    `zero graph.nodes GETs from JS enrichment path (got ${guardGets.length})`);
+
+  const rpcCall = calls.find(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
+  assert(!!rpcCall, 'RPC IS called with both identity keys');
+  assert(rpcCall?.body?.p_isrc === 'USAAA9999999',
+    `p_isrc passed to RPC (got "${rpcCall?.body?.p_isrc}")`);
+  assert(rpcCall?.body?.p_recording_mbid === mbid,
+    `p_recording_mbid passed to RPC (got "${rpcCall?.body?.p_recording_mbid}")`);
 }
 
-// ── IDEM-1: same track twice → same node_id, RPC called twice ────────────────
+// ── IDEM-1: same track twice → same identity key sent both times ─────────────
 
 async function test_idem1_same_track_twice_same_node_id() {
-  console.log('\n[IDEM-1] Idempotency — same track synced twice uses the same node_id');
+  console.log('\n[IDEM-1] Idempotency — same track synced twice sends the same identity key');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
   const calls = [];
-  // upsertRecordingEnrichment always returns the same UUID (DB-level idempotency).
   global.fetch = makeRlsMock({ calls, rpcNodeId: REC_UUID });
   const { syncEnrichmentToGraph } = loadFreshGraphSync();
 
@@ -188,45 +192,33 @@ async function test_idem1_same_track_twice_same_node_id() {
   const rpcCalls = calls.filter(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
   assert(rpcCalls.length === 2, `RPC called once per run — 2 total (got ${rpcCalls.length})`);
 
-  const externalIds = rpcCalls.map(c => c.body?.p_external_id);
-  assert(externalIds[0] === 'USIDEM000001' && externalIds[1] === 'USIDEM000001',
-    'both calls use the same external_id (ISRC)');
+  const isrcs = rpcCalls.map(c => c.body?.p_isrc);
+  assert(isrcs[0] === 'USIDEM000001' && isrcs[1] === 'USIDEM000001',
+    `both calls send p_isrc = USIDEM000001 (got ${JSON.stringify(isrcs)})`);
 
-  const schemas = rpcCalls.map(c => c.body?.p_external_id_ns);
-  assert(schemas.every(s => s === 'isrc'), `both calls use isrc namespace (got ${JSON.stringify(schemas)})`);
+  const mbids = rpcCalls.map(c => c.body?.p_recording_mbid);
+  assert(mbids.every(m => m === null || m === undefined),
+    `p_recording_mbid is null on both calls (got ${JSON.stringify(mbids)})`);
+
+  const guardGets = calls.filter(c =>
+    (c.method === 'GET' || !c.method) && c.url.includes('/rest/v1/nodes')
+  );
+  assert(guardGets.length === 0, `no graph.nodes GETs made (got ${guardGets.length})`);
 }
 
-// ── IDEM-2: composition_node_id sent on first run, absent on second ──────────
+// ── IDEM-2: composition_node_id always null from JS — DB COALESCE handles it ─
 
-async function test_idem2_composition_node_id_coalesce() {
-  console.log('\n[IDEM-2] Idempotency — p_composition_node_id passed when known, null on re-run leaves DB unchanged');
+async function test_idem2_composition_node_id_null_from_js() {
+  console.log('\n[IDEM-2] Idempotency — composition_node_id always null from JS (DB COALESCE preserves prior value)');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
   const calls = [];
-  // Simulate: first run has a work node (WORK_UUID); second run has no iswc/catalogId
-  // so workNodeId resolves to null. The DB-side COALESCE should preserve the first run's value.
-  let callIndex = 0;
-  global.fetch = async (url, opts = {}) => {
-    const body = opts.body ? JSON.parse(opts.body) : undefined;
-    calls.push({ url, method: opts.method || 'GET', headers: opts.headers || {}, body });
-
-    if (url.includes('/rpc/rpc_upsert_recording_enrichment')) {
-      callIndex++;
-      return { ok: true, text: async () => JSON.stringify({ node_id: REC_UUID }) };
-    }
-    if ((opts.method === 'GET' || !opts.method) && url.includes('/rest/v1/nodes')) {
-      // First call: work node found; subsequent: not found (run 2 no longer has iswc).
-      if (callIndex === 0 && url.includes('musigod_catalog')) {
-        return { ok: true, text: async () => JSON.stringify([{ id: WORK_UUID }]) };
-      }
-      return { ok: true, text: async () => JSON.stringify([]) };
-    }
-    throw new Error(`Unexpected: ${opts.method || 'GET'} ${url}`);
-  };
-
+  global.fetch = makeRlsMock({ calls, rpcNodeId: REC_UUID });
   const { syncEnrichmentToGraph } = loadFreshGraphSync();
 
-  // Run 1: has catalog_id → work node found → composition_node_id set.
+  // Run 1: has catalog_id — in v2 the JS layer no longer looks up a work node.
+  // composition_node_id is always null from JS; the DB COALESCE ensures a prior
+  // value from another code path is never overwritten by a null.
   await syncEnrichmentToGraph('TestArtist', [{
     trackTitle: 'Coalesce Track',
     catalog_id: 'cat-coalesce-01',
@@ -234,7 +226,7 @@ async function test_idem2_composition_node_id_coalesce() {
     recordingMBID: null,
   }]);
 
-  // Run 2: no catalog_id, no iswc → work node not found → composition_node_id is null.
+  // Run 2: same track, same result.
   await syncEnrichmentToGraph('TestArtist', [{
     trackTitle: 'Coalesce Track',
     isrcs: ['USCOA0000002'],
@@ -243,73 +235,85 @@ async function test_idem2_composition_node_id_coalesce() {
 
   const rpcCalls = calls.filter(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
   assert(rpcCalls.length === 2, `two RPC calls made (got ${rpcCalls.length})`);
-  assert(rpcCalls[0]?.body?.p_composition_node_id === WORK_UUID,
-    `run 1: p_composition_node_id = WORK_UUID (got "${rpcCalls[0]?.body?.p_composition_node_id}")`);
+  assert(rpcCalls[0]?.body?.p_composition_node_id === null,
+    `run 1: p_composition_node_id is null — work-node lookup removed from JS (got "${rpcCalls[0]?.body?.p_composition_node_id}")`);
   assert(rpcCalls[1]?.body?.p_composition_node_id === null,
-    `run 2: p_composition_node_id = null (DB COALESCE will preserve run-1 value) (got "${rpcCalls[1]?.body?.p_composition_node_id}")`);
+    `run 2: p_composition_node_id is null (got "${rpcCalls[1]?.body?.p_composition_node_id}")`);
+
+  const guardGets = calls.filter(c =>
+    (c.method === 'GET' || !c.method) && c.url.includes('/rest/v1/nodes')
+  );
+  assert(guardGets.length === 0, `no graph.nodes GETs on either run (got ${guardGets.length})`);
 }
 
-// ── IDEM-3: guard path sends p_existing_node_id, not p_external_id ───────────
+// ── IDEM-3: ISRC + MBID track → both keys forwarded, no JS guard lookup ──────
 
-async function test_idem3_guard_path_sends_existing_node_id() {
-  console.log('\n[IDEM-3] Guard path — p_existing_node_id sent when prior node found; p_external_id is null');
+async function test_idem3_both_keys_forwarded_no_guard_lookup() {
+  console.log('\n[IDEM-3] ISRC + MBID track — both keys forwarded to RPC, zero JS-level guard lookups');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
-  const MBID_UUID = 'cccccccc-3333-0000-0000-000000000003';
   const mbid = 'mbid-guard-idem3-0000';
   const calls = [];
 
-  global.fetch = makeRlsMock({ calls, existingNodeId: MBID_UUID });
+  global.fetch = makeRlsMock({ calls });
   const { syncEnrichmentToGraph } = loadFreshGraphSync();
 
-  // Track has ISRC (so guard fires) + MBID (guard finds MBID_UUID).
   await syncEnrichmentToGraph('TestArtist', [{
     trackTitle: 'Guard Track', isrcs: ['USGUARD00003'], recordingMBID: mbid,
   }]);
 
   const rpcCall = calls.find(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
   assert(!!rpcCall, 'RPC was called');
-  assert(rpcCall?.body?.p_existing_node_id === MBID_UUID,
-    `p_existing_node_id is the guard-found UUID (got "${rpcCall?.body?.p_existing_node_id}")`);
-  assert(rpcCall?.body?.p_external_id === null,
-    `p_external_id is null when existing node known (got "${rpcCall?.body?.p_external_id}")`);
-  assert(rpcCall?.body?.p_recording_patch?.isrc === 'USGUARD00003',
-    `ISRC still in recording_patch for works.recordings update (got "${rpcCall?.body?.p_recording_patch?.isrc}")`);
+  assert(rpcCall?.body?.p_isrc === 'USGUARD00003',
+    `p_isrc forwarded to RPC (got "${rpcCall?.body?.p_isrc}")`);
+  assert(rpcCall?.body?.p_recording_mbid === mbid,
+    `p_recording_mbid forwarded to RPC (got "${rpcCall?.body?.p_recording_mbid}")`);
+
+  const guardGets = calls.filter(c =>
+    (c.method === 'GET' || !c.method) && c.url.includes('/rest/v1/nodes')
+  );
+  assert(guardGets.length === 0,
+    `zero guard GETs from JS — lookup is inside DB function (got ${guardGets.length})`);
+
+  // Old params must not be present in the RPC body
+  assert(!('p_existing_node_id' in (rpcCall?.body || {})),
+    'p_existing_node_id absent from RPC body (old param removed)');
+  assert(!('p_external_id' in (rpcCall?.body || {})),
+    'p_external_id absent from RPC body (old param removed)');
 }
 
-// ── IDEM-4: no isrc + no mbid → RPC never called ────────────────────────────
+// ── IDEM-4: no isrc + no mbid + no catalog_id → RPC never called ─────────────
 
 async function test_idem4_no_identifiers_no_rpc() {
-  console.log('\n[IDEM-4] No ISRC or MBID → public RPC never called');
+  console.log('\n[IDEM-4] No ISRC, MBID, or catalog_id → public RPC never called');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
   const calls = [];
-  // Only allow guard GETs and composition patch; throw on anything else.
   global.fetch = async (url, opts = {}) => {
     const body = opts.body ? JSON.parse(opts.body) : undefined;
     calls.push({ url, method: opts.method || 'GET', headers: opts.headers || {}, body });
-    if ((opts.method === 'GET' || !opts.method) && url.includes('/rest/v1/nodes'))
-      return { ok: true, text: async () => JSON.stringify([]) };
-    if (opts.method === 'PATCH' && url.includes('/v1/compositions'))
-      return { ok: true, text: async () => '' };
     if (url.includes('/rpc/rpc_upsert_recording_enrichment'))
-      throw new Error('REGRESSION: RPC called with no ISRC/MBID');
+      throw new Error('REGRESSION: RPC called with no ISRC/MBID/catalog_id');
+    if ((opts.method === 'GET' || !opts.method) && url.includes('/rest/v1/nodes'))
+      throw new Error('REGRESSION: graph.nodes GET called from enrichment path');
+    if (opts.method === 'PATCH' && url.includes('/v1/compositions'))
+      throw new Error('REGRESSION: compositions PATCH called from enrichment path');
     throw new Error(`Unexpected: ${opts.method || 'GET'} ${url}`);
   };
 
   const { syncEnrichmentToGraph } = loadFreshGraphSync();
   await syncEnrichmentToGraph('TestArtist', [
-    { trackTitle: 'No IDs', iswc: 'T-111.222.333-C' },  // only iswc, no isrc/mbid
+    { trackTitle: 'No IDs', iswc: 'T-111.222.333-C' },  // only iswc, no isrc/mbid/catalog_id
   ]);
 
   const rpcCalls = calls.filter(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
-  assert(rpcCalls.length === 0, 'rpc_upsert_recording_enrichment NOT called when no ISRC/MBID');
+  assert(rpcCalls.length === 0, 'rpc_upsert_recording_enrichment NOT called when no ISRC/MBID/catalog_id');
 }
 
-// ── IDEM-5: MBID-only path → keyed by musicbrainz_recording namespace ────────
+// ── IDEM-5: MBID-only path → keyed by p_recording_mbid ───────────────────────
 
-async function test_idem5_mbid_only_keyed_by_mbid_ns() {
-  console.log('\n[IDEM-5] MBID-only track — RPC uses musicbrainz_recording namespace');
+async function test_idem5_mbid_only_keyed_by_mbid_param() {
+  console.log('\n[IDEM-5] MBID-only track — RPC called with p_recording_mbid set, p_isrc null');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
   const mbid = 'mbid-only-idem5-0000';
@@ -323,14 +327,23 @@ async function test_idem5_mbid_only_keyed_by_mbid_ns() {
 
   const rpcCall = calls.find(c => c.url.includes('/rpc/rpc_upsert_recording_enrichment'));
   assert(!!rpcCall, 'RPC called for MBID-only track');
-  assert(rpcCall?.body?.p_external_id === mbid,
-    `p_external_id is the MBID (got "${rpcCall?.body?.p_external_id}")`);
-  assert(rpcCall?.body?.p_external_id_ns === 'musicbrainz_recording',
-    `p_external_id_ns is musicbrainz_recording (got "${rpcCall?.body?.p_external_id_ns}")`);
-  assert(rpcCall?.body?.p_existing_node_id === null,
-    `p_existing_node_id is null (no guard on MBID-only path) (got "${rpcCall?.body?.p_existing_node_id}")`);
-  assert(rpcCall?.body?.p_recording_patch?.musicbrainz_recording_id === mbid,
-    `p_recording_patch.musicbrainz_recording_id correct (got "${rpcCall?.body?.p_recording_patch?.musicbrainz_recording_id}")`);
+  assert(rpcCall?.body?.p_recording_mbid === mbid,
+    `p_recording_mbid is the MBID (got "${rpcCall?.body?.p_recording_mbid}")`);
+  assert(rpcCall?.body?.p_isrc === null || rpcCall?.body?.p_isrc === undefined,
+    `p_isrc is null/absent (no ISRC on this track) (got "${rpcCall?.body?.p_isrc}")`);
+  assert(rpcCall?.body?.p_catalog_track_id === null || rpcCall?.body?.p_catalog_track_id === undefined,
+    `p_catalog_track_id is null/absent (got "${rpcCall?.body?.p_catalog_track_id}")`);
+
+  const guardGets = calls.filter(c =>
+    (c.method === 'GET' || !c.method) && c.url.includes('/rest/v1/nodes')
+  );
+  assert(guardGets.length === 0, `zero guard GETs from JS for MBID-only track (got ${guardGets.length})`);
+
+  // Old params must not be present
+  assert(!('p_external_id' in (rpcCall?.body || {})),
+    'p_external_id absent from RPC body (old param removed)');
+  assert(!('p_external_id_ns' in (rpcCall?.body || {})),
+    'p_external_id_ns absent from RPC body (old param removed)');
 }
 
 // ── IDEM-6: RPC missing (404) → synced=0, failed=N, no throw ────────────────
@@ -344,7 +357,7 @@ async function test_idem6_rpc_missing_fails_gracefully() {
       return { ok: false, status: 404, text: async () => JSON.stringify({ message: 'function does not exist' }) };
     }
     if ((opts.method === 'GET' || !opts.method) && url.includes('/rest/v1/nodes'))
-      return { ok: true, text: async () => JSON.stringify([]) };
+      throw new Error('REGRESSION: graph.nodes GET called from enrichment path');
     return { ok: false, status: 404, text: async () => '{"error":"unexpected"}' };
   };
 
@@ -368,19 +381,19 @@ async function test_idem6_rpc_missing_fails_gracefully() {
 
 (async () => {
   console.log('=== graph-rls.test.js ===');
-  console.log('Migration: 20260721_graph_rls_lockdown.sql\n');
+  console.log('Migrations: 20260721_graph_rls_lockdown.sql + 20260722_rpc_recording_enrichment_v2.sql\n');
 
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
 
   await test_auth1_rpc_in_public_schema();
   await test_auth2_service_role_key_on_every_call();
   await test_auth3_no_direct_write_to_graph_tables();
-  await test_auth4_guard_reads_carry_service_role_key();
+  await test_auth4_no_js_guard_reads();
   await test_idem1_same_track_twice_same_node_id();
-  await test_idem2_composition_node_id_coalesce();
-  await test_idem3_guard_path_sends_existing_node_id();
+  await test_idem2_composition_node_id_null_from_js();
+  await test_idem3_both_keys_forwarded_no_guard_lookup();
   await test_idem4_no_identifiers_no_rpc();
-  await test_idem5_mbid_only_keyed_by_mbid_ns();
+  await test_idem5_mbid_only_keyed_by_mbid_param();
   await test_idem6_rpc_missing_fails_gracefully();
 
   console.log(`\n${'─'.repeat(50)}`);
