@@ -4,9 +4,18 @@
 RESOLVED. Production verification passed 2026-07-23.
 Job `2a62edd9-43ec-453a-b333-f2c5cee3535d`: graphSynced=22, graphSyncFailed=0, tracksPersisted=22.
 
-### Promotion workflow run (2026-07-23) — workflow run #30030803152
+### Promotion run 1 (2026-07-23) — workflow run #30030803152 — SHA `ad484562`
 - **Production promotion:** PASS — SHA `ad484562` deployed, `/api/version` confirmed, GitHub Deployment recorded.
-- **Graph canary:** INCONCLUSIVE — `graphSynced=null graphSyncFailed=null`. Root cause: `api/enrich-artist.js` line 156 returned `{job_id, status, totalTracks, tracksPersisted}` only; `graphSynced` and `graphSyncFailed` were written to Supabase via `sbPatch` but omitted from the HTTP response body. The bash integer comparison `[ "null" -lt 1 ] 2>/dev/null` errored silently and fell through to PASS — a false positive. Fixed in PR #11: fields added to HTTP response; assert replaced with `node scripts/canary-assert.js` (fails closed on null/missing/non-numeric).
+- **Graph canary:** INCONCLUSIVE (false positive) — `graphSynced=null graphSyncFailed=null`. Root cause: `api/enrich-artist.js` line 156 returned `{job_id, status, totalTracks, tracksPersisted}` only; `graphSynced` and `graphSyncFailed` were written to Supabase via `sbPatch` but omitted from the HTTP response body. The bash integer comparison `[ "null" -lt 1 ] 2>/dev/null` errored silently and fell through to PASS. Fixed in PR #11.
+
+### Promotion run 2 (2026-07-23) — workflow run #30034932838 — SHA `3609a6e`
+- **Production promotion:** PASS — SHA `3609a6eb053557d1c4241dc5fd05eaf78002446c` deployed, `/api/version` confirmed, GitHub Deployment recorded.
+- **Graph canary:** PASS — `graphSynced=22 graphSyncFailed=0 totalTracks=22`. Explicit numeric counts returned in HTTP response body; `scripts/canary-assert.js` passed all rules; exit 0.
+
+### Workflow maintenance notes
+- The canary job requires `actions/checkout` before `node scripts/canary-assert.js` can execute. The checkout step is placed between the verify and assert steps in the YAML. If steps are reordered, the assert will fail with `MODULE_NOT_FOUND`.
+- `graphSynced` counts every successful RPC upsert call regardless of whether the row already existed. PASS (synced=22) on a re-run does not distinguish "newly synced" from "re-confirmed via idempotent upsert" — this is intentional; it proves the RPC path executed without error.
+- To retrieve canary job logs via CLI, filter by job name (`--json jobs --jq '.jobs[] | select(.name | contains("Canary")) | .databaseId'`) rather than hardcoding the `databaseId`, which varies per run.
 
 ---
 
