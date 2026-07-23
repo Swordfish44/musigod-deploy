@@ -4,6 +4,10 @@
 RESOLVED. Production verification passed 2026-07-23.
 Job `2a62edd9-43ec-453a-b333-f2c5cee3535d`: graphSynced=22, graphSyncFailed=0, tracksPersisted=22.
 
+### Promotion workflow run (2026-07-23) — workflow run #30030803152
+- **Production promotion:** PASS — SHA `ad484562` deployed, `/api/version` confirmed, GitHub Deployment recorded.
+- **Graph canary:** INCONCLUSIVE — `graphSynced=null graphSyncFailed=null`. Root cause: `api/enrich-artist.js` line 156 returned `{job_id, status, totalTracks, tracksPersisted}` only; `graphSynced` and `graphSyncFailed` were written to Supabase via `sbPatch` but omitted from the HTTP response body. The bash integer comparison `[ "null" -lt 1 ] 2>/dev/null` errored silently and fell through to PASS — a false positive. Fixed in PR #11: fields added to HTTP response; assert replaced with `node scripts/canary-assert.js` (fails closed on null/missing/non-numeric).
+
 ---
 
 ## Root Cause

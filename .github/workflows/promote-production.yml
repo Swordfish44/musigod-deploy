@@ -220,17 +220,12 @@ jobs:
           echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
           echo "tracks=$TRACKS" >> "$GITHUB_OUTPUT"
 
+      - uses: actions/checkout@v4
+
       - name: Assert canary result
-        run: |
-          STATUS="${{ steps.verify.outputs.status }}"
-          SYNCED="${{ steps.verify.outputs.synced }}"
-          FAILED="${{ steps.verify.outputs.failed }}"
-          TRACKS="${{ steps.verify.outputs.tracks }}"
-          echo "status=${STATUS}  graphSynced=${SYNCED}  graphSyncFailed=${FAILED}  totalTracks=${TRACKS}"
-          if [ "$STATUS" != "DONE" ]; then
-            echo "FAIL: expected status=DONE, got ${STATUS}"; exit 1
-          fi
-          if [ "$SYNCED" -lt 1 ] 2>/dev/null || [ "$FAILED" -ne 0 ] 2>/dev/null; then
-            echo "FAIL: expected graphSynced>=1 graphSyncFailed=0"; exit 1
-          fi
-          echo "PASS"
+        env:
+          CANARY_STATUS: ${{ steps.verify.outputs.status }}
+          CANARY_SYNCED: ${{ steps.verify.outputs.synced }}
+          CANARY_FAILED: ${{ steps.verify.outputs.failed }}
+          CANARY_TRACKS: ${{ steps.verify.outputs.tracks }}
+        run: node scripts/canary-assert.js

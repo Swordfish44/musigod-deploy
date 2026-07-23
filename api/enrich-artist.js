@@ -153,7 +153,7 @@ module.exports = async function handler(req, res) {
     });
 
     console.log(`[enrich] DONE job_id=${job_id} tracks=${catalog.totalTracks} persisted=${persistResult.persisted}`);
-    return res.status(200).json({ job_id, status: 'DONE', totalTracks: catalog.totalTracks, tracksPersisted: persistResult.persisted });
+    return res.status(200).json({ job_id, status: 'DONE', totalTracks: catalog.totalTracks, tracksPersisted: persistResult.persisted, graphSynced: graphResult.synced, graphSyncFailed: graphResult.failed });
 
   } catch (err) {
     console.error(`[enrich] ERROR job_id=${job_id}:`, err.message);

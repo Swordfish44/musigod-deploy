@@ -6,7 +6,7 @@
     "csv-stringify": "^6.7.0"
   },
   "scripts": {
-    "test": "node tests/graph-rls.test.js && node tests/graph-sync-identity.test.js && node tests/graph-sync-enrichment-upsert.test.js",
+    "test": "node tests/graph-rls.test.js && node tests/graph-sync-identity.test.js && node tests/graph-sync-enrichment-upsert.test.js && node tests/canary-assert.test.js",
     "dns:check": "node scripts/check-dns-state.js",
     "dns:email": "node scripts/check-email-security.js",
     "dns:sync": "node scripts/check-vercel-cloudflare-sync.js",
