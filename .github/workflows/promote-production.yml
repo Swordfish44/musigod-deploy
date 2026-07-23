@@ -1,0 +1,236 @@
+name: Promote to Production
+
+# Triggered manually. The caller supplies the exact SHA they want live.
+# Two approval gates:
+#   1. The "production" GitHub Environment — required reviewer must approve
+#      before any step in `promote` executes.
+#   2. The "canary-verification" GitHub Environment — a second human approves
+#      the graph-sync canary AFTER promotion, because it writes production rows.
+#
+# SETUP (one-time, in GitHub Settings → Environments):
+#   "production"            — add required reviewer; add secrets:
+#                             VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+#   "canary-verification"   — add required reviewer (CREATE THIS ENV FIRST); add secret:
+#                             AUDIT_ADMIN_KEY
+#
+# VERCEL_ORG_ID and VERCEL_PROJECT_ID are set explicitly so this workflow does
+# not rely on .vercel/project.json being present or correct in the checkout.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Git SHA to deploy — must be reachable from master HEAD'
+        required: true
+        type: string
+
+# Only one production deployment may run at a time.
+# cancel-in-progress: false means a second trigger queues rather than kills the first.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 1: promote
+  # Validates lineage, runs tests, deploys the exact SHA, verifies /api/version.
+  # ────────────────────────────────────────────────────────────────────────────
+  promote:
+    name: Deploy SHA to Production
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      PROD_URL:          https://project-1a5py.vercel.app
+
+    steps:
+      # ── Step 1: Validate input format ──────────────────────────────────────
+      - name: Validate SHA format
+        run: |
+          if ! printf '%s' "${{ inputs.sha }}" | grep -qE '^[0-9a-f]{7,40}$'; then
+            echo "ERROR: input sha='${{ inputs.sha }}' is not a valid lowercase hex git SHA"
+            exit 1
+          fi
+
+      # ── Step 2: Checkout master with full history ───────────────────────────
+      # Full history is required to verify the input SHA is reachable from HEAD.
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      # ── Step 3: Resolve full SHA; assert it is on the master lineage ────────
+      - name: Resolve and verify SHA lineage
+        run: |
+          FULL=$(git rev-parse --verify "${{ inputs.sha }}" 2>/dev/null) || {
+            echo "ERROR: '${{ inputs.sha }}' does not exist in this repository"
+            exit 1
+          }
+          MASTER_HEAD=$(git rev-parse HEAD)
+          if ! git merge-base --is-ancestor "$FULL" "$MASTER_HEAD"; then
+            echo "ERROR: $FULL is not reachable from master HEAD ($MASTER_HEAD)"
+            echo "Only commits on the master lineage may be promoted to production."
+            exit 1
+          fi
+          echo "DEPLOY_SHA=$FULL" >> "$GITHUB_ENV"
+          echo "Resolved:    ${{ inputs.sha }} → $FULL"
+          echo "Master HEAD: $MASTER_HEAD"
+
+      # ── Step 4: Check out the exact SHA to be deployed ──────────────────────
+      # The Vercel CLI deploys from the current working tree.
+      # Checking out the specific commit ensures no workspace drift from master.
+      - name: Checkout exact deployment SHA
+        run: |
+          git checkout "$DEPLOY_SHA"
+          ACTUAL=$(git rev-parse HEAD)
+          if [ "$ACTUAL" != "$DEPLOY_SHA" ]; then
+            echo "ERROR: HEAD is $ACTUAL after checkout, expected $DEPLOY_SHA"
+            exit 1
+          fi
+
+      # ── Step 5: Install dependencies ────────────────────────────────────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── Step 6: Run test suite ───────────────────────────────────────────────
+      # Test files are standalone Node async runners, not jest tests.
+      # npm test invokes each with `node` directly; any exit 1 fails the workflow.
+      - name: Run test suite
+        run: npm test
+
+      # ── Step 7: Deploy to Vercel production ─────────────────────────────────
+      # VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID are taken from the
+      # job-level env block (sourced from the "production" Environment secrets).
+      # These override any .vercel/project.json linkage in the checkout.
+      - name: Deploy to Vercel production
+        run: npx vercel --prod --force --yes --token "$VERCEL_TOKEN"
+
+      # ── Step 8: Verify /api/version reports the deployed SHA ────────────────
+      # Polls for up to 180 s (18 × 10 s). Fails the workflow if the live SHA
+      # does not match, which means the deployment did not take effect.
+      - name: Verify /api/version matches deployed SHA
+        run: |
+          EXPECTED="${DEPLOY_SHA:0:8}"
+          echo "Polling ${PROD_URL}/api/version for SHA prefix ${EXPECTED} ..."
+          for i in $(seq 1 18); do
+            LIVE=$(curl -sf --max-time 10 "${PROD_URL}/api/version" \
+                     | jq -r '.sha // empty' 2>/dev/null || true)
+            LIVE_SHORT="${LIVE:0:8}"
+            if [ -n "$LIVE_SHORT" ] && [ "$LIVE_SHORT" = "$EXPECTED" ]; then
+              echo "PASS: live sha=${LIVE_SHORT} matches expected=${EXPECTED} (attempt ${i})"
+              exit 0
+            fi
+            echo "Attempt ${i}/18: live=${LIVE_SHORT:-<empty>} expected=${EXPECTED} — sleeping 10 s"
+            sleep 10
+          done
+          echo "FAIL: /api/version did not report expected SHA within 180 s"
+          exit 1
+
+      # ── Step 9: Create auditable GitHub Deployment record ───────────────────
+      - name: Record GitHub Deployment
+        if: success()
+        uses: actions/github-script@v7
+        env:
+          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+          PROD_URL:   ${{ env.PROD_URL }}
+        with:
+          script: |
+            const sha = process.env.DEPLOY_SHA;
+            const url = process.env.PROD_URL;
+            const d = await github.rest.repos.createDeployment({
+              owner:             context.repo.owner,
+              repo:              context.repo.repo,
+              ref:               sha,
+              environment:       'production',
+              auto_merge:        false,
+              required_contexts: [],
+              description:       `Promoted by ${context.actor} via workflow_dispatch`,
+            });
+            await github.rest.repos.createDeploymentStatus({
+              owner:           context.repo.owner,
+              repo:            context.repo.repo,
+              deployment_id:   d.data.id,
+              state:           'success',
+              environment_url: url,
+              description:     `${sha.substring(0, 8)} live`,
+            });
+            core.notice(`Production deployment ${sha.substring(0, 8)} recorded.`);
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 2: canary
+  # Graph-sync smoke check. Runs ONLY after promote succeeds AND a human
+  # approves via the "canary-verification" GitHub Environment.
+  #
+  # This job writes one catalog_enrichments_v1 row and upserts ≤22
+  # works.recordings rows in production. It is intentionally gated so the
+  # team decides whether to run it after each deployment, not automatically.
+  #
+  # AUDIT_ADMIN_KEY is stored exclusively as an Environment secret in
+  # "canary-verification". It never appears in workflow code or logs.
+  # The full HTTP response is never logged (may contain CSV file contents).
+  # ────────────────────────────────────────────────────────────────────────────
+  canary:
+    name: Graph-Sync Canary (manual gate)
+    runs-on: ubuntu-latest
+    needs: promote
+    environment: canary-verification
+    env:
+      PROD_URL: https://project-1a5py.vercel.app
+
+    steps:
+      - name: Run Echo canary and verify graph-sync counts
+        id: verify
+        env:
+          AUDIT_ADMIN_KEY: ${{ secrets.AUDIT_ADMIN_KEY }}
+        run: |
+          # Mask the key value before any output line is emitted.
+          echo "::add-mask::${AUDIT_ADMIN_KEY}"
+
+          # Run enrichment. -s suppresses progress meter; 2>/dev/null suppresses
+          # curl errors which could leak header values on verbose failures.
+          RAW=$(curl -s --max-time 310 \
+            -X POST "${PROD_URL}/api/enrich-artist" \
+            -H "Content-Type: application/json" \
+            -H "x-admin-key: ${AUDIT_ADMIN_KEY}" \
+            -d '{"artistName":"Echo","maxReleases":3}' \
+            2>/dev/null) || { echo "FAIL: curl exited non-zero (timeout or network error)"; exit 1; }
+
+          # Extract only the safe summary fields. Never print RAW — it contains
+          # CSV file content (ASCAP/BMI/MLC registration data).
+          STATUS=$(printf '%s' "$RAW" | jq -r '.status          // "null"')
+          SYNCED=$(printf '%s' "$RAW" | jq -r '.graphSynced     // "null"')
+          FAILED=$(printf '%s' "$RAW" | jq -r '.graphSyncFailed // "null"')
+          TRACKS=$(printf '%s' "$RAW" | jq -r '.totalTracks     // "null"')
+          unset RAW AUDIT_ADMIN_KEY
+
+          # Write outputs for the assert step.
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          echo "synced=$SYNCED" >> "$GITHUB_OUTPUT"
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+          echo "tracks=$TRACKS" >> "$GITHUB_OUTPUT"
+
+      - name: Assert canary result
+        run: |
+          STATUS="${{ steps.verify.outputs.status }}"
+          SYNCED="${{ steps.verify.outputs.synced }}"
+          FAILED="${{ steps.verify.outputs.failed }}"
+          TRACKS="${{ steps.verify.outputs.tracks }}"
+          echo "status=${STATUS}  graphSynced=${SYNCED}  graphSyncFailed=${FAILED}  totalTracks=${TRACKS}"
+          if [ "$STATUS" != "DONE" ]; then
+            echo "FAIL: expected status=DONE, got ${STATUS}"; exit 1
+          fi
+          if [ "$SYNCED" -lt 1 ] 2>/dev/null || [ "$FAILED" -ne 0 ] 2>/dev/null; then
+            echo "FAIL: expected graphSynced>=1 graphSyncFailed=0"; exit 1
+          fi
+          echo "PASS"
