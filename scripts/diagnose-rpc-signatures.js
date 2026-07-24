@@ -9,9 +9,7 @@
 // Usage:
 //   SUPABASE_SERVICE_KEY=<key> node scripts/diagnose-rpc-signatures.js
 //
-// If you see PGRST202 in the probe results, the functions exist in pg_proc but
-// PostgREST's schema cache was not updated. Apply supabase/migrations/20260725_reload_schema.sql
-// via a session-mode connection (NOT the default transaction pooler) and re-run this script.
+// If you see PGRST202, apply the hardening/reload migration in the Supabase SQL Editor, then re-run this script.
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -98,7 +96,7 @@ async function probeRpc(fnName, body) {
     console.log(`  ❌ ${fnName}: PGRST202 — not in PostgREST schema cache`);
     console.log(`     HTTP ${r.status} body: ${txt.slice(0, 200)}`);
     console.log(`     → The function exists in pg_proc but PostgREST has not loaded it.`);
-    console.log(`     → Fix: apply supabase/migrations/20260725_reload_schema.sql via session mode.`);
+    console.log(`     → Fix: apply supabase/migrations/20260725_reload_schema.sql, then re-run this probe.`);
   } else if (isFK) {
     console.log(`  ✅ ${fnName}: in schema cache, callable, FK enforced (probe UUID rejected)`);
   } else if (r.ok) {
@@ -148,20 +146,7 @@ async function main() {
   // ── Section 3: SQL to reload PostgREST schema ─────────────────────────────
   sep('3. Schema reload instructions');
   console.log(`
-  The NOTIFY in the original migration was sent via Supabase's Supavisor transaction
-  pooler, which does NOT forward session-level NOTIFY to PostgREST's LISTEN connection.
-
-  Option A (preferred): Apply supabase/migrations/20260725_reload_schema.sql
-    → File contains only: SELECT pg_notify('pgrst', 'reload schema');
-    → Run it via SQL Editor in SESSION mode (not transaction mode):
-         Supabase SQL Editor → Connection type → Session mode (or Direct Connection)
-         Paste content → Run
-
-  Option B: Supabase Dashboard
-    → API Settings → Reload (if your project version has this button)
-
-  After reload, re-run this script. PGRST202 probes should flip to ✅.
-`);
+  Apply supabase/migrations/20260725_reload_schema.sql in the Supabase SQL Editor.\n  The migration pins SECURITY DEFINER search paths, revokes public/anon/authenticated\n  execution, grants service_role only, and requests a PostgREST schema reload.\n\n  After it commits, re-run this script. PGRST202 probes should flip to ✅.\n`);
 
   // ── Section 4: Live PostgREST probe ───────────────────────────────────────
   sep('4. Live PostgREST probe (requires SUPABASE_SERVICE_KEY)');
