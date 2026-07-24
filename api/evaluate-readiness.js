@@ -102,19 +102,24 @@ module.exports = async function handler(req, res) {
       return res.status(404).json({ error: 'No tracks found' });
     }
 
-    // 2. Fetch validated splits for these tracks (to check splits_validated)
+    // 2. Fetch validated splits for these tracks (to check splits_validated).
+    // Only scope to artist_id when present — fetching all artists' splits by title
+    // would silently mark a track validated if another artist shares the same title.
     const trackIds = tracks.map(t => t.id);
-    const splitParams = new URLSearchParams();
-    splitParams.set('artist_id', artist_id ? `eq.${artist_id}` : 'not.is.null');
-    splitParams.set('validated', 'eq.true');
-    splitParams.set('select', 'track_title,validated');
-    const splitRes = await sbFetch(`catalog_writer_splits_v1?${splitParams}`);
-    const splitRows = splitRes.ok ? await splitRes.json() : [];
-    const validatedTitles = new Set(
-      (Array.isArray(splitRows) ? splitRows : [])
-        .filter(r => r.validated)
-        .map(r => (r.track_title || '').toLowerCase().trim())
-    );
+    let validatedTitles = new Set();
+    if (artist_id) {
+      const splitParams = new URLSearchParams();
+      splitParams.set('artist_id', `eq.${artist_id}`);
+      splitParams.set('validated', 'eq.true');
+      splitParams.set('select', 'track_title,validated');
+      const splitRes = await sbFetch(`catalog_writer_splits_v1?${splitParams}`);
+      const splitRows = splitRes.ok ? await splitRes.json() : [];
+      validatedTitles = new Set(
+        (Array.isArray(splitRows) ? splitRows : [])
+          .filter(r => r.validated)
+          .map(r => (r.track_title || '').toLowerCase().trim())
+      );
+    }
 
     // 3. Evaluate each track × destination
     const decisions = [];

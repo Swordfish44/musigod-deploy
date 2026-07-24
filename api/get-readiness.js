@@ -129,7 +129,8 @@ module.exports = async function handler(req, res) {
       if (!rpcRes.ok) {
         return res.status(502).json({ error: 'Summary RPC failed', detail: (await rpcRes.text()).slice(0, 200) });
       }
-      const summaryData = await rpcRes.json();
+      const summaryRaw = await rpcRes.json();
+      const summaryData = Array.isArray(summaryRaw) ? summaryRaw[0] : summaryRaw;
       return res.status(200).json({
         artist_name: resolvedArtistName,
         total_tracks: trackIds.length,
