@@ -1,26 +1,30 @@
--- 20260725_reload_schema.sql
+-- 20260725_registration_readiness_rpc_hardening.sql
 --
--- Forces PostgREST to reload its schema cache so that the functions created in
--- 20260724_registration_readiness_v1.sql become visible in the API.
---
--- WHY THIS FILE EXISTS:
---   The NOTIFY at the end of the previous migration was sent through Supabase's
---   Supavisor transaction pooler (default for the SQL Editor). Transaction-mode
---   connections do not propagate session-level NOTIFY to PostgREST's dedicated
---   LISTEN connection. As a result, rpc_upsert_readiness_decision and
---   rpc_get_readiness_summary exist in pg_proc but return PGRST202 because they
---   are absent from PostgREST's schema cache.
---
--- HOW TO APPLY:
---   Run this in the Supabase SQL Editor using a SESSION or DIRECT connection,
---   NOT the default transaction pooler:
---     SQL Editor → Connection type dropdown → "Session mode" or "Direct connection"
---
---   Verify success: after running, call
---     POST /rest/v1/rpc/rpc_get_readiness_summary
---   and confirm it returns 200 (or a meaningful error) instead of PGRST202.
---
--- This file is safe to re-run. NOTIFY is idempotent — additional reloads cost
--- only a brief schema re-scan by PostgREST (~100 ms).
+-- Hardens the Registration Readiness SECURITY DEFINER RPCs and requests a
+-- PostgREST schema-cache reload. Safe and idempotent; no catalog rows change.
+
+ALTER FUNCTION public.rpc_upsert_readiness_decision(
+  UUID, TEXT, TEXT, TEXT, JSONB, JSONB, JSONB
+) SET search_path = public, pg_temp;
+
+ALTER FUNCTION public.rpc_get_readiness_summary(
+  TEXT, UUID[]
+) SET search_path = public, pg_temp;
+
+REVOKE ALL ON FUNCTION public.rpc_upsert_readiness_decision(
+  UUID, TEXT, TEXT, TEXT, JSONB, JSONB, JSONB
+) FROM PUBLIC, anon, authenticated;
+
+REVOKE ALL ON FUNCTION public.rpc_get_readiness_summary(
+  TEXT, UUID[]
+) FROM PUBLIC, anon, authenticated;
+
+GRANT EXECUTE ON FUNCTION public.rpc_upsert_readiness_decision(
+  UUID, TEXT, TEXT, TEXT, JSONB, JSONB, JSONB
+) TO service_role;
+
+GRANT EXECUTE ON FUNCTION public.rpc_get_readiness_summary(
+  TEXT, UUID[]
+) TO service_role;
 
 SELECT pg_notify('pgrst', 'reload schema');
