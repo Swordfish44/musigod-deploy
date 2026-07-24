@@ -118,8 +118,7 @@ async function checkUpsertRpc() {
   } else if (isPGRST202) {
     fail(
       'rpc_upsert_readiness_decision not in PostgREST schema cache — NOTIFY did not propagate',
-      `HTTP ${r.status}: PGRST202. Run "SELECT pg_notify(\'pgrst\', \'reload schema\')" via a ` +
-      'session-mode connection (not transaction pooler), then re-verify. ' + txt.slice(0, 80)
+      `HTTP ${r.status}: PGRST202. Apply supabase/migrations/20260725_reload_schema.sql, then re-verify. ` + txt.slice(0, 80)
     );
   } else if (isPermDeny) {
     fail('rpc_upsert_readiness_decision permission denied — grant to service_role missing', txt.slice(0, 120));
