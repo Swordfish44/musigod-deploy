@@ -8,7 +8,8 @@
 // 5. Merge splits into tracks (overrides equal-split defaults)
 // 6. Generate split-aware CSV and return as downloadable file
 
-const { generateASCAPCSV, generateBMICSV, generateMLCCSV } = require('../lib/generate-splits-csv')
+const { generateASCAPCSV, generateBMICSV, generateMLCCSV } = require('../lib/generate-splits-csv');
+const { assertExportReady } = require('../lib/generate-registration-files');
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
@@ -157,6 +158,49 @@ module.exports = async function handler(req, res) {
     const splitsApplied = mergedTracks.filter(t =>
       t.writers.some(w => w.split_pct != null)
     ).length
+
+    // 5b. Readiness gate — fetch current readiness decisions for this artist + destination.
+    // The reconstructed tracks have no catalog_track_id, so we resolve via
+    // catalog_enriched_tracks_v1 (title-keyed) then join to registration_readiness_v1.
+    const destMap = { ascap: 'ASCAP', bmi: 'BMI', mlc: 'MLC' }
+    const destName = destMap[format]
+    const titleReadinessMap = new Map()
+    try {
+      const catalogTracksRes = await sbGet(
+        `catalog_enriched_tracks_v1?artist_name=ilike.${encodeURIComponent(artistName)}&select=id,track_title&limit=2000`
+      )
+      if (catalogTracksRes.ok) {
+        const catalogTrackRows = await catalogTracksRes.json()
+        if (Array.isArray(catalogTrackRows) && catalogTrackRows.length > 0) {
+          const catalogIds = catalogTrackRows.map(t => `"${t.id}"`).join(',')
+          const rRes = await sbGet(
+            `registration_readiness_v1?catalog_track_id=in.(${catalogIds})&destination=eq.${destName}&select=catalog_track_id,decision,blockers,evidence_summary`
+          )
+          if (rRes.ok) {
+            const rRows = await rRes.json()
+            for (const row of (Array.isArray(rRows) ? rRows : [])) {
+              const title = (row.evidence_summary?.track_title || '').toLowerCase().trim()
+              if (title) titleReadinessMap.set(title, row)
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // Readiness lookup failed — titleReadinessMap remains empty → assertExportReady blocks
+    }
+    try {
+      assertExportReady(mergedTracks, titleReadinessMap)
+    } catch (guardErr) {
+      if (guardErr.code === 'EXPORT_BLOCKED') {
+        return res.status(400).json({
+          error: 'Export blocked: not all tracks are READY for registration',
+          destination: destName,
+          blocked_count: guardErr.nonReady.length,
+          blocked_tracks: guardErr.nonReady,
+        })
+      }
+      throw guardErr
+    }
 
     // 6. Generate CSV
     let csvContent, filename
