@@ -15,6 +15,10 @@
 // destinations: optional array subset of DESTINATIONS; defaults to all 5.
 
 const { evaluateReadiness, DESTINATIONS } = require('../lib/registration-readiness');
+const {
+  buildValidatedSplitsMap,
+  mergeValidatedSplitEvidence,
+} = require('../lib/readiness-evidence-adapter');
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -105,20 +109,15 @@ module.exports = async function handler(req, res) {
     // 2. Fetch validated splits for these tracks (to check splits_validated).
     // Only scope to artist_id when present — fetching all artists' splits by title
     // would silently mark a track validated if another artist shares the same title.
-    const trackIds = tracks.map(t => t.id);
-    let validatedTitles = new Set();
+    let validatedSplits = new Map();
     if (artist_id) {
       const splitParams = new URLSearchParams();
       splitParams.set('artist_id', `eq.${artist_id}`);
       splitParams.set('validated', 'eq.true');
-      splitParams.set('select', 'track_title,validated');
+      splitParams.set('select', 'track_title,validated,writers');
       const splitRes = await sbFetch(`catalog_writer_splits_v1?${splitParams}`);
       const splitRows = splitRes.ok ? await splitRes.json() : [];
-      validatedTitles = new Set(
-        (Array.isArray(splitRows) ? splitRows : [])
-          .filter(r => r.validated)
-          .map(r => (r.track_title || '').toLowerCase().trim())
-      );
+      validatedSplits = buildValidatedSplitsMap(splitRows);
     }
 
     // 3. Evaluate each track × destination
@@ -126,9 +125,9 @@ module.exports = async function handler(req, res) {
     const errors = [];
 
     for (const track of tracks) {
+      const trackWithSplits = mergeValidatedSplitEvidence(track, validatedSplits);
       const mergedTrack = {
-        ...track,
-        splits_validated: validatedTitles.has((track.track_title || '').toLowerCase().trim()),
+        ...trackWithSplits,
         // Fields not yet in schema — default to null (no fabrication)
         master_rights_holder: null,
         publisher_ipi:        null,
