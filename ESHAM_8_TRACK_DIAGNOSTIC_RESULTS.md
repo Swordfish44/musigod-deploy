@@ -5,16 +5,22 @@
 **Mode:** Read-only — zero database writes  
 **Test suite:** 421/421 passed (all 8 test files)  
 **Supabase project:** `uykzkrnoetcldeuxzqyy`  
-**Genius dry run:** completed 2026-07-29 — token present, 8/8 tracks searched, 0 found
+**Genius dry run v1 (exact only):** 2026-07-29 — 8/8 false negatives (see note below)  
+**Genius dry run v2 (fuzzy+corroboration):** 2026-07-29 — 5/8 confirmed present; 3/8 genuinely absent
 
 ---
 
 ## Summary
 
-All 8 zero-writer Esham tracks are **genuine hard cases**, not regressions. The
-three-tier enrichment pipeline (MusicBrainz → Discogs → Genius) already ran and
-found no writer credits for these tracks. They were never enriched — they did not
-regress from a previously enriched state.
+All 8 zero-writer Esham tracks require manual research for writer credits. The
+three-tier enrichment pipeline (MusicBrainz → Discogs → Genius) and all prior
+enrichment job CSVs contain no writer data for these tracks.
+
+The initial Genius dry run (v1) reported 8/8 "not found" — this was a **false
+negative**. The v1 code treated "song found but no writers listed" the same as
+"song not found." The v2 fuzzy run with proper title matching and raw-hit
+surfacing revealed that 5 of the 8 songs exist on Genius with EXACT title
+matches but with zero writers credited on their Genius pages.
 
 | Metric | Value |
 |--------|-------|
@@ -22,8 +28,28 @@ regress from a previously enriched state.
 | Tracks with writer data | 188 |
 | Tracks without writer data | **8** |
 | Auto-resolvable from prior enrichment CSVs | 0 |
-| Auto-resolvable from Genius (token present, 8 queried) | **0** |
-| Requires manual research | **8** |
+| Confirmed present on Genius (EXACT match) | **5** — but 0 writers listed on Genius |
+| Genuinely absent from Genius by title | **3** |
+| Requires manual PRO/Discogs research | **8** |
+
+---
+
+## False-Negative Root Cause
+
+The original `lib/genius.js` `getGeniusWriters()` returns `[]` when
+`writer_artists` is empty on the Genius page. The v1 diagnostic treated an empty
+writer list as "not found." All 5 found tracks return `writer_artists: []` on
+Genius — Genius has the song page but has not populated writer credits.
+
+The corrected v2 diagnostic separates two distinct states:
+
+| State | Meaning |
+|-------|---------|
+| Song found, writers listed | Resolvable from Genius |
+| Song found, **no writers listed** | Genius page exists; credits not yet populated there |
+| Song not found | Not indexed on Genius at all |
+
+All 8 tracks fall into the bottom two categories.
 
 ---
 
@@ -41,7 +67,9 @@ regress from a previously enriched state.
 | **Enrichment source** | (none — never enriched) |
 | **Pipeline error** | No work in MB; no credits on Discogs or Genius |
 | **Prior CSV match** | Not found in any of 10 DONE enrichment jobs |
-| **Genius dry-run result** | Not found (2026-07-29) |
+| **Genius v2 result** | EXACT match confirmed — no writers listed on Genius page |
+| **Genius evidence URL** | https://genius.com/Esham-as-i-rock-n-roll-lyrics |
+| **Genius album** | "Bootleg" (From The Lost Vault) Vol. 1 — same release, different title format |
 
 **Recommended research queries:**
 - MusicBrainz: https://musicbrainz.org/recording/dd1ac7f5-2a30-4aad-9154-de7b24d7a67b
@@ -62,7 +90,9 @@ regress from a previously enriched state.
 | **Enrichment source** | (none — never enriched) |
 | **Pipeline error** | No work in MB; no credits on Discogs or Genius |
 | **Prior CSV match** | Not found in any of 10 DONE enrichment jobs |
-| **Genius dry-run result** | Not found (2026-07-29) |
+| **Genius v2 result** | EXACT match confirmed — no writers listed on Genius page |
+| **Genius evidence URL** | https://genius.com/Esham-monkey-mix-lyrics |
+| **Genius album** | "Bootleg" (From The Lost Vault) Vol. 1 — same release, different title format |
 
 **Recommended research queries:**
 - MusicBrainz: https://musicbrainz.org/recording/ec1fe701-6449-4e52-895a-53348465600b
@@ -84,7 +114,9 @@ regress from a previously enriched state.
 | **Enrichment source** | (none — never enriched) |
 | **Pipeline error** | No work in MB; no credits on Discogs or Genius |
 | **Prior CSV match** | Not found in any of 10 DONE enrichment jobs |
-| **Genius dry-run result** | Not found (2026-07-29) |
+| **Genius v2 result** | EXACT match confirmed — no writers listed on Genius page |
+| **Genius evidence URL** | https://genius.com/Esham-price-on-ya-head-lyrics |
+| **Genius album** | "Bootleg" (From The Lost Vault) Vol. 1 — same release, different title format |
 
 **Recommended research queries:**
 - MusicBrainz: https://musicbrainz.org/recording/9a824b1e-a127-4953-aada-cda10b89b893
@@ -105,7 +137,9 @@ regress from a previously enriched state.
 | **Enrichment source** | (none — never enriched) |
 | **Pipeline error** | No work in MB; no credits on Discogs or Genius |
 | **Prior CSV match** | Not found in any of 10 DONE enrichment jobs |
-| **Genius dry-run result** | Not found (2026-07-29) |
+| **Genius v2 result** | EXACT match confirmed — no writers listed on Genius page |
+| **Genius evidence URL** | https://genius.com/Esham-suffer-the-consequences-lyrics |
+| **Genius album** | "Bootleg" (From The Lost Vault) Vol. 1 — same release, different title format |
 
 **Recommended research queries:**
 - MusicBrainz: https://musicbrainz.org/recording/eccbf63f-c7bd-4471-8197-d02095ee91dd
@@ -126,13 +160,21 @@ regress from a previously enriched state.
 | **Enrichment source** | (none — never enriched) |
 | **Pipeline error** | No work in MB; no credits on Discogs or Genius |
 | **Prior CSV match** | Not found in any of 10 DONE enrichment jobs |
-| **Genius dry-run result** | Not found (2026-07-29) |
+| **Genius v2 result** | EXACT match confirmed — no writers listed on Genius page |
+| **Genius evidence URL** | https://genius.com/Esham-helterskkkellter-lyrics |
+| **Genius album** | No album listed on the Genius song page |
+
+**Title/album spelling note:** The Genius *album* URL is
+`genius.com/albums/Esham/Hellterskkkelter` (double-l, double-k), while the Genius
+*track* URL uses `helterskkkellter` — matching our DB title exactly. The v1 run
+returning "not found" was a false negative caused by the `writer_artists: []`
+→ "not found" mapping, not a title mismatch.
 
 **Recommended research queries:**
 - MusicBrainz: https://musicbrainz.org/recording/ad23ceab-999f-4da8-b9a6-65f122b47254
 - BMI repertoire: search title "Helterskkkellter" + ISRC USASN0802426
-- Discogs: search "Esham" + "Helterskkkelter" — 1993 album may have physical liner notes scanned
-- Note: unusual spelling of title (three k's) — use exact string in all searches
+- Discogs: search "Esham" + "Helterskkkelter" — 1993 release may have scanned liner notes
+- Use exact DB spelling in all searches (three k's, double l in second half)
 
 ---
 
@@ -148,13 +190,18 @@ regress from a previously enriched state.
 | **Enrichment source** | (none — never enriched) |
 | **Pipeline error** | No work in MB; no credits on Discogs or Genius |
 | **Prior CSV match** | Not found in any of 10 DONE enrichment jobs |
-| **Genius dry-run result** | Not found (2026-07-29) |
+| **Genius v2 result** | Not found by title; closest Genius hit: `"? (Mail Dominance Track 16)"` |
+| **Genius hint URL** | https://genius.com/Esham-mail-dominance-track-16-lyrics |
+
+**Note:** Likely a cover of "California Dreamin'" by The Mamas & The Papas
+(John Phillips / Michelle Phillips, 1965). Genius lists *Mail Dominance* track 16
+as `"?"` — may be this song under an unknown track number. Confirm via liner notes
+or ISRC lookup, then enter original writers via `lib/overrides.js`.
 
 **Recommended research queries:**
 - MusicBrainz: https://musicbrainz.org/recording/a9a482bb-2df1-485a-a444-b0fbddeae5fa
 - BMI repertoire: search title "California Dreamin" + ISRC USASN0802518
-- Note: likely a Mamas & the Papas cover (John Phillips / Michelle Phillips) — check if the
-  original work relationship exists in MB and whether Esham's version credits original writers
+- Genius Mail Dominance album page for track listing and position
 
 ---
 
@@ -170,12 +217,14 @@ regress from a previously enriched state.
 | **Enrichment source** | (none — never enriched) |
 | **Pipeline error** | No work in MB; no credits on Discogs or Genius |
 | **Prior CSV match** | Not found in any of 10 DONE enrichment jobs |
-| **Genius dry-run result** | Not found (2026-07-29) |
+| **Genius v2 result** | Not found by title; closest Genius hit: `"? (Mail Dominance Track 16)"` |
+| **Genius hint URL** | https://genius.com/Esham-mail-dominance-track-16-lyrics |
 
 **Recommended research queries:**
 - MusicBrainz: https://musicbrainz.org/recording/88935d29-9e53-4909-8cae-fe311b86cbed
 - BMI repertoire: search title "Ozonelayer" + ISRC USASN0802515
 - ASCAP ACE: search title "Ozonelayer" + artist "Esham"
+- Genius Mail Dominance album page for track listing and position
 
 ---
 
@@ -191,13 +240,15 @@ regress from a previously enriched state.
 | **Enrichment source** | (none — never enriched) |
 | **Pipeline error** | No work in MB; no credits on Discogs or Genius |
 | **Prior CSV match** | Not found in any of 10 DONE enrichment jobs |
-| **Genius dry-run result** | Not found (2026-07-29) |
+| **Genius v2 result** | Not found by title; closest Genius hit: `"? (Mail Dominance Track 16)"` |
+| **Genius hint URL** | https://genius.com/Esham-mail-dominance-track-16-lyrics |
 
 **Recommended research queries:**
 - MusicBrainz: https://musicbrainz.org/recording/725e4a0d-fa62-4cbd-9b20-7cc37c77bf20
 - BMI repertoire: search title "Youknowucan'tride" + ISRC USASN0802508
 - ASCAP ACE: search title "Youknowucan'tride" + artist "Esham"
-- Note: condensed title with apostrophe — try alternate spellings ("You Know U Can't Ride")
+- Try alternate spellings: "You Know U Can't Ride"
+- Genius Mail Dominance album page for track listing and position
 
 ---
 
@@ -206,11 +257,51 @@ regress from a previously enriched state.
 Three distinct releases account for all 8 tracks. A single Discogs or liner-note
 lookup per release could unblock multiple tracks at once.
 
-| Release | Year | Tracks in this set |
-|---------|------|-------------------|
-| Bootleg: From the Lost Vault, Volume 1 | 2000 | 4 (tracks 1–4 above) |
-| Helterskkkelter | 1993 | 1 (track 5) |
-| Mail Dominance | 1999 | 3 (tracks 6–8) |
+| Release | Year | Tracks in this set | Genius status |
+|---------|------|-------------------|---------------|
+| Bootleg: From the Lost Vault, Volume 1 | 2000 | 4 (tracks 1–4) | All 4 present on Genius, 0 writers listed |
+| Helterskkkelter | 1993 | 1 (track 5) | Present on Genius, 0 writers listed |
+| Mail Dominance | 1999 | 3 (tracks 6–8) | Absent by title; listed as "?" on album page |
+
+---
+
+## Genius v2 Dry-Run Detail (2026-07-29)
+
+### Matching strategy
+
+1. **Exact** — `normTitle(geniusTitle) === normTitle(trackTitle)` (strip non-alnum, lowercase)
+2. **Normalized** — `collapseRepeats(normTitle(...))` matches (collapses consecutive repeated
+   characters: `"skkkk"` → `"sk"`, `"ll"` → `"l"`)
+3. **Substring** — one normalized form contains the other (≥5 chars)
+4. **Artist guard** — `primary_artist.name` must normalize to include `"esham"`
+5. **Album corroboration** — Genius `album.name` vs our `release_title` (normalized + collapsed)
+6. **Raw-hit surfacing** — when no match found, top Esham hits from all queries are shown
+
+### Per-track results
+
+| Track | Genius title found | Confidence | Writers on Genius | Album corroborated |
+|-------|-------------------|------------|-------------------|-------------------|
+| As I Rock-N-Roll | "As I Rock-N-Roll" | EXACT | 0 | ⚠️ title format differs (same release) |
+| Monkey Mix | "Monkey Mix" | EXACT | 0 | ⚠️ title format differs (same release) |
+| Price on Ya Head | "Price On Ya Head" | EXACT | 0 | ⚠️ title format differs (same release) |
+| Suffer the Consequences | "Suffer the Consequences" | EXACT | 0 | ⚠️ title format differs (same release) |
+| Helterskkkellter | "Helterskkkellter" | EXACT | 0 | No album on Genius page |
+| California Dreamin | — | not found | — | — |
+| Ozonelayer | — | not found | — | — |
+| Youknowucan'tride | — | not found | — | — |
+
+### Album title format difference — not a real mismatch
+
+For all four *Bootleg: From the Lost Vault, Volume 1* tracks, Genius lists the
+album as `"Bootleg" (From The Lost Vault) Vol. 1`. This is the same release with
+punctuation/capitalization differences. The corroboration algorithm flags it
+because normalized string comparison does not match `bootlegfromthelostvaultvolume1`
+vs `bootlegfromthelostvault1`. A human reviewer can confirm these are the same release.
+
+### Zero DB writes
+
+All Genius calls were read-only search and song-detail GET requests. No
+`writer_artists` data was written to any table.
 
 ---
 
@@ -242,7 +333,7 @@ confirming they were not enriched by any prior pipeline run.
 | Total link rows in `graph_catalog_links_v1` | **31** |
 | Tracks with **no** graph links | **193** |
 
-**Link breakdown by `node_role`** (the 31 rows on 3 tracks):
+**Link breakdown by `node_role`** (the 31 rows across 3 tracks):
 
 | node_role | rows |
 |-----------|------|
@@ -284,46 +375,38 @@ function is already deployed. Closes the 193-track gap.
 
 ---
 
-## Genius Dry-Run Results (2026-07-29)
-
-Genius was queried live (read-only) with a valid token for all 8 tracks. Every
-query returned "not found". The three-tier pipeline (MusicBrainz → Discogs →
-Genius) is now **fully exhausted** for these tracks. Automated recovery is not
-possible without a new data source.
-
-| Track | Genius result |
-|-------|--------------|
-| As I Rock-N-Roll | not found |
-| Monkey Mix | not found |
-| Price on Ya Head | not found |
-| Suffer the Consequences | not found |
-| Helterskkkellter | not found |
-| California Dreamin | not found |
-| Ozonelayer | not found |
-| Youknowucan'tride | not found |
-
-Zero database writes. Zero credentials exposed.
-
----
-
 ## Next Steps for the 8 Tracks
 
-All automated enrichment sources (MusicBrainz, Discogs, Genius) are exhausted.
-Manual research is the only remaining path.
+All automated enrichment sources are exhausted for writer credits. Genius
+confirms 5 song pages exist but has no writers populated. Manual research is
+the only remaining path.
 
-1. **BMI/ASCAP public repertoire search** — use the ISRCs and track titles in the
-   per-track tables above. Seven of the 8 tracks have ISRCs, which are the most
-   reliable lookup key for PRO repertoire databases.
+### Tracks 1–4 (Bootleg: From the Lost Vault, Volume 1)
 
-2. **"California Dreamin"** — almost certainly a cover of the Mamas & the Papas
-   song (John Phillips / Michelle Phillips, 1965). The original writers are
-   well-documented. Confirm the cover relationship is intentional, then add the
-   credits via `lib/overrides.js`.
+One Discogs lookup for the release may credit all 4 tracks at once. The
+Genius pages are confirmed — use them to verify track identity before entering
+manual credits into `lib/overrides.js`.
 
-3. **Release-level Discogs lookup** — one Discogs page per release may credit all
-   tracks on that release. Prioritize *Bootleg: From the Lost Vault, Volume 1*
-   (unblocks 4 tracks) and *Mail Dominance* (unblocks 3 tracks).
+### Track 5 (Helterskkkellter)
 
-4. **Manual entries** — once credits are confirmed from any authoritative source,
-   add them to `lib/overrides.js`. The next enrichment run will pick them up
-   without requiring the three-tier pipeline to find them independently.
+The Genius page exists at the URL above. No writers listed there. BMI/ASCAP
+ISRC search (USASN0802426) is the next best path.
+
+### Tracks 6–8 (Mail Dominance)
+
+Genius lists some *Mail Dominance* tracks as `"? (Mail Dominance Track N)"` —
+the album page may identify track positions. Cross-reference the ISRC values
+(USASN0802518, USASN0802515, USASN0802508) via BMI/ASCAP. "California Dreamin"
+is likely a cover (John Phillips / Michelle Phillips) — confirm then enter
+directly via `lib/overrides.js`.
+
+### Applying credits
+
+Once any credit is confirmed from an authoritative source:
+
+```js
+// lib/overrides.js — add entry with source documentation
+```
+
+The next enrichment run will pick it up. Do not write directly to
+`catalog_enriched_tracks_v1` — use the enrichment pipeline.
