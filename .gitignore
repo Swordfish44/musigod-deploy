@@ -1,5 +1,6 @@
 .vercel
 .env*.local
+.env.local
 .env.codex.local
 
 # MusicBrainz local staging — dumps and extracted data must never be committed

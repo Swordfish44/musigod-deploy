@@ -1,0 +1,660 @@
+{
+  "_meta": {
+    "created": "2026-07-09",
+    "closed": "2026-07-28",
+    "closure_status": "VERIFIED_HEALTHY — no production repair performed",
+    "closure_evidence": "Dry-run of scripts/restore-regressed-writers.js (DRY_RUN=1) with corrected EXACT_MATCH classification (strict normalized-set equality) confirmed all 31 tracks are EXACT_MATCH against the June 19 authoritative CSV. Current DB state equals the pre-regression state. No write was necessary.",
+    "closure_method": "Read-only dry-run comparison. Writer identity sets normalized via normalizeWriterName() (strips non-alphanumeric, lowercases). Matched by recording_mbid (primary) and title+release (fallback).",
+    "dry_run_backup": "esham_writer_recovery_before_<timestamp>.json preserved in repo root as evidence.",
+    "regression_prevention": "lib/writer-merge-policy.js (commit e95870e) — KEEP_EXISTING rule prevents any future 0-writer overwrite. 27/27 regression tests pass.",
+    "pilot_job_id": "9ad49466-797c-48f8-bd6c-3fac4e194fa8",
+    "pilot_ran_at": "2026-07-08T19:17:57.330799+00:00",
+    "pilot_completed_at": "2026-07-08T19:22:45.454783+00:00",
+    "pilot_latency_s": 288.8,
+    "cause_of_regression": "Genius budget guard (added in fix 32bc037) skipped Genius fallback calls after 240s. Tracks previously enriched by Genius in the June 19 prior run were overwritten with 0-writer results. The upsert strategy was always-overwrite with no preservation of existing evidence.",
+    "prior_job_created_at": "2026-06-19T05:54:51.132896+00:00",
+    "prior_job_id": "UNKNOWN — catalog_enrichments_v1 not queryable without service key; job_id not exposed in get-enriched-tracks API response",
+    "recovery_status": "CLOSED — all 31 tracks verified EXACT_MATCH. No repair required.",
+    "total_affected": 41,
+    "total_regressed": 31,
+    "total_upgraded": 10
+  },
+  "regressed": [
+    {
+      "id": "851c7879-1d49-4694-ab4f-291f563f45f7",
+      "track_title": "Black Orchid",
+      "release_title": "Bootleg: From the Lost Vault, Volume 1",
+      "release_year": "2000",
+      "writers_before_count": 2,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius (MB no work-rel; Discogs no credits for this release)",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "3e2be49e-1221-406a-b8e2-50ba1b3170d3",
+      "track_title": "Comerica",
+      "release_title": "Bootleg: From the Lost Vault, Volume 1",
+      "release_year": "2000",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "47010d4a-710c-4661-8942-ec0969b4bc4c",
+      "track_title": "Dumb Bitch",
+      "release_title": "Bootleg: From the Lost Vault, Volume 1",
+      "release_year": "2000",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "92c5ba66-00b0-49b2-a7df-c141b1572461",
+      "track_title": "Fallen Angel",
+      "release_title": "Bootleg: From the Lost Vault, Volume 1",
+      "release_year": "2000",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "0d407229-a811-4ff3-a0aa-036f81928480",
+      "track_title": "KKKill the Fetus",
+      "release_title": "Bootleg: From the Lost Vault, Volume 1",
+      "release_year": "2000",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "e1f859ac-c39e-4653-a1da-620ccc6015b9",
+      "track_title": "Midnight Hour",
+      "release_title": "Bootleg: From the Lost Vault, Volume 1",
+      "release_year": "2000",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "4bd95aae-a8a5-4692-8417-cef9c7b35e3d",
+      "track_title": "Morty's Theme",
+      "release_title": "Bootleg: From the Lost Vault, Volume 1",
+      "release_year": "2000",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "5f033ff5-7411-402f-b88d-f2eb0ac1b56c",
+      "track_title": "Outcha Atmosphere",
+      "release_title": "Bootleg: From the Lost Vault, Volume 1",
+      "release_year": "2000",
+      "writers_before_count": 2,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "3f3df72c-7a70-4ece-9b99-2e2d6957b5d8",
+      "track_title": "Redrum",
+      "release_title": "Bootleg: From the Lost Vault, Volume 1",
+      "release_year": "2000",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "9f2b1839-a74a-4da6-8bec-4b25bcd7e694",
+      "track_title": "Thinking to Myself",
+      "release_title": "Bootleg: From the Lost Vault, Volume 1",
+      "release_year": "2000",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "f3fd7279-42f4-4b2f-a335-8fa169edbd22",
+      "track_title": "Watch Cha Back",
+      "release_title": "Bootleg: From the Lost Vault, Volume 1",
+      "release_year": "2000",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "f420e78f-0f26-47cc-925a-64ec87336ba9",
+      "track_title": "What",
+      "release_title": "Bootleg: From the Lost Vault, Volume 1",
+      "release_year": "2000",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "c8ad769e-b80d-476f-a8ac-c8ba5bc4e213",
+      "track_title": "Acacia Polyacantha",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "8578e2a6-8713-4686-b9e3-db335a386c82",
+      "track_title": "Brainwreck",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "b57013da-3e06-48a4-9116-c74115245a6b",
+      "track_title": "C2h5oh",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "052ed575-96cd-4402-8772-863c709b9d81",
+      "track_title": "Claviceps",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "6e063841-12aa-4d21-88b1-db5234bdffac",
+      "track_title": "Delosperma Acuminatum",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "7d939e20-1fad-4ede-8a76-154a6436e625",
+      "track_title": "Dionaea Muscipula",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "96c8ffc6-7a4c-400b-a144-b59a653be912",
+      "track_title": "Echinopsis Peryviana",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "cd7429db-75c4-445f-abf7-e7fe82dbdb02",
+      "track_title": "Higgs Boson",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "7fa40949-6625-48c9-b4a3-20895f5e0313",
+      "track_title": "Myristicion",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "ad6752b0-9f17-46e7-8ad1-2ae2f22ed7ed",
+      "track_title": "Neurolathyrism",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "0d435cf6-5307-4c75-aa96-a489c01fa2a1",
+      "track_title": "Pandanicide",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "119d7e60-04fb-4bec-9128-4bd6a8cafd0d",
+      "track_title": "Peyote",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "73036f45-f7db-4249-8f34-559d44b4eee6",
+      "track_title": "Salvia Divinorum",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "3eee1d51-2d78-4683-a5bf-f194c70ec98b",
+      "track_title": "Scopolamine",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "8283f1af-4770-4fb4-a226-37c2c620b665",
+      "track_title": "Silene Capensis",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "cd65ef7f-a228-42e9-9e2e-c7e2a8887099",
+      "track_title": "Sinicuichi",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "8e88da45-f870-42ce-a3c1-e7d3e1aaf937",
+      "track_title": "Tetrahydrocannabinol",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "6d7349f2-eac5-4c38-b856-94e2ce0c6691",
+      "track_title": "Tetrodotoxin",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "00c2891b-272d-4717-ab2c-0dde48b18bee",
+      "track_title": "Zanthoxylum Aborescens",
+      "release_title": "Venus Flytrap",
+      "release_year": "2012",
+      "writers_before_count": 1,
+      "writers_before_names": "UNKNOWN — see _meta.recovery_status",
+      "writers_before_source": "likely genius",
+      "writers_after_count": 0,
+      "writers_after": [],
+      "error_after": "No work in MB; no credits on Discogs; Genius skipped (budget)",
+      "created_at_original": "2026-06-19T05:54:51.132896+00:00",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    }
+  ],
+  "upgraded": [
+    {
+      "id": "a6b5575d-1ceb-456e-8b65-0b8873fd0448",
+      "track_title": "Bloody Mary",
+      "release_title": "Judgement Day, Volume 3: Ascending",
+      "release_year": "2006",
+      "writers_before_count": 1,
+      "writers_after_count": 2,
+      "writers_after": [
+        {
+          "name": "Esham A. Smith",
+          "source": "discogs"
+        },
+        {
+          "name": "The Unholy (4)",
+          "source": "discogs"
+        }
+      ],
+      "delta": "gained co-writer The Unholy (4) from Discogs multi-candidate scan",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "31804dc7-22f2-424e-a14e-bf949b9a25c7",
+      "track_title": "Deathwish",
+      "release_title": "Judgement Day, Volume 3: Ascending",
+      "release_year": "2006",
+      "writers_before_count": 1,
+      "writers_after_count": 2,
+      "writers_after": [
+        {
+          "name": "Esham A. Smith",
+          "source": "discogs"
+        },
+        {
+          "name": "The Unholy (4)",
+          "source": "discogs"
+        }
+      ],
+      "delta": "gained co-writer The Unholy (4) from Discogs multi-candidate scan",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "ae694084-cca8-4864-856f-231de9fe55ab",
+      "track_title": "Fucked Up in the Head",
+      "release_title": "Judgement Day, Volume 3: Ascending",
+      "release_year": "2006",
+      "writers_before_count": 1,
+      "writers_after_count": 2,
+      "writers_after": [
+        {
+          "name": "Esham A. Smith",
+          "source": "discogs"
+        },
+        {
+          "name": "The Unholy (4)",
+          "source": "discogs"
+        }
+      ],
+      "delta": "gained co-writer The Unholy (4) from Discogs multi-candidate scan",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "e7c4d446-79ab-47c2-aace-408b96efdabd",
+      "track_title": "Hold on Tight",
+      "release_title": "Judgement Day, Volume 3: Ascending",
+      "release_year": "2006",
+      "writers_before_count": 1,
+      "writers_after_count": 2,
+      "writers_after": [
+        {
+          "name": "Esham A. Smith",
+          "source": "discogs"
+        },
+        {
+          "name": "The Unholy (4)",
+          "source": "discogs"
+        }
+      ],
+      "delta": "gained co-writer The Unholy (4) from Discogs multi-candidate scan",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "2b3882e6-4fa6-48e9-b32b-0c64c9d190b2",
+      "track_title": "Jokers Wild",
+      "release_title": "Judgement Day, Volume 3: Ascending",
+      "release_year": "2006",
+      "writers_before_count": 1,
+      "writers_after_count": 2,
+      "writers_after": [
+        {
+          "name": "Esham A. Smith",
+          "source": "discogs"
+        },
+        {
+          "name": "The Unholy (4)",
+          "source": "discogs"
+        }
+      ],
+      "delta": "gained co-writer The Unholy (4) from Discogs multi-candidate scan",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "4364a6bb-964c-4cc1-a476-2ba45ae11e2f",
+      "track_title": "Just Another Pretty Face",
+      "release_title": "Judgement Day, Volume 3: Ascending",
+      "release_year": "2006",
+      "writers_before_count": 1,
+      "writers_after_count": 2,
+      "writers_after": [
+        {
+          "name": "Esham A. Smith",
+          "source": "discogs"
+        },
+        {
+          "name": "The Unholy (4)",
+          "source": "discogs"
+        }
+      ],
+      "delta": "gained co-writer The Unholy (4) from Discogs multi-candidate scan",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "12aebfb5-ed87-4092-b69b-1f5f52cc0799",
+      "track_title": "Nice with my Hands",
+      "release_title": "Judgement Day, Volume 3: Ascending",
+      "release_year": "2006",
+      "writers_before_count": 1,
+      "writers_after_count": 2,
+      "writers_after": [
+        {
+          "name": "Esham A. Smith",
+          "source": "discogs"
+        },
+        {
+          "name": "The Unholy (4)",
+          "source": "discogs"
+        }
+      ],
+      "delta": "gained co-writer The Unholy (4) from Discogs multi-candidate scan",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "7c4e4d4b-4e8a-4085-b218-e085d4eb84fe",
+      "track_title": "Preacherz Daughter",
+      "release_title": "Judgement Day, Volume 3: Ascending",
+      "release_year": "2006",
+      "writers_before_count": 1,
+      "writers_after_count": 2,
+      "writers_after": [
+        {
+          "name": "Esham A. Smith",
+          "source": "discogs"
+        },
+        {
+          "name": "The Unholy (4)",
+          "source": "discogs"
+        }
+      ],
+      "delta": "gained co-writer The Unholy (4) from Discogs multi-candidate scan",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "410c4189-1a67-4309-8dc4-59029ac66f1c",
+      "track_title": "Suck My Dick",
+      "release_title": "Judgement Day, Volume 3: Ascending",
+      "release_year": "2006",
+      "writers_before_count": 1,
+      "writers_after_count": 2,
+      "writers_after": [
+        {
+          "name": "Esham A. Smith",
+          "source": "discogs"
+        },
+        {
+          "name": "The Unholy (4)",
+          "source": "discogs"
+        }
+      ],
+      "delta": "gained co-writer The Unholy (4) from Discogs multi-candidate scan",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    },
+    {
+      "id": "3ba45abb-905e-45d0-a075-58e16d3806d2",
+      "track_title": "Would U Die 4 Me",
+      "release_title": "Judgement Day, Volume 3: Ascending",
+      "release_year": "2006",
+      "writers_before_count": 1,
+      "writers_after_count": 2,
+      "writers_after": [
+        {
+          "name": "Esham A. Smith",
+          "source": "discogs"
+        },
+        {
+          "name": "The Unholy (4)",
+          "source": "discogs"
+        }
+      ],
+      "delta": "gained co-writer The Unholy (4) from Discogs multi-candidate scan",
+      "overwritten_at": "2026-07-08T19:22:45.454783+00:00"
+    }
+  ]
+}
