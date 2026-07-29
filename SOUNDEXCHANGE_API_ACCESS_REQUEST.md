@@ -27,20 +27,19 @@ not confirmed about that API's contract, so the eventual integration
 
 ## Ready-to-send email draft
 
-Fill in the bracketed placeholders before sending. Everything else is ready
-as-is.
+Ready to send as-is.
 
 ```
 To: repertoire@soundexchange.com
-From: [Your Name] <[your-email@musigod.com]>
+From: Naim Salaam <swordfishlp44@proton.me>
 Subject: API access request — Repertoire Search (recording/ISRC matching)
 
 Hi SoundExchange Repertoire team,
 
-My name is [Your Name], [Your Title] at MusiGod (musigod.com). We're a
-publishing administrator for independent artists — artists retain 100% of
-their rights; we handle PRO registration, catalog administration, and
-royalty recovery on their behalf.
+My name is Naim Salaam, Managing Director at MusiGod Royalties, LLC
+(musigod.com). We're a publishing administrator for independent artists —
+artists retain 100% of their rights; we handle PRO registration, catalog
+administration, and royalty recovery on their behalf.
 
 I'd like to request API access to your Repertoire Search API for
 recording/ISRC matching, per your team's guidance that integration access
@@ -97,10 +96,10 @@ detail on our security practices if useful.
 Thanks for your time — happy to hop on a call if that's easier than email.
 
 Best,
-[Your Name]
-[Your Title]
-MusiGod
-[your-email@musigod.com]
+Naim Salaam
+Managing Director
+MusiGod Royalties, LLC
+swordfishlp44@proton.me
 ```
 
 ## What we are asking for (internal notes)
