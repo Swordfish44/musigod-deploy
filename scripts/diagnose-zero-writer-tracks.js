@@ -8,11 +8,18 @@
 //   [1] Identifies the 8 zero-writer tracks with full detail
 //   [2] Checks all stored enrichment job results for prior writer data
 //   [3] Calls Genius API (read-only) with fuzzy/normalized title matching,
-//       exact artist validation, album corroboration, confidence scoring
+//       exact artist validation, album corroboration, confidence scoring.
+//       Distinguishes FOUND_WITH_WRITERS / FOUND_UNCREDITED / NOT_FOUND.
 //   [4] Explains and quantifies the graph-sync gap (31 links vs 196 tracks)
-//   [5] Reports: auto-resolvable / needs-manual-research / unresolvable
+//   [5] Reports: auto-resolvable / confirmed-uncredited / needs-manual-research
 //
-// Requires:
+// Exported utilities (safe to require without a real key — main() is guarded):
+//   classifyGeniusResult(result)  → 'FOUND_WITH_WRITERS'|'FOUND_UNCREDITED'|'NOT_FOUND'
+//   normTitle(s)                  → lowercase, non-alnum stripped
+//   collapseRepeats(s)            → collapse consecutive repeated chars
+//   titleVariants(title)          → [normTitle, collapseRepeats(normTitle)] deduplicated
+//
+// Requires at runtime:
 //   SUPABASE_SERVICE_KEY — for catalog queries
 //   GENIUS_ACCESS_TOKEN  — optional; Genius dry-run is skipped if absent
 //
@@ -36,17 +43,10 @@ const SB_KEY       = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SE
 const GENIUS_TOKEN = process.env.GENIUS_ACCESS_TOKEN || '';
 const HAS_GENIUS   = !!GENIUS_TOKEN;
 
-if (!SB_KEY) {
-  console.error('FAIL: SUPABASE_SERVICE_KEY not found.');
-  console.error('  Add to .env.local: SUPABASE_SERVICE_KEY=sb_secret_...');
-  process.exit(1);
-}
-
-const IS_JWT = SB_KEY.startsWith('eyJ');
-
+// IS_JWT evaluated lazily inside hdr() so a missing key at require-time is safe.
 function hdr(extra = {}) {
   const h = { apikey: SB_KEY, Accept: 'application/json', 'Content-Type': 'application/json', ...extra };
-  if (IS_JWT) h.Authorization = `Bearer ${SB_KEY}`;
+  if (SB_KEY && SB_KEY.startsWith('eyJ')) h.Authorization = `Bearer ${SB_KEY}`;
   return h;
 }
 
@@ -94,16 +94,17 @@ function parseCSV(text) {
   });
 }
 
-// ── Genius fuzzy-search helpers ───────────────────────────────────────────────
+// ── Genius fuzzy-search helpers (exported) ────────────────────────────────────
 
 // Strip non-alphanumeric and lowercase.
 const normTitle = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-// Collapse consecutive repeated characters: "skkkk" → "sk", "ll" → "l".
-// This makes "helterskkkellter" and "hellterskkkelter" both reduce to
-// "helterskelter", catching intentional misspelling variants in artist names.
+// Collapse consecutive repeated characters.
+// "helterskkkellter" → "helterskelter"
+// "hellterskkkelter" → "helterskelter"  (same result — catches spelling variants)
 const collapseRepeats = s => s.replace(/(.)\1+/g, '$1');
 
+// Returns up to two unique normalized forms for a title.
 function titleVariants(title) {
   const n = normTitle(title);
   const c = collapseRepeats(n);
@@ -112,6 +113,18 @@ function titleVariants(title) {
 
 function confidenceRank(c) {
   return { EXACT: 3, NORMALIZED: 2, SUBSTRING: 1 }[c] || 0;
+}
+
+// Classify a result from searchGeniusFuzzy into one of three states:
+//   FOUND_WITH_WRITERS  — song found AND writer_artists contained at least one name
+//   FOUND_UNCREDITED    — song found BUT writer_artists was empty on the Genius page
+//   NOT_FOUND           — no song matched (found=false or null/undefined)
+//
+// A Genius page with writer_artists:[] is FOUND_UNCREDITED, never NOT_FOUND.
+// This prevents the false-negative that treats "found but uncredited" as absent.
+function classifyGeniusResult(result) {
+  if (!result || !result.found) return 'NOT_FOUND';
+  return (result.writers && result.writers.length > 0) ? 'FOUND_WITH_WRITERS' : 'FOUND_UNCREDITED';
 }
 
 async function geniusGet(path) {
@@ -125,24 +138,22 @@ async function geniusGet(path) {
   return res.json();
 }
 
-// Search Genius with multiple title variants and return a scored match or null.
-// Never writes to any database. All calls are GET requests to the Genius API.
+// Search Genius with multiple title variants and return a classified result.
+// Never writes to any database. All calls are read-only GET requests.
 //
-// Returns:
-//   null — no validated match found
-//   { songId, writers, confidence, matchNote, geniusTitle, geniusArtist,
+// Returns one of:
+//   { found: false, geniusStatus: 'NOT_FOUND', topHits: [...] }
+//   { found: true,  geniusStatus: 'FOUND_WITH_WRITERS'|'FOUND_UNCREDITED',
+//     songId, writers, confidence, matchNote, geniusTitle, geniusArtist,
 //     geniusAlbum, geniusUrl, albumCorroborated, albumNote, searchQuery }
 //
-// confidence levels:
-//   EXACT      — norm(geniusTitle) === norm(trackTitle)
-//   NORMALIZED — collapsed-repeat forms match
-//   SUBSTRING  — one normalized form contains the other (≥5 chars)
+// confidence: 'EXACT' | 'NORMALIZED' | 'SUBSTRING'
 async function searchGeniusFuzzy(trackTitle, releaseTitle) {
   const ARTIST = 'Esham';
   const artistNorm = normTitle(ARTIST);
   const trackVariants = titleVariants(trackTitle);
 
-  // Queries tried in order — first hit with valid artist+title wins.
+  // Queries tried in order — first validated match wins.
   const queries = [
     `${ARTIST} ${trackTitle}`,
     `${ARTIST} ${collapseRepeats(normTitle(trackTitle))}`,
@@ -150,8 +161,8 @@ async function searchGeniusFuzzy(trackTitle, releaseTitle) {
   if (releaseTitle) queries.push(`${ARTIST} ${releaseTitle}`);
 
   const tried = new Set();
-  let bestHit = null;    // { r (hit result), confidence, matchNote, query }
-  let allRawHits = [];   // for "not found" reporting
+  let bestHit = null;
+  let allRawHits = [];
 
   for (const q of queries) {
     if (tried.has(q)) continue;
@@ -160,7 +171,6 @@ async function searchGeniusFuzzy(trackTitle, releaseTitle) {
     const data = await geniusGet(`/search?q=${encodeURIComponent(q)}`);
     const hits = (data.response?.hits || []).filter(h => h.type === 'song');
 
-    // Collect for raw-hit reporting
     for (const h of hits) allRawHits.push({ ...h.result, _query: q });
 
     for (const h of hits) {
@@ -203,12 +213,12 @@ async function searchGeniusFuzzy(trackTitle, releaseTitle) {
   }
 
   if (!bestHit) {
-    // Surface top Esham hits for debugging
+    // Surface top Esham hits for debugging false negatives.
     const eshamHits = allRawHits.filter(r => normTitle(r.primary_artist?.name || '').includes('esham'));
-    return { found: false, topHits: eshamHits.slice(0, 3) };
+    return { found: false, geniusStatus: 'NOT_FOUND', topHits: eshamHits.slice(0, 3) };
   }
 
-  // Fetch full song detail for writers + album name
+  // Fetch full song detail for writers + album corroboration.
   const { r, confidence, matchNote, query } = bestHit;
   const detail = await geniusGet(`/songs/${r.id}`);
   const song = detail.response?.song || {};
@@ -230,7 +240,7 @@ async function searchGeniusFuzzy(trackTitle, releaseTitle) {
     ? `Genius album: "${geniusAlbum}"${albumCorroborated ? ' ✅ matches release' : ' ⚠️ differs from our release title'}`
     : 'no album listed on Genius';
 
-  return {
+  const result = {
     found: true,
     songId: r.id,
     writers,
@@ -244,15 +254,25 @@ async function searchGeniusFuzzy(trackTitle, releaseTitle) {
     albumNote,
     searchQuery: query,
   };
+  result.geniusStatus = classifyGeniusResult(result);
+  return result;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function main() {
+  if (!SB_KEY) {
+    console.error('FAIL: SUPABASE_SERVICE_KEY not found.');
+    console.error('  Add to .env.local: SUPABASE_SERVICE_KEY=sb_secret_...');
+    process.exit(1);
+  }
+
+  const isJwt = SB_KEY.startsWith('eyJ');
+
   console.log('');
   console.log('════ Esham Zero-Writer Track Diagnostic (read-only) ════');
   console.log(`Target:       ${SB_URL}`);
-  console.log(`Auth:         ${IS_JWT ? 'JWT' : 'opaque key'}`);
+  console.log(`Auth:         ${isJwt ? 'JWT' : 'opaque key'}`);
   console.log(`Genius:       ${HAS_GENIUS ? 'token present — fuzzy dry run active' : 'no token — Genius dry run skipped'}`);
   console.log(`Date:         ${new Date().toISOString()}`);
 
@@ -309,8 +329,8 @@ async function main() {
 
     const masterContent = full.result?.files?.master?.content;
     const bmiContent    = full.result?.files?.bmi?.content;
-
     let foundWriters = 0;
+
     if (masterContent) {
       const records = parseCSV(masterContent);
       for (const rec of records) {
@@ -350,7 +370,6 @@ async function main() {
   }
 
   console.log(`\n  Total prior-writer index: ${priorWritersByKey.size} tracks`);
-
   console.log('');
   console.log('  Match results against prior job CSVs:');
   const recoverable = [];
@@ -361,7 +380,7 @@ async function main() {
     const prior = priorWritersByKey.get(key);
     if (prior) {
       recoverable.push({ track: t, prior });
-      console.log(`  ✅ "${t.track_title}" — prior writers found in job ${prior.jobDate}: ${prior.writers.map(w => w.name).join(', ')}`);
+      console.log(`  ✅ "${t.track_title}" — prior writers found (${prior.jobDate}): ${prior.writers.map(w => w.name).join(', ')}`);
     } else {
       notInPrior.push(t);
       console.log(`  ❌ "${t.track_title}" — not in any prior job CSV`);
@@ -371,9 +390,9 @@ async function main() {
   // ── [3] Genius fuzzy dry run ──────────────────────────────────────────────
   console.log('');
   console.log('━━━ [3] Genius dry run — fuzzy/normalized title matching ━━━━━');
+  console.log('    States: FOUND_WITH_WRITERS / FOUND_UNCREDITED / NOT_FOUND');
   console.log('    Strategy: exact → collapsed-repeats → release-title fallback');
   console.log('    Artist guard: primary_artist must include "esham"');
-  console.log('    Album corroboration: Genius album vs our release_title');
   console.log('');
 
   if (!HAS_GENIUS) {
@@ -385,37 +404,40 @@ async function main() {
   const geniusResults = [];
 
   for (const t of zeroWriterRows) {
-    process.stdout.write(`  Querying: "${t.track_title}" (${t.release_title})…\n`);
-
+    console.log(`  "${t.track_title}" (${t.release_title})`);
     try {
       const result = await searchGeniusFuzzy(t.track_title, t.release_title);
 
-      if (result.found) {
+      if (result.geniusStatus === 'FOUND_WITH_WRITERS') {
         const confLabel = { EXACT: '✅ EXACT', NORMALIZED: '🔶 NORMALIZED', SUBSTRING: '🔷 SUBSTRING' }[result.confidence] || result.confidence;
-        console.log(`    ${confLabel} match — "${result.geniusTitle}" by ${result.geniusArtist}`);
-        if (result.matchNote) console.log(`    Match note:  ${result.matchNote}`);
+        console.log(`    Status:    FOUND_WITH_WRITERS (${confLabel})`);
+        if (result.matchNote) console.log(`    Match:     ${result.matchNote}`);
+        console.log(`    Writers:   ${result.writers.map(w => w.name).join(', ')}`);
         console.log(`    ${result.albumNote}`);
-        console.log(`    Writers:     ${result.writers.length ? result.writers.map(w => w.name).join(', ') : '(none listed on Genius)'}`);
-        console.log(`    Evidence:    ${result.geniusUrl}`);
-        if (!result.albumCorroborated && result.geniusAlbum) {
-          console.log(`    ⚠️  Album mismatch — verify this is the correct recording before applying`);
-        }
-        geniusResults.push({ track: t, ...result });
+        console.log(`    URL:       ${result.geniusUrl}`);
+      } else if (result.geniusStatus === 'FOUND_UNCREDITED') {
+        const confLabel = { EXACT: 'EXACT', NORMALIZED: 'NORMALIZED', SUBSTRING: 'SUBSTRING' }[result.confidence] || result.confidence;
+        console.log(`    Status:    FOUND_UNCREDITED (${confLabel} match)`);
+        console.log(`    Genius:    "${result.geniusTitle}" by ${result.geniusArtist}`);
+        if (result.matchNote) console.log(`    Match:     ${result.matchNote}`);
+        console.log(`    Writers:   (none listed on Genius page)`);
+        console.log(`    ${result.albumNote}`);
+        console.log(`    URL:       ${result.geniusUrl}`);
+        console.log(`    Note:      Song page confirmed; credits not populated on Genius`);
       } else {
-        console.log(`    ❌ Not found after all variants`);
+        console.log(`    Status:    NOT_FOUND`);
         if (result.topHits?.length) {
-          console.log(`    Top Esham hits returned by Genius (for manual review):`);
-          result.topHits.forEach(h => {
-            console.log(`      • "${h.title}" — ${h.url}`);
-          });
+          console.log(`    Top Esham hits from Genius (for manual review):`);
+          result.topHits.forEach(h => console.log(`      • "${h.title}" — ${h.url}`));
         } else {
           console.log(`    No Esham results returned by any search query`);
         }
-        geniusResults.push({ track: t, found: false });
       }
+
+      geniusResults.push({ track: t, ...result });
     } catch (err) {
-      console.log(`    ERROR — ${err.message.slice(0, 100)}`);
-      geniusResults.push({ track: t, found: false, error: err.message });
+      console.log(`    Status:    ERROR — ${err.message.slice(0, 100)}`);
+      geniusResults.push({ track: t, found: false, geniusStatus: 'NOT_FOUND', error: err.message });
     }
     console.log('');
   }
@@ -448,7 +470,6 @@ async function main() {
 
   const linkedByRole = {};
   for (const l of graphLinks) linkedByRole[l.node_role] = (linkedByRole[l.node_role] || 0) + 1;
-
   const linkedBy = {};
   for (const l of graphLinks) linkedBy[l.linked_by] = (linkedBy[l.linked_by] || 0) + 1;
 
@@ -463,75 +484,90 @@ async function main() {
   }
   if (Object.keys(linkedBy).length) {
     console.log('  Link breakdown by linked_by:');
-    for (const [by, n] of Object.entries(linkedBy)) console.log(`    ${by.padEnd(16)} ${n}`);
+    for (const [by, n] of Object.entries(linkedBy)) console.log(`    ${by.padEnd(24)} ${n}`);
   }
   console.log('');
   console.log('  Root cause: enrichment pipeline calls rpc_upsert_recording_enrichment()');
   console.log('  (→ graph.nodes + works.recordings) while graph_catalog_links_v1 requires');
   console.log('  fn_sync_track_to_graph() / fn_backfill_catalog_to_graph().');
-  console.log(`  Fix: SELECT fn_backfill_catalog_to_graph() in SQL Editor (idempotent).`);
+  console.log('  Fix: SELECT fn_backfill_catalog_to_graph() in SQL Editor (idempotent).');
 
   // ── [5] Resolution summary ────────────────────────────────────────────────
   console.log('');
   console.log('━━━ [5] Resolution plan — dry-run proposed changes ━━━━━━━━━━━');
   console.log('');
 
-  const autoFromPrior  = recoverable;
-  const geniusFound    = geniusResults.filter(g => g.found);
-  const geniusNotPrior = geniusFound.filter(g => !recoverable.some(r => r.track.id === g.track.id));
-  const needsManual    = zeroWriterRows.filter(t =>
-    !recoverable.some(r => r.track.id === t.id) &&
-    !geniusFound.some(g => g.track.id === t.id)
+  const autoFromPrior    = recoverable;
+  const withWriters      = geniusResults.filter(g => g.geniusStatus === 'FOUND_WITH_WRITERS' &&
+                             !autoFromPrior.some(r => r.track.id === g.track.id));
+  const uncredited       = geniusResults.filter(g => g.geniusStatus === 'FOUND_UNCREDITED');
+  const notFoundGenius   = geniusResults.filter(g => g.geniusStatus === 'NOT_FOUND');
+  const needsManual      = zeroWriterRows.filter(t =>
+    !autoFromPrior.some(r => r.track.id === t.id) &&
+    !withWriters.some(g => g.track.id === t.id)
   );
 
   if (autoFromPrior.length) {
-    console.log(`  ✅ AUTO-RESOLVABLE from prior enrichment CSV (${autoFromPrior.length} track(s)):`);
+    console.log(`  ✅ AUTO-RESOLVABLE from prior CSV (${autoFromPrior.length} track(s))`);
     for (const { track, prior } of autoFromPrior) {
-      const g = geniusFound.find(g => g.track.id === track.id);
-      console.log(`\n     "${track.track_title}" (${track.release_title})`);
-      console.log(`       ID:      ${track.id}`);
-      console.log(`       Writers: ${prior.writers.map(w => w.name).join(', ')}`);
-      if (g) {
-        const agree = g.writers.every(gw => prior.writers.some(pw =>
-          pw.name.toLowerCase() === gw.name.toLowerCase()
-        ));
-        console.log(`       Genius:  ${g.writers.map(w => w.name).join(', ')} [conf: ${g.confidence}]${agree ? ' ✅ agrees' : ' ⚠️ DIFFERS — review'}`);
-        console.log(`       URL:     ${g.geniusUrl}`);
+      const g = geniusResults.find(g => g.track.id === track.id);
+      console.log(`\n     "${track.track_title}" — ${prior.writers.map(w => w.name).join(', ')}`);
+      if (g?.geniusStatus === 'FOUND_WITH_WRITERS') {
+        const agree = g.writers.every(gw => prior.writers.some(pw => pw.name.toLowerCase() === gw.name.toLowerCase()));
+        console.log(`     Genius: ${g.writers.map(w => w.name).join(', ')} [${g.confidence}]${agree ? ' ✅ agrees' : ' ⚠️ DIFFERS'}`);
+        console.log(`     URL:    ${g.geniusUrl}`);
       }
     }
     console.log('');
   }
 
-  if (geniusNotPrior.length) {
-    console.log(`  🎵 AUTO-RESOLVABLE from Genius only (${geniusNotPrior.length} track(s)):`);
-    for (const g of geniusNotPrior) {
+  if (withWriters.length) {
+    console.log(`  🎵 AUTO-RESOLVABLE from Genius (${withWriters.length} track(s))`);
+    for (const g of withWriters) {
       console.log(`\n     "${g.track.track_title}" (${g.track.release_title})`);
-      console.log(`       ID:         ${g.track.id}`);
-      console.log(`       Confidence: ${g.confidence}${g.matchNote ? ' — ' + g.matchNote : ''}`);
-      console.log(`       Writers:    ${g.writers.length ? g.writers.map(w => w.name).join(', ') : '(none listed)'}`);
-      console.log(`       ${g.albumNote}`);
-      console.log(`       URL:        ${g.geniusUrl}`);
-      if (!g.albumCorroborated) {
-        console.log(`       ⚠️  Album not corroborated — manual verification required before applying`);
+      console.log(`     ID:         ${g.track.id}`);
+      console.log(`     Confidence: ${g.confidence}${g.matchNote ? ' — ' + g.matchNote : ''}`);
+      console.log(`     Writers:    ${g.writers.map(w => w.name).join(', ')}`);
+      console.log(`     ${g.albumNote}`);
+      console.log(`     URL:        ${g.geniusUrl}`);
+      if (!g.albumCorroborated) console.log(`     ⚠️  Album not corroborated — verify before applying`);
+    }
+    console.log('');
+  }
+
+  if (uncredited.length) {
+    console.log(`  🔵 FOUND_UNCREDITED on Genius — page confirmed, no writers populated (${uncredited.length} track(s))`);
+    for (const g of uncredited) {
+      console.log(`\n     "${g.track.track_title}" (${g.track.release_title})`);
+      console.log(`     ID:         ${g.track.id}`);
+      console.log(`     Confidence: ${g.confidence}`);
+      console.log(`     Genius:     "${g.geniusTitle}" — ${g.geniusUrl}`);
+      console.log(`     ${g.albumNote}`);
+      console.log(`     Next step:  BMI/ASCAP search by ISRC; Discogs; then lib/overrides.js`);
+    }
+    console.log('');
+  }
+
+  if (notFoundGenius.length && HAS_GENIUS) {
+    console.log(`  ❌ NOT_FOUND on Genius (${notFoundGenius.length} track(s))`);
+    for (const g of notFoundGenius) {
+      const t = g.track;
+      console.log(`\n     "${t.track_title}" (${t.release_title})`);
+      console.log(`     ID: ${t.id}   MBID: ${t.recording_mbid || 'none'}   ISRCs: ${(t.isrcs || []).join(', ') || 'none'}`);
+      if (g.topHits?.length) {
+        console.log(`     Closest Genius hits:`);
+        g.topHits.forEach(h => console.log(`       • "${h.title}" — ${h.url}`));
       }
     }
     console.log('');
   }
 
   if (needsManual.length) {
-    console.log(`  ⚠️  NEEDS MANUAL RESEARCH (${needsManual.length} track(s)):`);
-    for (const t of needsManual) {
-      console.log(`\n     "${t.track_title}" (${t.release_title})`);
-      console.log(`       ID:    ${t.id}`);
-      console.log(`       MBID:  ${t.recording_mbid || 'none'}`);
-      console.log(`       ISRCs: ${(t.isrcs || []).join(', ') || 'none'}`);
-    }
-    console.log('');
-    console.log('     Manual research paths:');
-    console.log('     1. MusicBrainz: look up recording by MBID; check linked work + writer-rels');
-    console.log('     2. Discogs: search artist + release title for credits');
-    console.log('     3. BMI/ASCAP public repertoire search by ISRC or title');
-    console.log('     4. lib/overrides.js: add confirmed credits manually');
+    console.log('  Manual research paths for all unresolved tracks:');
+    console.log('    1. MusicBrainz: look up by MBID for linked work + writer-rels');
+    console.log('    2. Discogs: search artist + release title for credits');
+    console.log('    3. BMI/ASCAP public repertoire search by ISRC or title');
+    console.log('    4. lib/overrides.js: add confirmed credits manually');
   }
 
   // ── Summary ───────────────────────────────────────────────────────────────
@@ -539,25 +575,19 @@ async function main() {
   console.log('─────────────────────────────────────────────────────────────');
   console.log(`Zero-writer tracks:             ${zeroWriterRows.length}`);
   console.log(`Auto-resolvable (prior CSV):    ${autoFromPrior.length}`);
-  console.log(`Auto-resolvable (Genius):       ${geniusNotPrior.length}`);
-  const exactCount      = geniusFound.filter(g => g.confidence === 'EXACT').length;
-  const normalizedCount = geniusFound.filter(g => g.confidence === 'NORMALIZED').length;
-  const substringCount  = geniusFound.filter(g => g.confidence === 'SUBSTRING').length;
-  if (geniusFound.length) {
-    console.log(`  Genius confidence breakdown:`);
-    if (exactCount)      console.log(`    EXACT:      ${exactCount}`);
-    if (normalizedCount) console.log(`    NORMALIZED: ${normalizedCount}`);
-    if (substringCount)  console.log(`    SUBSTRING:  ${substringCount}`);
-  }
-  console.log(`Needs manual research:          ${needsManual.length}`);
+  console.log(`Auto-resolvable (Genius):       ${withWriters.length}`);
+  console.log(`Found on Genius, uncredited:    ${uncredited.length}  ← confirmed pages, no writers populated`);
+  console.log(`Not found on Genius:            ${notFoundGenius.length}`);
   console.log(`Graph link gap:                 ${gap} of ${totalTracks} tracks unlinked`);
   console.log('');
   console.log('Zero DB writes made. All Genius calls were read-only API searches.');
-  console.log('To apply proposed changes: add confirmed credits to lib/overrides.js');
-  console.log('(for Genius results, verify album corroboration first).');
 }
 
-main().catch(err => {
-  console.error('Uncaught error:', err.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch(err => {
+    console.error('Uncaught error:', err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { classifyGeniusResult, normTitle, collapseRepeats, titleVariants };

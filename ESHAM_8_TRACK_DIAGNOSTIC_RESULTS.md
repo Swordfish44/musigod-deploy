@@ -6,7 +6,8 @@
 **Test suite:** 421/421 passed (all 8 test files)  
 **Supabase project:** `uykzkrnoetcldeuxzqyy`  
 **Genius dry run v1 (exact only):** 2026-07-29 — 8/8 false negatives (see note below)  
-**Genius dry run v2 (fuzzy+corroboration):** 2026-07-29 — 5/8 confirmed present; 3/8 genuinely absent
+**Genius dry run v2 (fuzzy+corroboration):** 2026-07-29 — 5/8 FOUND_UNCREDITED; 3/8 NOT_FOUND  
+**Genius dry run v3 (classified states):** 2026-07-29 — FOUND_UNCREDITED=5, NOT_FOUND=3, FOUND_WITH_WRITERS=0
 
 ---
 
@@ -28,8 +29,9 @@ matches but with zero writers credited on their Genius pages.
 | Tracks with writer data | 188 |
 | Tracks without writer data | **8** |
 | Auto-resolvable from prior enrichment CSVs | 0 |
-| Confirmed present on Genius (EXACT match) | **5** — but 0 writers listed on Genius |
-| Genuinely absent from Genius by title | **3** |
+| FOUND_UNCREDITED on Genius (page confirmed, no writers) | **5** |
+| NOT_FOUND on Genius (not indexed by title) | **3** |
+| FOUND_WITH_WRITERS on Genius | **0** |
 | Requires manual PRO/Discogs research | **8** |
 
 ---
@@ -41,15 +43,20 @@ The original `lib/genius.js` `getGeniusWriters()` returns `[]` when
 writer list as "not found." All 5 found tracks return `writer_artists: []` on
 Genius — Genius has the song page but has not populated writer credits.
 
-The corrected v2 diagnostic separates two distinct states:
+The v3 diagnostic introduces three explicit states enforced by `classifyGeniusResult()`:
 
-| State | Meaning |
-|-------|---------|
-| Song found, writers listed | Resolvable from Genius |
-| Song found, **no writers listed** | Genius page exists; credits not yet populated there |
-| Song not found | Not indexed on Genius at all |
+| `geniusStatus` | Meaning |
+|----------------|---------|
+| `FOUND_WITH_WRITERS` | Song found AND `writer_artists` non-empty — directly resolvable |
+| `FOUND_UNCREDITED` | Song found BUT `writer_artists: []` — page confirmed, credits not populated |
+| `NOT_FOUND` | No song matched any search query |
 
-All 8 tracks fall into the bottom two categories.
+A result with `found=true, writers=[]` is `FOUND_UNCREDITED`, never `NOT_FOUND`.
+This is enforced in `classifyGeniusResult()` and covered by regression tests in
+`tests/genius-search-classify.test.js` (32 assertions, 32 passed).
+
+All 8 tracks fall into `FOUND_UNCREDITED` (5) or `NOT_FOUND` (3).
+`FOUND_WITH_WRITERS` = 0 — no Genius page for any of the 8 has writer credits populated.
 
 ---
 
@@ -67,7 +74,7 @@ All 8 tracks fall into the bottom two categories.
 | **Enrichment source** | (none — never enriched) |
 | **Pipeline error** | No work in MB; no credits on Discogs or Genius |
 | **Prior CSV match** | Not found in any of 10 DONE enrichment jobs |
-| **Genius v2 result** | EXACT match confirmed — no writers listed on Genius page |
+| **Genius status** | `FOUND_UNCREDITED` — EXACT title match, no writers on Genius page |
 | **Genius evidence URL** | https://genius.com/Esham-as-i-rock-n-roll-lyrics |
 | **Genius album** | "Bootleg" (From The Lost Vault) Vol. 1 — same release, different title format |
 
@@ -90,7 +97,7 @@ All 8 tracks fall into the bottom two categories.
 | **Enrichment source** | (none — never enriched) |
 | **Pipeline error** | No work in MB; no credits on Discogs or Genius |
 | **Prior CSV match** | Not found in any of 10 DONE enrichment jobs |
-| **Genius v2 result** | EXACT match confirmed — no writers listed on Genius page |
+| **Genius status** | `FOUND_UNCREDITED` — EXACT title match, no writers on Genius page |
 | **Genius evidence URL** | https://genius.com/Esham-monkey-mix-lyrics |
 | **Genius album** | "Bootleg" (From The Lost Vault) Vol. 1 — same release, different title format |
 
@@ -114,7 +121,7 @@ All 8 tracks fall into the bottom two categories.
 | **Enrichment source** | (none — never enriched) |
 | **Pipeline error** | No work in MB; no credits on Discogs or Genius |
 | **Prior CSV match** | Not found in any of 10 DONE enrichment jobs |
-| **Genius v2 result** | EXACT match confirmed — no writers listed on Genius page |
+| **Genius status** | `FOUND_UNCREDITED` — EXACT title match, no writers on Genius page |
 | **Genius evidence URL** | https://genius.com/Esham-price-on-ya-head-lyrics |
 | **Genius album** | "Bootleg" (From The Lost Vault) Vol. 1 — same release, different title format |
 
@@ -137,7 +144,7 @@ All 8 tracks fall into the bottom two categories.
 | **Enrichment source** | (none — never enriched) |
 | **Pipeline error** | No work in MB; no credits on Discogs or Genius |
 | **Prior CSV match** | Not found in any of 10 DONE enrichment jobs |
-| **Genius v2 result** | EXACT match confirmed — no writers listed on Genius page |
+| **Genius status** | `FOUND_UNCREDITED` — EXACT title match, no writers on Genius page |
 | **Genius evidence URL** | https://genius.com/Esham-suffer-the-consequences-lyrics |
 | **Genius album** | "Bootleg" (From The Lost Vault) Vol. 1 — same release, different title format |
 
@@ -160,7 +167,7 @@ All 8 tracks fall into the bottom two categories.
 | **Enrichment source** | (none — never enriched) |
 | **Pipeline error** | No work in MB; no credits on Discogs or Genius |
 | **Prior CSV match** | Not found in any of 10 DONE enrichment jobs |
-| **Genius v2 result** | EXACT match confirmed — no writers listed on Genius page |
+| **Genius status** | `FOUND_UNCREDITED` — EXACT title match, no writers on Genius page |
 | **Genius evidence URL** | https://genius.com/Esham-helterskkkellter-lyrics |
 | **Genius album** | No album listed on the Genius song page |
 
@@ -190,7 +197,7 @@ returning "not found" was a false negative caused by the `writer_artists: []`
 | **Enrichment source** | (none — never enriched) |
 | **Pipeline error** | No work in MB; no credits on Discogs or Genius |
 | **Prior CSV match** | Not found in any of 10 DONE enrichment jobs |
-| **Genius v2 result** | Not found by title; closest Genius hit: `"? (Mail Dominance Track 16)"` |
+| **Genius status** | `NOT_FOUND` — not indexed by title; closest hit: `"? (Mail Dominance Track 16)"` |
 | **Genius hint URL** | https://genius.com/Esham-mail-dominance-track-16-lyrics |
 
 **Note:** Likely a cover of "California Dreamin'" by The Mamas & The Papas
@@ -217,7 +224,7 @@ or ISRC lookup, then enter original writers via `lib/overrides.js`.
 | **Enrichment source** | (none — never enriched) |
 | **Pipeline error** | No work in MB; no credits on Discogs or Genius |
 | **Prior CSV match** | Not found in any of 10 DONE enrichment jobs |
-| **Genius v2 result** | Not found by title; closest Genius hit: `"? (Mail Dominance Track 16)"` |
+| **Genius status** | `NOT_FOUND` — not indexed by title; closest hit: `"? (Mail Dominance Track 16)"` |
 | **Genius hint URL** | https://genius.com/Esham-mail-dominance-track-16-lyrics |
 
 **Recommended research queries:**
@@ -240,7 +247,7 @@ or ISRC lookup, then enter original writers via `lib/overrides.js`.
 | **Enrichment source** | (none — never enriched) |
 | **Pipeline error** | No work in MB; no credits on Discogs or Genius |
 | **Prior CSV match** | Not found in any of 10 DONE enrichment jobs |
-| **Genius v2 result** | Not found by title; closest Genius hit: `"? (Mail Dominance Track 16)"` |
+| **Genius status** | `NOT_FOUND` — not indexed by title; closest hit: `"? (Mail Dominance Track 16)"` |
 | **Genius hint URL** | https://genius.com/Esham-mail-dominance-track-16-lyrics |
 
 **Recommended research queries:**
@@ -259,13 +266,26 @@ lookup per release could unblock multiple tracks at once.
 
 | Release | Year | Tracks in this set | Genius status |
 |---------|------|-------------------|---------------|
-| Bootleg: From the Lost Vault, Volume 1 | 2000 | 4 (tracks 1–4) | All 4 present on Genius, 0 writers listed |
-| Helterskkkelter | 1993 | 1 (track 5) | Present on Genius, 0 writers listed |
-| Mail Dominance | 1999 | 3 (tracks 6–8) | Absent by title; listed as "?" on album page |
+| Bootleg: From the Lost Vault, Volume 1 | 2000 | 4 (tracks 1–4) | `FOUND_UNCREDITED` — 4 pages confirmed, 0 writers |
+| Helterskkkelter | 1993 | 1 (track 5) | `FOUND_UNCREDITED` — page confirmed, 0 writers |
+| Mail Dominance | 1999 | 3 (tracks 6–8) | `NOT_FOUND` — unlisted as "?" on album page |
 
 ---
 
-## Genius v2 Dry-Run Detail (2026-07-29)
+## Genius v3 Dry-Run Detail (2026-07-29)
+
+### Classification logic
+
+`classifyGeniusResult(result)` in `scripts/diagnose-zero-writer-tracks.js`:
+
+```
+found=false or null  →  NOT_FOUND
+found=true, writers.length > 0  →  FOUND_WITH_WRITERS
+found=true, writers.length === 0  →  FOUND_UNCREDITED   ← never NOT_FOUND
+```
+
+Regression tests in `tests/genius-search-classify.test.js` cover all three
+states across 32 assertions (32 passed).
 
 ### Matching strategy
 
@@ -275,28 +295,29 @@ lookup per release could unblock multiple tracks at once.
 3. **Substring** — one normalized form contains the other (≥5 chars)
 4. **Artist guard** — `primary_artist.name` must normalize to include `"esham"`
 5. **Album corroboration** — Genius `album.name` vs our `release_title` (normalized + collapsed)
-6. **Raw-hit surfacing** — when no match found, top Esham hits from all queries are shown
+6. **Raw-hit surfacing** — when `NOT_FOUND`, top Esham hits from all queries are shown
 
 ### Per-track results
 
-| Track | Genius title found | Confidence | Writers on Genius | Album corroborated |
-|-------|-------------------|------------|-------------------|-------------------|
-| As I Rock-N-Roll | "As I Rock-N-Roll" | EXACT | 0 | ⚠️ title format differs (same release) |
-| Monkey Mix | "Monkey Mix" | EXACT | 0 | ⚠️ title format differs (same release) |
-| Price on Ya Head | "Price On Ya Head" | EXACT | 0 | ⚠️ title format differs (same release) |
-| Suffer the Consequences | "Suffer the Consequences" | EXACT | 0 | ⚠️ title format differs (same release) |
-| Helterskkkellter | "Helterskkkellter" | EXACT | 0 | No album on Genius page |
-| California Dreamin | — | not found | — | — |
-| Ozonelayer | — | not found | — | — |
-| Youknowucan'tride | — | not found | — | — |
+| Track | Genius title | Confidence | `geniusStatus` | Writers on Genius |
+|-------|-------------|------------|----------------|-------------------|
+| As I Rock-N-Roll | "As I Rock-N-Roll" | EXACT | `FOUND_UNCREDITED` | 0 |
+| Monkey Mix | "Monkey Mix" | EXACT | `FOUND_UNCREDITED` | 0 |
+| Price on Ya Head | "Price On Ya Head" | EXACT | `FOUND_UNCREDITED` | 0 |
+| Suffer the Consequences | "Suffer the Consequences" | EXACT | `FOUND_UNCREDITED` | 0 |
+| Helterskkkellter | "Helterskkkellter" | EXACT | `FOUND_UNCREDITED` | 0 |
+| California Dreamin | — | — | `NOT_FOUND` | — |
+| Ozonelayer | — | — | `NOT_FOUND` | — |
+| Youknowucan'tride | — | — | `NOT_FOUND` | — |
 
 ### Album title format difference — not a real mismatch
 
 For all four *Bootleg: From the Lost Vault, Volume 1* tracks, Genius lists the
 album as `"Bootleg" (From The Lost Vault) Vol. 1`. This is the same release with
 punctuation/capitalization differences. The corroboration algorithm flags it
-because normalized string comparison does not match `bootlegfromthelostvaultvolume1`
-vs `bootlegfromthelostvault1`. A human reviewer can confirm these are the same release.
+as a mismatch because the normalized strings differ
+(`bootlegfromthelostvaultvolume1` vs `bootlegfromthelostvault1`). A human
+reviewer can confirm these are the same release.
 
 ### Zero DB writes
 
