@@ -25,10 +25,85 @@ not confirmed about that API's contract, so the eventual integration
   SoundExchange account — which MusiGod does not have and will not attempt
   to access programmatically or by scraping.
 
-## What we are asking for
+## Ready-to-send email draft
 
-Email to: `repertoire@soundexchange.com`
+Fill in the bracketed placeholders before sending. Everything else is ready
+as-is.
+
+```
+To: repertoire@soundexchange.com
+From: [Your Name] <[your-email@musigod.com]>
 Subject: API access request — Repertoire Search (recording/ISRC matching)
+
+Hi SoundExchange Repertoire team,
+
+My name is [Your Name], [Your Title] at MusiGod (musigod.com). We're a
+publishing administrator for independent artists — artists retain 100% of
+their rights; we handle PRO registration, catalog administration, and
+royalty recovery on their behalf.
+
+I'd like to request API access to your Repertoire Search API for
+recording/ISRC matching, per your team's guidance that integration access
+goes through this address.
+
+Our use case: as part of our artist rights-audit workflow, we check whether
+an artist's recordings are registered in SoundExchange's repertoire for
+digital performance royalties (webcasting, satellite radio, etc.), so we
+can point unregistered artists to register directly with SoundExchange.
+We are not a CMO, PRO, or collection agent for SoundExchange-administered
+royalties, and we are not looking to access or move any funds — we want to
+confirm registration status by ISRC or artist+title match only.
+
+Specifically, we'd like access to:
+1. ISRC lookup — given one or more ISRCs, whether each is present in your
+   repertoire (and, for a confirmed match, the recording/artist metadata
+   you're willing to expose).
+2. Recording lookup by artist name + title — matching repertoire entries so
+   we can confirm an exact match or confirm no match.
+
+To be clear about what we're NOT requesting: no royalty balance, statement,
+payment, claim, or adjustment data for any account, and no endpoint that
+requires a SoundExchange member's own login credentials. This is
+registration-status lookup only.
+
+A few questions that would help us build this correctly on our end:
+
+1. What is the base URL and endpoint path for the Repertoire Search API?
+2. What authentication scheme do you use (API key header, OAuth, mTLS)?
+3. What are the request parameter names for ISRC lookup vs. artist+title
+   lookup?
+4. What does a response look like — envelope shape and field names for
+   ISRC, title, artist, and match/registration status?
+5. What rate limits apply, and how are rate-limit responses signaled?
+6. Is there a sandbox/test environment, or does all access hit production
+   data?
+7. Are there terms of use or data-handling restrictions on results (e.g.,
+   can we display "registered" / "not found" to our own artists; any
+   restriction on retention)?
+8. Separately — is there any authorized path to account-level royalty data
+   (balances, statements, claims, adjustments) for artists who've
+   explicitly designated MusiGod as their agent? We currently handle that
+   via each artist's own CSV/XLSX exports and would only build an
+   integration for it if SoundExchange offers one directly.
+9. Who should we work with for credential issuance once terms are agreed,
+   and is there an application or agreement we need to sign first?
+
+On our side: credentials would be stored only in encrypted environment
+variables (never in source control or logs), all requests would be
+server-side only, and the integration stays off by default until we've
+validated the real contract against a test credential. Happy to share more
+detail on our security practices if useful.
+
+Thanks for your time — happy to hop on a call if that's easier than email.
+
+Best,
+[Your Name]
+[Your Title]
+MusiGod
+[your-email@musigod.com]
+```
+
+## What we are asking for (internal notes)
 
 ### Our use case
 
