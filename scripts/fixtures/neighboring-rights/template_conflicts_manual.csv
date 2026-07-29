@@ -1,0 +1,2 @@
+isrc,title,conflict_type,conflict_description,claimant_a,claimant_a_share_pct,claimant_b,claimant_b_share_pct,territory,resolution,resolution_date,resolved_by,evidence_ref
+USASN0802524,Example Track Title,OWNERSHIP_CONFLICT,Two parties both claim 100% ownership in US,Claimant A Name,100,Claimant B Name,100,US,PENDING,,,[AGREEMENT-REF or N/A]

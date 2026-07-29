@@ -1,0 +1,3 @@
+performer_name,role,isrc,title,album_title,artist_name,performer_ipi,performer_isni,featured,effective_from,effective_to,evidence_ref
+Performer Full Name,featured_performer,USASN0802524,Example Track Title,Album Title,Artist Name,000000000000,0000000000000000,true,2008-01-01,,CONTRACT-001
+Session Musician Name,non_featured_performer,USASN0802524,Example Track Title,Album Title,Artist Name,,,false,2008-01-01,,SESSION-AGREEMENT-001

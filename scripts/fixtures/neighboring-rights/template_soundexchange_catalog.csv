@@ -1,0 +1,3 @@
+isrc,title,artist_name,album_title,release_year,duration_seconds,label,performer_name,rightsholder_name,rightsholder_share_pct,territory,catalog_number
+USASN0802524,Example Track Title,Artist Name,Album Title,2008,245,Label Name,Performer Full Name,Rightsholder Legal Name,100,US,CAT-001
+US-XYZ-99-12345,Second Example Track,Artist Name,Album Title,1999,180,Label Name,Performer Full Name,Rightsholder Legal Name,100,US,CAT-002
