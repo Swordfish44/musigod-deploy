@@ -18,6 +18,8 @@
 
 ---
 
+**[DRAFT v0.1 — ATTORNEY REVIEW REQUIRED]**
+
 ## Your Privacy at MusiGod
 
 MusiGod respects your privacy. This notice explains what information we collect when you use the MusiGod Artist Rights Intake system, how we use it, who we share it with, and what rights you have.
