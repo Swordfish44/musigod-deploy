@@ -3,7 +3,8 @@ const { syncArtistToGraph } = require('./graph-sync')
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
-const N8N_REGISTERED_WEBHOOK_URL = process.env.N8N_REGISTERED_WEBHOOK_URL || 'https://musigod-n8n.onrender.com/webhook/artist-registered'
+const N8N_REGISTERED_WEBHOOK_URL = process.env.N8N_REGISTERED_WEBHOOK_URL   // required — no hardcoded fallback
+const N8N_WEBHOOK_SECRET          = process.env.N8N_WEBHOOK_SECRET
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const OPS_EMAIL = process.env.OPS_EMAIL || process.env.VA_EMAIL || 'support@musigod.com'
 const FROM_EMAIL = process.env.FROM_EMAIL || 'MusiGod <support@musigod.com>'
@@ -168,10 +169,15 @@ async function sbFetch(path, schema, options = {}) {
 }
 
 async function notifyN8n(artistId, registrationId, payload) {
-  if (!N8N_REGISTERED_WEBHOOK_URL) return
+  if (!N8N_REGISTERED_WEBHOOK_URL) {
+    console.warn('N8N_REGISTERED_WEBHOOK_URL not configured — skipping registration webhook')
+    return
+  }
+  const headers = { 'Content-Type': 'application/json' }
+  if (N8N_WEBHOOK_SECRET) headers['x-webhook-secret'] = N8N_WEBHOOK_SECRET
   await fetch(N8N_REGISTERED_WEBHOOK_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       artist_id: artistId,
       registration_id: registrationId,

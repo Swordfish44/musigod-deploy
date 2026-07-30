@@ -6,7 +6,8 @@ const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SER
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const OPS_EMAIL = process.env.OPS_EMAIL || process.env.VA_EMAIL || 'support@musigod.com'
 const FROM_EMAIL = process.env.FROM_EMAIL || 'MusiGod <noreply@musigod.com>'
-const RIGHTS_AUDIT_WEBHOOK_URL = process.env.RIGHTS_AUDIT_WEBHOOK_URL || 'https://musigod-n8n.onrender.com/webhook/rights-audit-started'
+const RIGHTS_AUDIT_WEBHOOK_URL = process.env.RIGHTS_AUDIT_WEBHOOK_URL   // required — no hardcoded fallback
+const N8N_WEBHOOK_SECRET       = process.env.N8N_WEBHOOK_SECRET
 
 module.exports = withSentry(async function handler(req, res) {
   const requestId = correlationId('rights_audit_start')
@@ -322,10 +323,15 @@ async function createAudit(payload) {
 }
 
 async function notifyN8n(audit) {
-  if (!RIGHTS_AUDIT_WEBHOOK_URL) return
+  if (!RIGHTS_AUDIT_WEBHOOK_URL) {
+    console.warn('RIGHTS_AUDIT_WEBHOOK_URL not configured — skipping rights audit webhook')
+    return
+  }
+  const headers = { 'Content-Type': 'application/json' }
+  if (N8N_WEBHOOK_SECRET) headers['x-webhook-secret'] = N8N_WEBHOOK_SECRET
   const response = await fetch(RIGHTS_AUDIT_WEBHOOK_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       event: 'rights_audit.started',
       audit_id: audit.audit_id,

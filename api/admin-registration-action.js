@@ -1,8 +1,10 @@
 const { captureException, withSentry } = require('./_sentry')
 
-const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
-const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
-const ADMIN_API_KEY = process.env.ADMIN_API_KEY
+const SB_URL         = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
+const SB_KEY         = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
+const ADMIN_API_KEY  = process.env.ADMIN_API_KEY
+const N8N_REGISTRATION_REJECTED_WEBHOOK_URL = process.env.N8N_REGISTRATION_REJECTED_WEBHOOK_URL   // required — no hardcoded fallback
+const N8N_WEBHOOK_SECRET = process.env.N8N_WEBHOOK_SECRET
 
 module.exports = withSentry(async function handler(req, res) {
   setCors(req, res)
@@ -65,9 +67,15 @@ async function createCommission(artistId) {
 }
 
 async function notifyReject(registrationId, artistId, reason) {
-  await fetch('https://musigod-n8n.onrender.com/webhook/registration-rejected', {
+  if (!N8N_REGISTRATION_REJECTED_WEBHOOK_URL) {
+    console.warn('N8N_REGISTRATION_REJECTED_WEBHOOK_URL not configured — skipping rejection webhook')
+    return
+  }
+  const headers = { 'Content-Type': 'application/json' }
+  if (N8N_WEBHOOK_SECRET) headers['x-webhook-secret'] = N8N_WEBHOOK_SECRET
+  await fetch(N8N_REGISTRATION_REJECTED_WEBHOOK_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ registration_id: registrationId, rejection_reason: reason, artist_id: artistId || null }),
   }).catch(err => console.warn('reject webhook skipped:', err.message))
 }
