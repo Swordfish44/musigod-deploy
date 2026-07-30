@@ -13,7 +13,8 @@
     "sentry:test": "node scripts/test-sentry-config.js",
     "db:migrate": "node scripts/db-migrate-local.js",
     "db:seed": "node scripts/db-seed-local.js",
-    "db:status": "node scripts/db-status-local.js"
+    "db:status": "node scripts/db-status-local.js",
+    "db:test:migrate": "node scripts/db-test-migrations.js"
   },
   "devDependencies": {
     "dotenv": "^17.4.2"
