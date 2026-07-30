@@ -53,7 +53,7 @@ The Automated Artist Rights Intake system is a software workflow that collects, 
 The intake system does the following:
 
 1. **Sends a structured invitation** to a prospective artist client.
-2. **Collects an identity and authority questionnaire** — legal name, stage name, aliases, performer role, business entities, PRO affiliations, SoundExchange membership status, and submission context (individual, entity, group, or authorized representative). Does **not** collect SSN, EIN, routing numbers, account numbers, passwords, or portal credentials.
+2. **Collects an identity and authority questionnaire** — legal name, stage name, aliases, performer role, business entities, PRO affiliations, SoundExchange membership status, and submission context (individual, entity, group, or authorized representative). Does **not** collect SSN, EIN, routing numbers, account numbers, payment card numbers, passwords, recovery codes, or portal credentials. (Nine field types are prohibited in code: `ssn`, `ein`, `tax_id`, `routing_number`, `account_number`, `card_number`, `password`, `recovery_code`, `portal_credential`. See `lib/artist-identity.js` → `PROHIBITED_FIELDS`.)
 3. **Presents and collects e-signatures** on the engagement agreement and a Limited Letter of Authorization, using a provider-neutral e-signature adapter. No paid vendor is currently activated; mock provider only.
 4. **Guides the artist through a document export process** via a guided checklist. The artist logs into their own SoundExchange Direct account, distributor portal, and any other relevant portals, exports their own data as files, and uploads those files to MusiGod through a secure upload interface. MusiGod does not log into any portal on the artist's behalf.
 5. **Validates and classifies uploaded documents** — file type, size, content hash, duplicate detection, sensitive-data scan (SSN/EIN/bank/password patterns), and document classification (provider, type, period, ISRC coverage).
@@ -135,7 +135,7 @@ Statement data: stays on CSV import path; never routes through SoundExchange API
 ### Document Access Controls
 
 - All documents stored in a private Supabase Storage bucket. Public access is disabled.
-- Documents are accessed only via short-lived signed URLs (5-minute expiry) generated server-side. Signed URLs are never included in email or API responses.
+- Documents are accessed only via short-lived signed URLs (5-minute expiry) generated server-side. Signed URLs are never included in email — `buildMessageRecord()` in `lib/intake-comms.js` throws an error if a `portalUrl` parameter contains a storage token or `/storage/v1/object` path (code-enforced). Excluding signed URLs from other API response bodies is a system design policy: the audit manifest explicitly omits `storage_path` from document entries, and vault records expose paths, not pre-signed URLs. There is no dedicated runtime response-layer check on arbitrary API routes; operator code discipline is required for those paths.
 - Each document record is bound to a specific `artist_id` and `engagement_id`. Cross-artist access is prevented at both the application and database (RLS) layers.
 - Every document access is appended to an audit log (`access_log`) on the vault record.
 - MusiGod operators can view queue metadata (document type, hash, status) without accessing document content directly.
