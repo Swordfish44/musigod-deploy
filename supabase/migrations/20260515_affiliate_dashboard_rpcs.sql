@@ -7,6 +7,12 @@
 -- Or: python run_migration.py (if SUPABASE_ACCESS_TOKEN is set)
 -- ============================================================
 
+-- Disable body validation for LANGUAGE sql functions that reference the
+-- affiliates schema. That schema is not tracked as a migration file (applied
+-- directly to production). Functions compile fine; body errors surface only
+-- at call time, and only in environments where affiliates schema is absent.
+SET check_function_bodies = OFF;
+
 -- List all affiliates (for dashboard affiliates table)
 CREATE OR REPLACE FUNCTION public.fn_list_affiliates()
 RETURNS JSON
@@ -37,3 +43,5 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.fn_list_affiliates() TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.fn_list_commissions(INT) TO anon, authenticated;
+
+SET check_function_bodies = ON;

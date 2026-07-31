@@ -3,9 +3,22 @@
 -- Run in Supabase SQL editor: Dashboard → SQL Editor → New query
 -- ============================================================
 
--- 1. Add ref_code column to artists_v1 (idempotent)
-ALTER TABLE artists.artists_v1
-  ADD COLUMN IF NOT EXISTS ref_code TEXT;
+-- Disable body validation: fn_get_commissions (LANGUAGE sql) references
+-- affiliates.commissions_v1 which is not a tracked migration.
+SET check_function_bodies = OFF;
+
+-- 1. Add ref_code column to artists_v1 (idempotent).
+-- Conditional: artists.artists_v1 is not a tracked migration so it may
+-- not exist in local dev environments.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'artists' AND table_name = 'artists_v1'
+  ) THEN
+    ALTER TABLE artists.artists_v1 ADD COLUMN IF NOT EXISTS ref_code TEXT;
+  END IF;
+END $$;
 
 -- 2. Proxy: INSERT a commission row (callable from REST via rpc/fn_create_commission)
 --    SECURITY DEFINER runs as owner (postgres), bypasses RLS on affiliates schema.
@@ -62,6 +75,8 @@ $$;
 -- 4. Grant execute to anon and authenticated roles
 GRANT EXECUTE ON FUNCTION public.fn_create_commission(TEXT, UUID, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.fn_get_commissions(UUID) TO anon, authenticated;
+
+SET check_function_bodies = ON;
 
 -- ============================================================
 -- COLUMN ASSUMPTIONS — if affiliates tables use different names,
