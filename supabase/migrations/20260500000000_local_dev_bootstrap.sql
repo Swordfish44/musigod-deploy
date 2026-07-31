@@ -15,10 +15,18 @@
 -- so a fresh local DB needs these stubs before those migrations can run.
 
 -- ── Non-public schemas ────────────────────────────────────────────────────────
+-- All schemas referenced by config.toml db_schemas or by tracked migrations.
+-- Created here because they were applied to production directly via SQL Editor
+-- and are not tracked as migration files (CLAUDE.md backlog item #1).
 
 CREATE SCHEMA IF NOT EXISTS registrations;
 CREATE SCHEMA IF NOT EXISTS catalog;
 CREATE SCHEMA IF NOT EXISTS works;
+CREATE SCHEMA IF NOT EXISTS graph;
+CREATE SCHEMA IF NOT EXISTS rights;
+CREATE SCHEMA IF NOT EXISTS royalties;
+CREATE SCHEMA IF NOT EXISTS disputes;
+CREATE SCHEMA IF NOT EXISTS legal;
 
 -- ── registrations.artists_v1 ─────────────────────────────────────────────────
 -- FK target for intake_workflows_v1.artist_id and intake_upload_tokens_v1.artist_id.
