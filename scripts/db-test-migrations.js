@@ -24,18 +24,30 @@ const { execSync, spawnSync } = require('child_process');
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const LOCAL_API_URL  = 'http://localhost:54321';
-
-// Standard Supabase local dev JWTs (deterministic for all local instances)
-const SERVICE_ROLE_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' +
-  'eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.' +
-  'EGIM96RAZx35lJzdJsyH-qQwv8Hj04zWl196z2-SBc0';
-const ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' +
-  'eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.' +
-  'CRFA0NiK7W9oQ972PkofZ3-Uo_uf1ApkkmhORQEL7DI';
-
 const SCHEMA = 'registrations';
+
+// Keys are read from the running local stack at startup (supabase status --output json)
+// because the CLI generates instance-specific JWT signatures, not the old demo defaults.
+let SERVICE_ROLE_KEY = '';
+let ANON_KEY = '';
+
+function loadLocalKeys() {
+  const r = spawnSync('supabase', ['status', '--output', 'json'], { encoding: 'utf8' });
+  if (r.status !== 0) {
+    console.error('\nError: supabase status failed — is the local stack running?');
+    console.error('Run: supabase start -x realtime,imgproxy,studio,logflare,edge-runtime,mailpit,vector,supavisor,storage-api,postgres-meta');
+    process.exit(1);
+  }
+  // Strip any non-JSON prefix (e.g. "Stopped services:" line)
+  const jsonStart = r.stdout.indexOf('{');
+  const parsed = JSON.parse(r.stdout.slice(jsonStart));
+  SERVICE_ROLE_KEY = parsed.SERVICE_ROLE_KEY;
+  ANON_KEY         = parsed.ANON_KEY;
+  if (!SERVICE_ROLE_KEY || !ANON_KEY) {
+    console.error('\nError: could not read SERVICE_ROLE_KEY / ANON_KEY from supabase status output.');
+    process.exit(1);
+  }
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -188,13 +200,14 @@ function supabaseReset() {
     CASCADE;
   `);
 
-  // 2. Reapply all 5 intake migrations — proves DDL is idempotent on a live schema.
+  // 2. Reapply all intake migrations — proves DDL is idempotent on a live schema.
   const migrations = [
     'supabase/migrations/20260730000000_intake_workflows_v1.sql',
     'supabase/migrations/20260730000001_intake_transitions_v1.sql',
     'supabase/migrations/20260730000002_intake_item_statuses_v1.sql',
     'supabase/migrations/20260730000003_intake_manifests_v1.sql',
     'supabase/migrations/20260730000004_intake_upload_tokens_v1.sql',
+    'supabase/migrations/20260730000005_intake_grants_v1.sql',
   ];
   for (const mig of migrations) {
     psqlExec(readFileSync(mig, 'utf8'));
@@ -203,7 +216,7 @@ function supabaseReset() {
   // 3. Re-seed Echo test data (all INSERTs are ON CONFLICT DO NOTHING).
   psqlExec(readFileSync('supabase/seed.sql', 'utf8'));
 
-  console.log('  Reset complete. Waiting 3s for PostgREST to reload...');
+  console.log('  Reset complete. Waiting 8s for PostgREST to finish schema reloads...');
 }
 
 // ── Test suites ───────────────────────────────────────────────────────────────
@@ -534,7 +547,7 @@ async function runCycle(label) {
   console.log('═'.repeat(60));
 
   supabaseReset();
-  await sleep(3000); // wait for PostgREST to reload schema after reset
+  await sleep(8000); // 5 migrations each NOTIFY pgrst — allow time for all reloads
 
   const beforePassed = passed;
   const beforeFailed = failed;
@@ -557,6 +570,7 @@ async function runCycle(label) {
   console.log('╚══════════════════════════════════════════════════════════╝');
 
   checkDocker();
+  loadLocalKeys();
 
   // Cycle 1: initial apply
   const cycle1Ok = await runCycle('Apply (first time)');
