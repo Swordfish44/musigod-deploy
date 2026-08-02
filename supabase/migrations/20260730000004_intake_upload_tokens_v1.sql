@@ -15,7 +15,7 @@
 --
 -- After applying: NOTIFY pgrst, 'reload schema'; is included below.
 
-CREATE TABLE registrations.intake_upload_tokens_v1 (
+CREATE TABLE IF NOT EXISTS registrations.intake_upload_tokens_v1 (
   id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
 
   -- Hashed token. Raw token is returned once to the issuer and never persisted.
@@ -46,11 +46,11 @@ CREATE TABLE registrations.intake_upload_tokens_v1 (
 );
 
 -- Fast lookup by hash (used on every token verification)
-CREATE UNIQUE INDEX intake_upload_tokens_hash_idx
+CREATE UNIQUE INDEX IF NOT EXISTS intake_upload_tokens_hash_idx
   ON registrations.intake_upload_tokens_v1 (token_hash);
 
 -- Partial index: active tokens per artist (for duplicate-issuance checks)
-CREATE INDEX intake_upload_tokens_active_artist_idx
+CREATE INDEX IF NOT EXISTS intake_upload_tokens_active_artist_idx
   ON registrations.intake_upload_tokens_v1 (artist_email, token_type, expires_at)
   WHERE revoked_at IS NULL AND used_at IS NULL;
 
@@ -71,6 +71,7 @@ COMMENT ON COLUMN registrations.intake_upload_tokens_v1.used_at IS
 
 ALTER TABLE registrations.intake_upload_tokens_v1 ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "service_role_all" ON registrations.intake_upload_tokens_v1;
 CREATE POLICY "service_role_all"
   ON registrations.intake_upload_tokens_v1
   TO service_role
