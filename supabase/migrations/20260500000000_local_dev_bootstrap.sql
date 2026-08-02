@@ -56,3 +56,16 @@ CREATE TABLE IF NOT EXISTS works.recordings (
   composition_node_id     UUID,
   updated_at              TIMESTAMPTZ DEFAULT now()
 );
+
+-- ── PostgREST schema cache timeout fix ───────────────────────────────────────
+-- The authenticator role ships with statement_timeout=8s. With 8 schemas in
+-- db-schemas (config.toml), PostgREST's schema introspection query takes ~3s
+-- normally but can exceed 8s during slow startup (e.g., after crash recovery).
+-- statement_timeout=0 means "no timeout" — safe because this query is internal
+-- and bounded by PostgREST's own reconnect logic.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticator') THEN
+    EXECUTE $r$ALTER ROLE authenticator SET statement_timeout = 0$r$;
+  END IF;
+END $$;

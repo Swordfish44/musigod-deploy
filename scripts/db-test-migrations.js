@@ -23,7 +23,7 @@ const { execSync, spawnSync } = require('child_process');
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const LOCAL_API_URL  = 'http://localhost:54321';
+const LOCAL_API_URL  = 'http://127.0.0.1:54321'; // Node.js 18+ resolves localhost→::1 on Windows; Docker only binds IPv4
 const SCHEMA = 'registrations';
 
 // Keys are read from the running local stack at startup (supabase status --output json)
@@ -32,13 +32,17 @@ let SERVICE_ROLE_KEY = '';
 let ANON_KEY = '';
 
 function loadLocalKeys() {
-  const r = spawnSync('supabase', ['status', '--output', 'json'], { encoding: 'utf8' });
-  if (r.status !== 0) {
+  console.log('  Reading local JWT keys from supabase status...');
+  const r = spawnSync('supabase', ['status', '--output', 'json'], {
+    encoding: 'utf8',
+    timeout: 90000,   // Windows Docker Desktop makes this slower than bash; 90s is safe
+  });
+  if (r.status !== 0 || r.error) {
     console.error('\nError: supabase status failed — is the local stack running?');
     console.error('Run: supabase start -x realtime,imgproxy,studio,logflare,edge-runtime,mailpit,vector,supavisor,storage-api,postgres-meta');
+    if (r.error) console.error(r.error.message);
     process.exit(1);
   }
-  // Strip any non-JSON prefix (e.g. "Stopped services:" line)
   const jsonStart = r.stdout.indexOf('{');
   const parsed = JSON.parse(r.stdout.slice(jsonStart));
   SERVICE_ROLE_KEY = parsed.SERVICE_ROLE_KEY;
@@ -47,6 +51,7 @@ function loadLocalKeys() {
     console.error('\nError: could not read SERVICE_ROLE_KEY / ANON_KEY from supabase status output.');
     process.exit(1);
   }
+  console.log('  Keys loaded.\n');
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -75,13 +80,30 @@ async function sbFetch(table, { method = 'GET', body, key = SERVICE_ROLE_KEY, pr
   };
   if (method !== 'GET' && method !== 'DELETE') headers['Content-Profile'] = SCHEMA;
   if (prefer) headers['Prefer'] = prefer;
-  const r = await fetch(`${LOCAL_API_URL}/rest/v1/${table}`, {
-    method, headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  let json = null;
-  try { json = await r.json(); } catch {}
-  return { status: r.status, json };
+
+  // Retry on transient connection resets (PostgREST still reloading schema).
+  const maxRetries = 5;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const r = await fetch(`${LOCAL_API_URL}/rest/v1/${table}`, {
+        method, headers,
+        body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(10000),
+      });
+      let json = null;
+      try { json = await r.json(); } catch {}
+      return { status: r.status, json };
+    } catch (err) {
+      const isRetryable = err.cause?.code === 'ECONNRESET' || err.cause?.code === 'ECONNREFUSED' || err.name === 'TimeoutError';
+      if (isRetryable && attempt < maxRetries) {
+        const delay = attempt * 2000;
+        process.stdout.write(`  [retry ${attempt}/${maxRetries - 1} after ${delay}ms: ${err.cause?.code || err.name}]...\n`);
+        await sleep(delay);
+      } else {
+        throw err;
+      }
+    }
+  }
 }
 
 async function sbRpc(fn, params, { key = SERVICE_ROLE_KEY } = {}) {
@@ -156,6 +178,43 @@ async function assertSelectCount(label, table, expectedMin) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// Poll PostgREST until it responds with a non-5xx status (or times out).
+// Needed because NOTIFY pgrst causes a full schema reload and briefly closes
+// active connections — a fixed sleep is too fragile.
+async function waitForPostgREST(maxWaitMs = 60000) {
+  process.stdout.write(`  Waiting for PostgREST to finish schema reload (up to ${maxWaitMs / 1000}s)`);
+  const start = Date.now();
+  let attempts = 0;
+  while (Date.now() - start < maxWaitMs) {
+    attempts++;
+    let status = null;
+    let errInfo = null;
+    try {
+      const r = await fetch(`${LOCAL_API_URL}/rest/v1/`, {
+        headers: { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` },
+        signal: AbortSignal.timeout(5000),
+      });
+      status = r.status;
+      if (status < 500) {
+        process.stdout.write(` ready (${Math.round((Date.now() - start) / 1000)}s, status=${status}).\n`);
+        return;
+      }
+    } catch (e) {
+      errInfo = e.cause?.code || e.name || e.message;
+    }
+    if (attempts <= 3 || attempts % 10 === 0) {
+      const elapsed = Math.round((Date.now() - start) / 1000);
+      process.stdout.write(`\n    [${elapsed}s] attempt ${attempts}: ${status !== null ? `HTTP ${status}` : `err=${errInfo}`}`);
+    } else {
+      process.stdout.write('.');
+    }
+    await sleep(3000);
+  }
+  process.stdout.write('\n');
+  console.error(`Error: PostgREST did not become ready within ${maxWaitMs / 1000}s — aborting.`);
+  process.exit(1);
+}
+
 // ── Preflight ─────────────────────────────────────────────────────────────────
 
 const DB_CONTAINER = 'supabase_db_musigod-deploy';
@@ -177,10 +236,27 @@ function psqlExec(sql) {
   const r = spawnSync(
     'docker',
     ['exec', '-i', DB_CONTAINER, 'psql', '-U', 'postgres', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1'],
-    { encoding: 'utf8', input: sql, stdio: ['pipe', 'inherit', 'inherit'] }
+    { encoding: 'utf8', input: sql, stdio: ['pipe', 'inherit', 'inherit'], timeout: 60000 }
   );
-  if (r.status !== 0) {
+  if (r.status !== 0 || r.error) {
     console.error('\nError: psql command failed (see above).');
+    if (r.error) console.error(r.error.message);
+    process.exit(1);
+  }
+}
+
+// Run SQL as supabase_admin (superuser) — needed for ALTER EVENT TRIGGER,
+// which requires ownership of the trigger (owned by supabase_admin, not postgres).
+function psqlExecAdmin(sql) {
+  const r = spawnSync(
+    'docker',
+    ['exec', '-e', 'PGPASSWORD=postgres', '-i', DB_CONTAINER,
+     'psql', '-U', 'supabase_admin', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1'],
+    { encoding: 'utf8', input: sql, stdio: ['pipe', 'inherit', 'inherit'], timeout: 60000 }
+  );
+  if (r.status !== 0 || r.error) {
+    console.error('\nError: psql (admin) command failed (see above).');
+    if (r.error) console.error(r.error.message);
     process.exit(1);
   }
 }
@@ -188,6 +264,10 @@ function psqlExec(sql) {
 function supabaseReset() {
   const { readFileSync } = require('fs');
   console.log('\n  Running: TRUNCATE intake tables + reapply migrations (idempotency) + seed...');
+
+  // Give PostgREST's schema cache query unlimited time — it needs to introspect 8
+  // schemas on each NOTIFY reload, which can exceed the default statement_timeout.
+  psqlExec(`ALTER ROLE authenticator SET statement_timeout = 0;`);
 
   // 1. Clear all intake tables — CASCADE handles FK dependencies automatically.
   psqlExec(`
@@ -201,6 +281,15 @@ function supabaseReset() {
   `);
 
   // 2. Reapply all intake migrations — proves DDL is idempotent on a live schema.
+  // Disable pgrst_ddl_watch / pgrst_drop_watch before applying: every CREATE TABLE,
+  // CREATE FUNCTION, CREATE TRIGGER, COMMENT, DROP TRIGGER fires a NOTIFY via these
+  // event triggers (~35 NOTIFYs for 6 migrations), causing a reload storm that trips
+  // Kong's circuit breaker. We send one explicit NOTIFY at the end instead.
+  psqlExecAdmin(`
+    ALTER EVENT TRIGGER pgrst_ddl_watch DISABLE;
+    ALTER EVENT TRIGGER pgrst_drop_watch DISABLE;
+  `);
+
   const migrations = [
     'supabase/migrations/20260730000000_intake_workflows_v1.sql',
     'supabase/migrations/20260730000001_intake_transitions_v1.sql',
@@ -210,13 +299,27 @@ function supabaseReset() {
     'supabase/migrations/20260730000005_intake_grants_v1.sql',
   ];
   for (const mig of migrations) {
-    psqlExec(readFileSync(mig, 'utf8'));
+    const name = require('path').basename(mig);
+    process.stdout.write(`  Applying ${name}...\n`);
+    const raw = readFileSync(mig, 'utf8');
+    const lines = raw.split(/\r?\n/);
+    const notifyCount = lines.filter(l => /^\s*NOTIFY\s+pgrst/i.test(l)).length;
+    if (notifyCount > 0) process.stdout.write(`    (stripped ${notifyCount} NOTIFY pgrst lines)\n`);
+    const sql = lines.filter(line => !/^\s*NOTIFY\s+pgrst/i.test(line)).join('\n');
+    psqlExec(sql);
   }
 
-  // 3. Re-seed Echo test data (all INSERTs are ON CONFLICT DO NOTHING).
+  // 3. Re-enable event triggers and seed.
+  psqlExecAdmin(`
+    ALTER EVENT TRIGGER pgrst_ddl_watch ENABLE;
+    ALTER EVENT TRIGGER pgrst_drop_watch ENABLE;
+  `);
   psqlExec(readFileSync('supabase/seed.sql', 'utf8'));
 
-  console.log('  Reset complete. Waiting 8s for PostgREST to finish schema reloads...');
+  // 4. Single consolidated reload — exactly 1 NOTIFY so PostgREST reloads once.
+  psqlExec(`NOTIFY pgrst, 'reload schema';`);
+
+  console.log('  Reset complete.');
 }
 
 // ── Test suites ───────────────────────────────────────────────────────────────
@@ -547,7 +650,7 @@ async function runCycle(label) {
   console.log('═'.repeat(60));
 
   supabaseReset();
-  await sleep(8000); // 5 migrations each NOTIFY pgrst — allow time for all reloads
+  await waitForPostgREST(180000);
 
   const beforePassed = passed;
   const beforeFailed = failed;
