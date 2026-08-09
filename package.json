@@ -6,7 +6,7 @@
     "csv-stringify": "^6.7.0"
   },
   "scripts": {
-    "test": "node tests/graph-rls.test.js && node tests/graph-sync-identity.test.js && node tests/graph-sync-enrichment-upsert.test.js && node tests/canary-assert.test.js && node tests/enrich-catalog-budget.test.js && node tests/registration-readiness.test.js && node tests/rpc-signature-alignment.test.js && node tests/writer-recovery-classify.test.js && node tests/genius-search-classify.test.js && node tests/neighboring-rights-audit.test.js && node tests/soundexchange-adapter.test.js && node tests/artist-intake.test.js && node tests/intake-tokens.test.js && node tests/integration/echo-sandbox.test.js",
+    "test": "node tests/graph-rls.test.js && node tests/graph-sync-identity.test.js && node tests/graph-sync-enrichment-upsert.test.js && node tests/canary-assert.test.js && node tests/enrich-catalog-budget.test.js && node tests/registration-readiness.test.js && node tests/rpc-signature-alignment.test.js && node tests/writer-recovery-classify.test.js && node tests/genius-search-classify.test.js && node tests/neighboring-rights-audit.test.js && node tests/soundexchange-adapter.test.js && node tests/artist-intake.test.js && node tests/intake-tokens.test.js && node tests/mb-ingestion.test.js && node tests/integration/echo-sandbox.test.js",
     "dns:check": "node scripts/check-dns-state.js",
     "dns:email": "node scripts/check-email-security.js",
     "dns:sync": "node scripts/check-vercel-cloudflare-sync.js",
@@ -16,7 +16,12 @@
     "db:status": "node scripts/db-status-local.js",
     "db:test:migrate": "node scripts/db-test-migrations.js",
     "sandbox": "node scripts/sandbox/echo-pilot.js",
-    "test:echo": "node tests/integration/echo-sandbox.test.js"
+    "test:echo": "node tests/integration/echo-sandbox.test.js",
+    "musicbrainz:import": "node scripts/mb-import.js",
+    "musicbrainz:import:all": "node scripts/mb-import.js --all",
+    "musicbrainz:import:artists": "node scripts/mb-import.js --artists",
+    "musicbrainz:resolve": "node scripts/mb-import.js --resolve",
+    "musicbrainz:dry-run": "node scripts/mb-import.js --all --dry-run"
   },
   "devDependencies": {
     "dotenv": "^17.4.2"
