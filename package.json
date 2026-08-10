@@ -3,7 +3,8 @@
   "dependencies": {
     "@sentry/browser": "^8.55.0",
     "@sentry/node": "^8.55.0",
-    "csv-stringify": "^6.7.0"
+    "csv-stringify": "^6.7.0",
+    "pg": "^8.23.0"
   },
   "scripts": {
     "test": "node tests/graph-rls.test.js && node tests/graph-sync-identity.test.js && node tests/graph-sync-enrichment-upsert.test.js && node tests/canary-assert.test.js && node tests/enrich-catalog-budget.test.js && node tests/registration-readiness.test.js && node tests/rpc-signature-alignment.test.js && node tests/writer-recovery-classify.test.js && node tests/genius-search-classify.test.js && node tests/neighboring-rights-audit.test.js && node tests/soundexchange-adapter.test.js && node tests/artist-intake.test.js && node tests/intake-tokens.test.js && node tests/mb-ingestion.test.js && node tests/integration/echo-sandbox.test.js",

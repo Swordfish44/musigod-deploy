@@ -38,8 +38,13 @@
 //
 // ENVIRONMENT
 // ───────────
-//   SUPABASE_URL (defaults to uykzkrnoetcldeuxzqyy.supabase.co)
-//   SUPABASE_SERVICE_ROLE_KEY  (required; never commit)
+//   MUSICBRAINZ_DATABASE_URL   (required) postgres:// connection for external corpus DB
+//   SUPABASE_URL               (defaults to uykzkrnoetcldeuxzqyy.supabase.co)
+//   SUPABASE_SERVICE_ROLE_KEY  (required) for entity_matches_v1 writes + loadEnrichedTracks
+//
+// Architecture:
+//   Corpus writes (artists, recordings, ISRCs, works, releases, …) → external PostgreSQL
+//   entity_matches_v1 (human-review boundary)                       → Supabase
 //
 // FIRST RUN (data source)
 // ───────────────────────
@@ -47,6 +52,8 @@
 //   The real initial import command is at the end of that file.
 
 require('dotenv').config();
+
+const { healthCheck: corpusHealthCheck, isConfigured: corpusIsConfigured } = require('../lib/mb-corpus-db');
 
 const {
   upsertArtists, upsertArtistAliases,
@@ -94,6 +101,7 @@ function parseArgs(argv) {
       case '--dump-file':     opts.dumpFile      = args[++i]; break;
       case '--artist-name':   opts.artistName    = args[++i]; break;
       case '--batch-size':    opts.batchSize     = parseInt(args[++i], 10) || 500; break;
+    case '--health-check':  opts.healthCheck   = true; break;
     }
   }
 
@@ -498,11 +506,12 @@ async function main() {
   const opts = parseArgs(process.argv);
 
   if (!opts.artists && !opts.recordings && !opts.works &&
-      !opts.releases && !opts.relationships && !opts.resolve && !opts.all) {
+      !opts.releases && !opts.relationships && !opts.resolve && !opts.all && !opts.healthCheck) {
     console.error([
       'Usage: node scripts/mb-import.js [entities] [flags]',
       '  Entities: --artists --recordings --works --releases --relationships --resolve --all',
       '  Flags:    --resume --dry-run --dump-file <path> --artist-name <name> --batch-size <N>',
+      '            --health-check',
     ].join('\n'));
     process.exit(1);
   }
@@ -510,6 +519,21 @@ async function main() {
   const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
   if (!SB_KEY) {
     console.error('[mb-import] SUPABASE_SERVICE_ROLE_KEY is required');
+    process.exit(1);
+  }
+
+  if (!corpusIsConfigured()) {
+    console.error('[mb-import] MUSICBRAINZ_DATABASE_URL is not set. Cannot reach corpus DB.');
+    process.exit(1);
+  }
+
+  const corpusOk = await corpusHealthCheck();
+  if (opts.healthCheck) {
+    console.log(corpusOk ? '[mb-import] Corpus DB: OK' : '[mb-import] Corpus DB: UNREACHABLE');
+    process.exit(corpusOk ? 0 : 1);
+  }
+  if (!corpusOk) {
+    console.error('[mb-import] MusicBrainz corpus DB is not reachable. Check MUSICBRAINZ_DATABASE_URL.');
     process.exit(1);
   }
 

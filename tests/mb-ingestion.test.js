@@ -3,7 +3,8 @@
 // MusicBrainz ingestion pipeline tests.
 //
 // All tests run without network access or a real database.
-// DB calls are intercepted via global.fetch mocks.
+// Corpus DB calls (external PostgreSQL) are intercepted via mock pool injection.
+// Supabase calls (entity_matches_v1) are intercepted via global.fetch mocks.
 // File I/O is tested with in-memory stream simulation.
 //
 // Tests:
@@ -22,11 +23,14 @@
 //   13. Recording vs work are never conflated — distinct entity types
 //   14. Repeated resolution is idempotent — same candidates re-upserted
 //   15. No candidates when staging tables are empty
-//   16. Batch chunking: 1200 rows → 3 batches of ≤500
-//   17. Checkpoint save/load (mock Supabase)
-//   18. Dry-run does not call fetch
+//   16. Batch chunking: 1200 rows → 3 corpus DB inserts of ≤500
+//   17. Checkpoint save/load (mock corpus DB)
+//   18. Dry-run does not call corpus DB or Supabase
 //   19. Provenance fields are set on all staging rows
-//   20. Artist without MBID generates no API calls
+//   20. Artist without MBID generates no corpus DB calls
+//   21. Corpus DB not configured → writer throws clear error
+//   22. Corpus DB outage → resolver degrades gracefully (empty candidates, no throw)
+//   23. healthCheck() returns false when corpus DB query throws
 
 let passed = 0;
 let failed = 0;
@@ -41,10 +45,42 @@ function assert(cond, label) {
 const { normalize, titleSimilarity } = require('../lib/mb-entity-resolver');
 const { parseLine, COLUMN_DEFS }     = require('../lib/mb-dump-parser');
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Mock helpers ──────────────────────────────────────────────────────────────
 
-function mockFetch(responses) {
-  return async (url) => {
+// Build a mock pg pool. responses: array of [sqlSubstring, rows[]]
+function makeMockPool(responses = []) {
+  return {
+    async query(sql, _params) {
+      for (const [pattern, rows] of responses) {
+        if (sql.includes(pattern)) return { rows };
+      }
+      return { rows: [] };
+    },
+    on() {},
+    async end() {},
+  };
+}
+
+// Build a mock pool that records every query call for inspection.
+function makeSpy(responses = []) {
+  const calls = [];
+  const pool = {
+    async query(sql, params) {
+      calls.push({ sql, params });
+      for (const [pattern, rows] of responses) {
+        if (sql.includes(pattern)) return { rows };
+      }
+      return { rows: [] };
+    },
+    on() {},
+    async end() {},
+  };
+  return { pool, calls };
+}
+
+// Fetch mock for Supabase entity_matches_v1 RPC calls.
+function mockSbFetch(responses = []) {
+  return async (url, opts) => {
     for (const [pattern, payload] of responses) {
       if (url.includes(pattern)) {
         return { ok: true, text: async () => JSON.stringify(payload) };
@@ -54,18 +90,24 @@ function mockFetch(responses) {
   };
 }
 
-function mockFetchFail(status, message) {
-  return async () => ({ ok: false, status, text: async () => JSON.stringify({ message }) });
+// ── Module loaders ────────────────────────────────────────────────────────────
+
+function loadFreshCorpusDb() {
+  delete require.cache[require.resolve('../lib/mb-corpus-db')];
+  return require('../lib/mb-corpus-db');
 }
 
 function loadFreshResolver() {
+  // Clear all three inter-dependent modules so the corpus-db singleton resets.
   delete require.cache[require.resolve('../lib/mb-entity-resolver')];
   delete require.cache[require.resolve('../lib/mb-staging-writer')];
+  delete require.cache[require.resolve('../lib/mb-corpus-db')];
   return require('../lib/mb-entity-resolver');
 }
 
 function loadFreshWriter() {
   delete require.cache[require.resolve('../lib/mb-staging-writer')];
+  delete require.cache[require.resolve('../lib/mb-corpus-db')];
   return require('../lib/mb-staging-writer');
 }
 
@@ -142,12 +184,12 @@ async function test7_isrc_exact_match() {
   console.log('\n[7] resolveTrack() ISRC exact match → confidence 1.0, method isrc_exact');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
-  const origFetch = global.fetch;
-  global.fetch = mockFetch([
-    ['fn_mb_lookup_isrc', [{ mb_recording_id: 'mb-rec-0007' }]],
-  ]);
-
   const { resolveTrack } = loadFreshResolver();
+  const corpusDb = require('../lib/mb-corpus-db');
+  corpusDb._setPool(makeMockPool([
+    ['isrcs_v1', [{ mb_recording_id: 'mb-rec-0007' }]],
+  ]));
+
   const candidates = await resolveTrack({
     id:          'track-0007',
     isrcs:       ['USABC1234567'],
@@ -155,8 +197,6 @@ async function test7_isrc_exact_match() {
     iswc:        null,
     track_title: 'Redrum',
   });
-
-  global.fetch = origFetch;
 
   const top = candidates[0];
   assert(top?.confidence        === 1.0,          `confidence = 1.0 (got ${top?.confidence})`);
@@ -172,13 +212,13 @@ async function test8_mbid_direct_match() {
   console.log('\n[8] resolveTrack() MBID direct match → confidence 1.0, method mbid_direct');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
-  const origFetch = global.fetch;
-  global.fetch = mockFetch([
-    ['fn_mb_lookup_isrc', []],
-    ['fn_mb_lookup_recording_mbid', [{ mb_recording_id: 'mb-rec-0008' }]],
-  ]);
-
   const { resolveTrack } = loadFreshResolver();
+  const corpusDb = require('../lib/mb-corpus-db');
+  // isrcs_v1 → [] (no ISRC match); recordings_v1 → MBID match
+  corpusDb._setPool(makeMockPool([
+    ['recordings_v1', [{ mb_recording_id: 'mb-rec-0008' }]],
+  ]));
+
   const candidates = await resolveTrack({
     id:             'track-0008',
     isrcs:          [],
@@ -186,8 +226,6 @@ async function test8_mbid_direct_match() {
     iswc:           null,
     track_title:    'Acid Rain',
   });
-
-  global.fetch = origFetch;
 
   const top = candidates[0];
   assert(top?.confidence   === 1.0,           `confidence = 1.0 (got ${top?.confidence})`);
@@ -201,14 +239,12 @@ async function test9_iswc_exact_match() {
   console.log('\n[9] resolveTrack() ISWC exact match → confidence 0.95, entity type work');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
-  const origFetch = global.fetch;
-  global.fetch = mockFetch([
-    ['fn_mb_lookup_isrc', []],
-    ['fn_mb_lookup_recording_mbid', []],
-    ['fn_mb_lookup_iswc', [{ mb_work_id: 'mb-work-0009' }]],
-  ]);
-
   const { resolveTrack } = loadFreshResolver();
+  const corpusDb = require('../lib/mb-corpus-db');
+  corpusDb._setPool(makeMockPool([
+    ['iswcs_v1', [{ mb_work_id: 'mb-work-0009' }]],
+  ]));
+
   const candidates = await resolveTrack({
     id:             'track-0009',
     isrcs:          [],
@@ -217,15 +253,11 @@ async function test9_iswc_exact_match() {
     track_title:    'Composition Nine',
   });
 
-  global.fetch = origFetch;
-
   const workCandidate = candidates.find(c => c.mb_entity_type === 'work');
   assert(workCandidate !== undefined,             'work candidate found');
   assert(workCandidate?.confidence    === 0.95,   `confidence = 0.95 (got ${workCandidate?.confidence})`);
   assert(workCandidate?.match_method  === 'iswc_exact', `method = iswc_exact (got "${workCandidate?.match_method}")`);
   assert(workCandidate?.mb_entity_id  === 'mb-work-0009', 'mb_entity_id correct');
-
-  // Crucially: the work candidate must NOT appear as a recording
   assert(workCandidate?.mb_entity_type !== 'recording', 'work is NOT confused with recording');
 }
 
@@ -235,12 +267,12 @@ async function test10_fuzzy_name_match() {
   console.log('\n[10] resolveTrack() fuzzy name match → confidence < 0.9, method name_fuzzy');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
-  const origFetch = global.fetch;
-  global.fetch = mockFetch([
-    ['fn_mb_search_recordings', [{ mb_recording_id: 'mb-rec-0010', title: 'Redrum', length_ms: '185000' }]],
-  ]);
-
   const { resolveTrack } = loadFreshResolver();
+  const corpusDb = require('../lib/mb-corpus-db');
+  corpusDb._setPool(makeMockPool([
+    ['recordings_v1', [{ mb_recording_id: 'mb-rec-0010', title: 'Redrum', length_ms: 185000 }]],
+  ]));
+
   const candidates = await resolveTrack({
     id:             'track-0010',
     isrcs:          [],
@@ -249,8 +281,6 @@ async function test10_fuzzy_name_match() {
     track_title:    'Redrum',
     track_duration: 185,
   });
-
-  global.fetch = origFetch;
 
   const top = candidates[0];
   assert(top !== undefined,                  'candidate found');
@@ -265,25 +295,22 @@ async function test11_duration_bonus() {
   console.log('\n[11] resolveTrack() duration bonus applied when within 2 seconds');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
-  const origFetch = global.fetch;
-
-  // Exact duration match
-  global.fetch = mockFetch([
-    ['fn_mb_search_recordings', [{ mb_recording_id: 'mb-rec-0011', title: 'Redrum', length_ms: '185000' }]],
-  ]);
   const { resolveTrack: r1 } = loadFreshResolver();
+  const db1 = require('../lib/mb-corpus-db');
+  db1._setPool(makeMockPool([
+    ['recordings_v1', [{ mb_recording_id: 'mb-rec-0011', title: 'Redrum', length_ms: 185000 }]],
+  ]));
   const withBonus = await r1({ id: 't1', isrcs: [], recording_mbid: null, iswc: null, track_title: 'Redrum', track_duration: 185 });
 
-  global.fetch = mockFetch([
-    ['fn_mb_search_recordings', [{ mb_recording_id: 'mb-rec-0011b', title: 'Redrum', length_ms: '250000' }]],
-  ]);
   const { resolveTrack: r2 } = loadFreshResolver();
+  const db2 = require('../lib/mb-corpus-db');
+  db2._setPool(makeMockPool([
+    ['recordings_v1', [{ mb_recording_id: 'mb-rec-0011b', title: 'Redrum', length_ms: 250000 }]],
+  ]));
   const noBonus = await r2({ id: 't2', isrcs: [], recording_mbid: null, iswc: null, track_title: 'Redrum', track_duration: 185 });
 
-  global.fetch = origFetch;
-
-  const bonusConf  = withBonus[0]?.confidence  || 0;
-  const nobonusConf = noBonus[0]?.confidence   || 0;
+  const bonusConf   = withBonus[0]?.confidence  || 0;
+  const nobonusConf = noBonus[0]?.confidence    || 0;
 
   assert(bonusConf > nobonusConf, `duration match increases confidence: ${bonusConf.toFixed(3)} > ${nobonusConf.toFixed(3)}`);
   assert(withBonus[0]?.match_signals?.duration_match === true, 'duration_match signal set');
@@ -295,16 +322,16 @@ async function test12_artist_name_collision() {
   console.log('\n[12] resolveTrack() artist name collision — two different MBIDs remain separate');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
-  const origFetch = global.fetch;
-  // Two recordings with same title but different MBIDs (different artists with same name)
-  global.fetch = mockFetch([
-    ['fn_mb_lookup_isrc', [
+  const { resolveTrack } = loadFreshResolver();
+  const corpusDb = require('../lib/mb-corpus-db');
+  // ISRC lookup returns two different recording MBIDs (collision).
+  corpusDb._setPool(makeMockPool([
+    ['isrcs_v1', [
       { mb_recording_id: 'mb-rec-collision-A' },
       { mb_recording_id: 'mb-rec-collision-B' },
     ]],
-  ]);
+  ]));
 
-  const { resolveTrack } = loadFreshResolver();
   const candidates = await resolveTrack({
     id:          'track-collision',
     isrcs:       ['USABC0000001', 'USABC0000002'],
@@ -313,14 +340,11 @@ async function test12_artist_name_collision() {
     track_title: 'Common Title',
   });
 
-  global.fetch = origFetch;
-
   const mbIds = candidates.map(c => c.mb_entity_id);
   assert(mbIds.includes('mb-rec-collision-A'), 'first MBID present');
   assert(mbIds.includes('mb-rec-collision-B'), 'second MBID present');
   assert(mbIds.length >= 2, `at least 2 distinct candidates (got ${mbIds.length})`);
 
-  // Both must be recordings, not works
   const nonRecordings = candidates.filter(c => c.mb_entity_type !== 'recording');
   assert(nonRecordings.length === 0, 'all collision candidates are recordings, not works');
 }
@@ -331,13 +355,13 @@ async function test13_recording_vs_work_not_conflated() {
   console.log('\n[13] recording and work entity types never conflated');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
-  const origFetch = global.fetch;
-  global.fetch = mockFetch([
-    ['fn_mb_lookup_isrc', [{ mb_recording_id: 'mb-rec-0013' }]],
-    ['fn_mb_lookup_iswc', [{ mb_work_id:      'mb-work-0013' }]],
-  ]);
-
   const { resolveTrack } = loadFreshResolver();
+  const corpusDb = require('../lib/mb-corpus-db');
+  corpusDb._setPool(makeMockPool([
+    ['isrcs_v1',  [{ mb_recording_id: 'mb-rec-0013' }]],
+    ['iswcs_v1',  [{ mb_work_id:      'mb-work-0013' }]],
+  ]));
+
   const candidates = await resolveTrack({
     id:          'track-0013',
     isrcs:       ['USREC0000013'],
@@ -345,8 +369,6 @@ async function test13_recording_vs_work_not_conflated() {
     iswc:        'T-000.000.013-0',
     track_title: 'Dual Match',
   });
-
-  global.fetch = origFetch;
 
   const recCands  = candidates.filter(c => c.mb_entity_type === 'recording');
   const workCands = candidates.filter(c => c.mb_entity_type === 'work');
@@ -367,22 +389,23 @@ async function test14_resolution_idempotent() {
   console.log('\n[14] Repeated resolution calls produce same candidates — upsert is idempotent');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
-  const calls = [];
+  const { resolveTrack, persistCandidates } = loadFreshResolver();
+  const corpusDb = require('../lib/mb-corpus-db');
+  corpusDb._setPool(makeMockPool([
+    ['isrcs_v1', [{ mb_recording_id: 'mb-rec-idem' }]],
+  ]));
+
+  const sbCalls = [];
   const origFetch = global.fetch;
   global.fetch = async (url, opts) => {
-    calls.push({ url, method: opts?.method || 'GET' });
-    if (url.includes('fn_mb_lookup_isrc')) {
-      return { ok: true, text: async () => JSON.stringify([{ mb_recording_id: 'mb-rec-idem' }]) };
-    }
+    sbCalls.push({ url, method: opts?.method || 'GET' });
     if (url.includes('fn_mb_upsert_entity_matches')) {
       return { ok: true, text: async () => JSON.stringify(null) };
     }
     return { ok: true, text: async () => JSON.stringify([]) };
   };
 
-  const { resolveTrack, persistCandidates } = loadFreshResolver();
   const track = { id: 'track-idem', isrcs: ['USIDEM000001'], recording_mbid: null, iswc: null, track_title: 'Idempotent' };
-
   const c1 = await resolveTrack(track);
   await persistCandidates(c1);
   const c2 = await resolveTrack(track);
@@ -394,7 +417,7 @@ async function test14_resolution_idempotent() {
   assert(c1[0]?.mb_entity_id === c2[0]?.mb_entity_id, 'same top candidate both runs');
   assert(c1[0]?.confidence   === c2[0]?.confidence,   'same confidence both runs');
 
-  const matchUpserts = calls.filter(c => c.url.includes('fn_mb_upsert_entity_matches'));
+  const matchUpserts = sbCalls.filter(c => c.url.includes('fn_mb_upsert_entity_matches'));
   assert(matchUpserts.length === 2, `entity_matches_v1 written twice (once per run, got ${matchUpserts.length})`);
 }
 
@@ -404,10 +427,10 @@ async function test15_no_candidates_when_staging_empty() {
   console.log('\n[15] resolveTrack() returns empty array when staging tables have no matching data');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
-  const origFetch = global.fetch;
-  global.fetch = mockFetch([]);  // all endpoints return []
-
   const { resolveTrack } = loadFreshResolver();
+  const corpusDb = require('../lib/mb-corpus-db');
+  corpusDb._setPool(makeMockPool([]));  // all queries return []
+
   const candidates = await resolveTrack({
     id:          'track-empty',
     isrcs:       ['USXXX9999999'],
@@ -416,8 +439,6 @@ async function test15_no_candidates_when_staging_empty() {
     track_title: 'Ghost Track',
   });
 
-  global.fetch = origFetch;
-
   assert(Array.isArray(candidates),   'returns array');
   assert(candidates.length === 0,     `empty array when no matches (got ${candidates.length})`);
 }
@@ -425,106 +446,121 @@ async function test15_no_candidates_when_staging_empty() {
 // ── Test 16: Batch chunking ───────────────────────────────────────────────────
 
 async function test16_batch_chunking() {
-  console.log('\n[16] upsertBatch() splits 1200 rows into batches of ≤500');
-
-  const calls = [];
-  const origFetch = global.fetch;
-  global.fetch = async (url, opts) => {
-    if (opts?.method === 'POST') {
-      const body = JSON.parse(opts.body);
-      calls.push(body.rows || body);
-    }
-    return { ok: true, text: async () => JSON.stringify(null) };
-  };
+  console.log('\n[16] upsertArtists() splits 1200 rows into 3 corpus DB insert calls');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
+  const { pool, calls } = makeSpy();
   const { upsertArtists } = loadFreshWriter();
+  const corpusDb = require('../lib/mb-corpus-db');
+  corpusDb._setPool(pool);
 
   const artists = Array.from({ length: 1200 }, (_, i) => ({
-    mb_artist_id: `mb-artist-${i}`,
-    name:         `Artist ${i}`,
+    mb_artist_id:    `mb-artist-${i}`,
+    name:            `Artist ${i}`,
     ingestion_source: 'dump',
-    provenance:   {},
-    ended:        false,
+    provenance:      {},
+    ended:           false,
   }));
 
   await upsertArtists(artists);
 
-  global.fetch = origFetch;
+  const insertCalls = calls.filter(c => c.sql.includes('artists_v1') && c.sql.includes('INSERT'));
+  // 1200 rows at BATCH_SIZE=500: 3 calls (500 + 500 + 200)
+  assert(insertCalls.length === 3, `3 insert calls for 1200 rows (got ${insertCalls.length})`);
 
-  // 1200 rows at 500/batch = 3 batches (500 + 500 + 200)
-  assert(calls.length === 3, `3 batches for 1200 rows (got ${calls.length})`);
-  assert(calls[0].length === 500, `batch 1: 500 rows (got ${calls[0].length})`);
-  assert(calls[1].length === 500, `batch 2: 500 rows (got ${calls[1].length})`);
-  assert(calls[2].length === 200, `batch 3: 200 rows (got ${calls[2].length})`);
+  // Each call's param count = rows_in_chunk × columns_per_artist (13 columns)
+  const COLS = 13;
+  assert(insertCalls[0].params.length === 500 * COLS, `batch 1: 500 rows (got ${insertCalls[0].params.length / COLS})`);
+  assert(insertCalls[1].params.length === 500 * COLS, `batch 2: 500 rows (got ${insertCalls[1].params.length / COLS})`);
+  assert(insertCalls[2].params.length === 200 * COLS, `batch 3: 200 rows (got ${insertCalls[2].params.length / COLS})`);
 }
 
 // ── Test 17: Checkpoint save/load ─────────────────────────────────────────────
 
 async function test17_checkpoint_save_load() {
   console.log('\n[17] checkpointProgress() saves state; getIngestionState() reads it back');
-
-  const storedStates = {};
-  const origFetch = global.fetch;
-  global.fetch = async (url, opts) => {
-    if (url.includes('fn_mb_save_ingestion_state')) {
-      const body = JSON.parse(opts.body);
-      const k = `${body.p_entity_type}:${body.p_import_mode}`;
-      storedStates[k] = body.p_data;
-      return { ok: true, text: async () => JSON.stringify(null) };
-    }
-    if (url.includes('fn_mb_get_ingestion_state')) {
-      const body = JSON.parse(opts.body);
-      const k = `${body.p_entity_type}:${body.p_import_mode}`;
-      return { ok: true, text: async () => JSON.stringify(storedStates[k] || null) };
-    }
-    return { ok: true, text: async () => JSON.stringify(null) };
-  };
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
+  const stateDb = {};
+
+  const pool = {
+    async query(sql, params) {
+      if (!sql.includes('ingestion_state_v1')) return { rows: [] };
+      const key = `${params[0]}:${params[1]}`;
+
+      if (/^\s*INSERT/i.test(sql) && sql.includes('DO NOTHING')) {
+        if (!stateDb[key]) stateDb[key] = { entity_type: params[0], import_mode: params[1] };
+        return { rows: [] };
+      }
+
+      if (/^\s*UPDATE/i.test(sql)) {
+        const setMatch = sql.match(/SET\s+([\s\S]+?)\s+WHERE/i);
+        if (setMatch) {
+          for (const clause of setMatch[1].split(',').map(s => s.trim())) {
+            const m = clause.match(/^(\w+)\s*=\s*\$(\d+)/);
+            if (m) {
+              const col = m[1];
+              const idx = parseInt(m[2], 10) - 1;
+              if (!stateDb[key]) stateDb[key] = {};
+              stateDb[key][col] = params[idx];
+            }
+          }
+        }
+        return { rows: [] };
+      }
+
+      if (/^\s*SELECT/i.test(sql)) {
+        return { rows: stateDb[key] ? [stateDb[key]] : [] };
+      }
+      return { rows: [] };
+    },
+    on() {},
+    async end() {},
+  };
+
   const { checkpointProgress, getIngestionState } = loadFreshWriter();
+  const corpusDb = require('../lib/mb-corpus-db');
+  corpusDb._setPool(pool);
 
   await checkpointProgress('recordings', 'dump', 50000, 'mb-rec-last', 50000, 3);
   const state = await getIngestionState('recordings', 'dump');
 
-  global.fetch = origFetch;
-
-  assert(state !== null,                      'state returned (not null)');
-  assert(state?.last_offset     === 50000,    `last_offset = 50000 (got ${state?.last_offset})`);
-  assert(state?.last_mb_id      === 'mb-rec-last', `last_mb_id preserved (got "${state?.last_mb_id}")`);
-  assert(state?.total_processed === 50000,    `total_processed = 50000 (got ${state?.total_processed})`);
-  assert(state?.total_errors    === 3,        `total_errors = 3 (got ${state?.total_errors})`);
+  assert(state !== null,                            'state returned (not null)');
+  assert(state?.last_offset     === 50000,          `last_offset = 50000 (got ${state?.last_offset})`);
+  assert(state?.last_mb_id      === 'mb-rec-last',  `last_mb_id preserved (got "${state?.last_mb_id}")`);
+  assert(state?.total_processed === 50000,          `total_processed = 50000 (got ${state?.total_processed})`);
+  assert(state?.total_errors    === 3,              `total_errors = 3 (got ${state?.total_errors})`);
 }
 
 // ── Test 18: Dry-run does not write ──────────────────────────────────────────
 
 async function test18_dry_run_no_writes() {
-  console.log('\n[18] upsertArtists() in dry-run mode makes no fetch calls');
-
-  const calls = [];
-  const origFetch = global.fetch;
-  global.fetch = async (url, opts) => {
-    calls.push({ url, method: opts?.method || 'GET' });
-    return { ok: true, text: async () => JSON.stringify(null) };
-  };
+  console.log('\n[18] upsertArtists() in dry-run mode makes no corpus DB calls');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
+  const { pool, calls } = makeSpy();
+  const origFetch = global.fetch;
+  const fetchCalls = [];
+  global.fetch = async (url, opts) => { fetchCalls.push(url); return { ok: true, text: async () => '[]' }; };
+
   const { upsertArtists } = loadFreshWriter();
+  const corpusDb = require('../lib/mb-corpus-db');
+  corpusDb._setPool(pool);
+
   await upsertArtists([
     { mb_artist_id: 'dry-run-artist', name: 'Dry Run Artist', ingestion_source: 'api', provenance: {}, ended: false },
-  ], true); // dryRun = true
+  ], true);  // dryRun = true
 
   global.fetch = origFetch;
 
-  assert(calls.length === 0, `no fetch calls in dry-run (got ${calls.length})`);
+  assert(calls.length    === 0, `no corpus DB calls in dry-run (got ${calls.length})`);
+  assert(fetchCalls.length === 0, `no Supabase fetch calls in dry-run (got ${fetchCalls.length})`);
 }
 
 // ── Test 19: Provenance fields ────────────────────────────────────────────────
 
 async function test19_provenance_fields() {
   console.log('\n[19] API-mode staging rows include provenance with source and data_license');
-  // We test this by constructing a staging row and checking its structure
-  // (no DB call needed — the shape is validated in-process)
 
   const row = {
     mb_artist_id:    'mb-prov-0019',
@@ -542,51 +578,114 @@ async function test19_provenance_fields() {
   assert(row.ingestion_source          === 'api',        'ingestion_source = api');
 }
 
-// ── Test 20: Artist without MBID ─────────────────────────────────────────────
+// ── Test 20: No calls for minimal track ──────────────────────────────────────
 
-async function test20_no_mbid_no_api_calls() {
-  console.log('\n[20] resolveTrack() with no ISRC, no MBID, no ISWC, short title → no API calls to staging');
-
-  const calls = [];
-  const origFetch = global.fetch;
-  global.fetch = async (url, opts) => {
-    calls.push(url);
-    return { ok: true, text: async () => JSON.stringify([]) };
-  };
+async function test20_no_calls_for_minimal_track() {
+  console.log('\n[20] resolveTrack() with no ISRC, no MBID, no ISWC, short title → no corpus DB calls');
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 
+  const { pool, calls } = makeSpy();
   const { resolveTrack } = loadFreshResolver();
+  const corpusDb = require('../lib/mb-corpus-db');
+  corpusDb._setPool(pool);
+
   const candidates = await resolveTrack({
     id:             'track-noid',
     isrcs:          [],
     recording_mbid: null,
     iswc:           null,
-    track_title:    'Hi',  // too short for trigram search (length < 3 after normalize)
+    track_title:    'Hi',  // too short for trigram: normalize('Hi')='hi', length=2 < 3
   });
 
-  global.fetch = origFetch;
-
-  // isrcs_v1 is not called (no ISRCs)
-  // recordings_v1 MBID lookup is skipped (no MBID)
-  // iswcs_v1 is skipped (no ISWC)
-  // title fuzzy: normalize('Hi') = 'hi', length = 2 < 3, so fuzzy skipped too
-  const isrcCalls    = calls.filter(u => u.includes('fn_mb_lookup_isrc'));
-  const mbidCalls    = calls.filter(u => u.includes('fn_mb_lookup_recording_mbid'));
-  const iswcCalls    = calls.filter(u => u.includes('fn_mb_lookup_iswc'));
-  const titleCalls   = calls.filter(u => u.includes('fn_mb_search_recordings'));
+  const isrcCalls  = calls.filter(c => c.sql.includes('isrcs_v1'));
+  const mbidCalls  = calls.filter(c => c.sql.includes('recordings_v1'));
+  const iswcCalls  = calls.filter(c => c.sql.includes('iswcs_v1'));
 
   assert(isrcCalls.length  === 0, `no isrcs_v1 calls (got ${isrcCalls.length})`);
-  assert(mbidCalls.length  === 0, `no MBID lookup calls (got ${mbidCalls.length})`);
+  assert(mbidCalls.length  === 0, `no recordings_v1 calls (got ${mbidCalls.length})`);
   assert(iswcCalls.length  === 0, `no iswcs_v1 calls (got ${iswcCalls.length})`);
-  assert(titleCalls.length === 0, `no title fuzzy calls for short title (got ${titleCalls.length})`);
   assert(candidates.length === 0, 'no candidates returned');
+}
+
+// ── Test 21: Corpus DB not configured → writer throws ────────────────────────
+
+async function test21_corpus_db_not_configured() {
+  console.log('\n[21] Corpus DB not configured → writer throws error mentioning MUSICBRAINZ_DATABASE_URL');
+
+  const saved = process.env.MUSICBRAINZ_DATABASE_URL;
+  delete process.env.MUSICBRAINZ_DATABASE_URL;
+
+  const { upsertArtists } = loadFreshWriter();
+  // Do NOT set a mock pool — let it fall through to getPool() which reads the env var.
+
+  let threw = false;
+  let errMsg = '';
+  try {
+    await upsertArtists([{ mb_artist_id: 'test', name: 'test', ingestion_source: 'api', provenance: {}, ended: false }]);
+  } catch (e) {
+    threw  = true;
+    errMsg = e.message;
+  }
+
+  if (saved !== undefined) process.env.MUSICBRAINZ_DATABASE_URL = saved;
+
+  assert(threw, 'throws when MUSICBRAINZ_DATABASE_URL is not set');
+  assert(errMsg.includes('MUSICBRAINZ_DATABASE_URL'), `error mentions env var (got: "${errMsg.slice(0, 80)}")`);
+}
+
+// ── Test 22: Corpus DB outage → resolver degrades gracefully ─────────────────
+
+async function test22_corpus_outage_graceful_degradation() {
+  console.log('\n[22] Corpus DB outage → resolveTrack() returns empty candidates without throwing');
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
+
+  const { resolveTrack } = loadFreshResolver();
+  const corpusDb = require('../lib/mb-corpus-db');
+  // Simulate DB outage: every query throws.
+  corpusDb._setPool({
+    async query() { throw new Error('connection refused'); },
+    on() {},
+  });
+
+  let threw = false;
+  let candidates;
+  try {
+    candidates = await resolveTrack({
+      id:          'track-outage',
+      isrcs:       ['USTEST123456'],
+      recording_mbid: null,
+      iswc:        null,
+      track_title: 'Connectivity Test',
+    });
+  } catch (e) {
+    threw = true;
+  }
+
+  assert(!threw,                    'resolveTrack does not throw when corpus DB is unavailable');
+  assert(Array.isArray(candidates), 'returns an array even on corpus failure');
+  assert(candidates.length === 0,   'empty candidates when corpus DB is down');
+}
+
+// ── Test 23: healthCheck returns false on error ───────────────────────────────
+
+async function test23_health_check_false_on_error() {
+  console.log('\n[23] healthCheck() returns false when corpus DB query throws');
+
+  const corpusDb = loadFreshCorpusDb();
+  corpusDb._setPool({
+    async query() { throw new Error('timeout'); },
+    on() {},
+  });
+
+  const healthy = await corpusDb.healthCheck();
+  assert(healthy === false, 'healthCheck returns false on DB error');
 }
 
 // ── Runner ────────────────────────────────────────────────────────────────────
 
 (async () => {
   console.log('=== mb-ingestion.test.js ===');
-  console.log('MusicBrainz ingestion pipeline — parser, resolver, writer, idempotency\n');
+  console.log('MusicBrainz ingestion pipeline — parser, resolver, writer, corpus DB, isolation\n');
 
   await test1_normalize();
   await test2_similarity_identical();
@@ -607,7 +706,10 @@ async function test20_no_mbid_no_api_calls() {
   await test17_checkpoint_save_load();
   await test18_dry_run_no_writes();
   await test19_provenance_fields();
-  await test20_no_mbid_no_api_calls();
+  await test20_no_calls_for_minimal_track();
+  await test21_corpus_db_not_configured();
+  await test22_corpus_outage_graceful_degradation();
+  await test23_health_check_false_on_error();
 
   console.log(`\n${'─'.repeat(50)}`);
   const total = passed + failed;
