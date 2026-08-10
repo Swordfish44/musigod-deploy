@@ -144,7 +144,7 @@ async function test7_isrc_exact_match() {
 
   const origFetch = global.fetch;
   global.fetch = mockFetch([
-    ['isrcs_v1', [{ mb_recording_id: 'mb-rec-0007' }]],
+    ['fn_mb_lookup_isrc', [{ mb_recording_id: 'mb-rec-0007' }]],
   ]);
 
   const { resolveTrack } = loadFreshResolver();
@@ -174,8 +174,8 @@ async function test8_mbid_direct_match() {
 
   const origFetch = global.fetch;
   global.fetch = mockFetch([
-    ['isrcs_v1', []],
-    ['recordings_v1', [{ mb_recording_id: 'mb-rec-0008' }]],
+    ['fn_mb_lookup_isrc', []],
+    ['fn_mb_lookup_recording_mbid', [{ mb_recording_id: 'mb-rec-0008' }]],
   ]);
 
   const { resolveTrack } = loadFreshResolver();
@@ -203,9 +203,9 @@ async function test9_iswc_exact_match() {
 
   const origFetch = global.fetch;
   global.fetch = mockFetch([
-    ['isrcs_v1', []],
-    ['recordings_v1', []],  // no MBID match
-    ['iswcs_v1', [{ mb_work_id: 'mb-work-0009' }]],
+    ['fn_mb_lookup_isrc', []],
+    ['fn_mb_lookup_recording_mbid', []],
+    ['fn_mb_lookup_iswc', [{ mb_work_id: 'mb-work-0009' }]],
   ]);
 
   const { resolveTrack } = loadFreshResolver();
@@ -237,9 +237,7 @@ async function test10_fuzzy_name_match() {
 
   const origFetch = global.fetch;
   global.fetch = mockFetch([
-    ['isrcs_v1', []],
-    ['recordings_v1', [{ mb_recording_id: 'mb-rec-0010', title: 'Redrum', length_ms: '185000' }]],
-    ['iswcs_v1', []],
+    ['fn_mb_search_recordings', [{ mb_recording_id: 'mb-rec-0010', title: 'Redrum', length_ms: '185000' }]],
   ]);
 
   const { resolveTrack } = loadFreshResolver();
@@ -271,17 +269,13 @@ async function test11_duration_bonus() {
 
   // Exact duration match
   global.fetch = mockFetch([
-    ['isrcs_v1', []],
-    ['recordings_v1', [{ mb_recording_id: 'mb-rec-0011', title: 'Redrum', length_ms: '185000' }]],
-    ['iswcs_v1', []],
+    ['fn_mb_search_recordings', [{ mb_recording_id: 'mb-rec-0011', title: 'Redrum', length_ms: '185000' }]],
   ]);
   const { resolveTrack: r1 } = loadFreshResolver();
   const withBonus = await r1({ id: 't1', isrcs: [], recording_mbid: null, iswc: null, track_title: 'Redrum', track_duration: 185 });
 
   global.fetch = mockFetch([
-    ['isrcs_v1', []],
-    ['recordings_v1', [{ mb_recording_id: 'mb-rec-0011b', title: 'Redrum', length_ms: '250000' }]],
-    ['iswcs_v1', []],
+    ['fn_mb_search_recordings', [{ mb_recording_id: 'mb-rec-0011b', title: 'Redrum', length_ms: '250000' }]],
   ]);
   const { resolveTrack: r2 } = loadFreshResolver();
   const noBonus = await r2({ id: 't2', isrcs: [], recording_mbid: null, iswc: null, track_title: 'Redrum', track_duration: 185 });
@@ -304,7 +298,7 @@ async function test12_artist_name_collision() {
   const origFetch = global.fetch;
   // Two recordings with same title but different MBIDs (different artists with same name)
   global.fetch = mockFetch([
-    ['isrcs_v1', [
+    ['fn_mb_lookup_isrc', [
       { mb_recording_id: 'mb-rec-collision-A' },
       { mb_recording_id: 'mb-rec-collision-B' },
     ]],
@@ -339,8 +333,8 @@ async function test13_recording_vs_work_not_conflated() {
 
   const origFetch = global.fetch;
   global.fetch = mockFetch([
-    ['isrcs_v1', [{ mb_recording_id: 'mb-rec-0013' }]],
-    ['iswcs_v1', [{ mb_work_id:      'mb-work-0013' }]],
+    ['fn_mb_lookup_isrc', [{ mb_recording_id: 'mb-rec-0013' }]],
+    ['fn_mb_lookup_iswc', [{ mb_work_id:      'mb-work-0013' }]],
   ]);
 
   const { resolveTrack } = loadFreshResolver();
@@ -377,10 +371,10 @@ async function test14_resolution_idempotent() {
   const origFetch = global.fetch;
   global.fetch = async (url, opts) => {
     calls.push({ url, method: opts?.method || 'GET' });
-    if (url.includes('isrcs_v1')) {
+    if (url.includes('fn_mb_lookup_isrc')) {
       return { ok: true, text: async () => JSON.stringify([{ mb_recording_id: 'mb-rec-idem' }]) };
     }
-    if (url.includes('entity_matches_v1')) {
+    if (url.includes('fn_mb_upsert_entity_matches')) {
       return { ok: true, text: async () => JSON.stringify(null) };
     }
     return { ok: true, text: async () => JSON.stringify([]) };
@@ -400,7 +394,7 @@ async function test14_resolution_idempotent() {
   assert(c1[0]?.mb_entity_id === c2[0]?.mb_entity_id, 'same top candidate both runs');
   assert(c1[0]?.confidence   === c2[0]?.confidence,   'same confidence both runs');
 
-  const matchUpserts = calls.filter(c => c.url.includes('entity_matches_v1') && c.method === 'POST');
+  const matchUpserts = calls.filter(c => c.url.includes('fn_mb_upsert_entity_matches'));
   assert(matchUpserts.length === 2, `entity_matches_v1 written twice (once per run, got ${matchUpserts.length})`);
 }
 
@@ -436,7 +430,10 @@ async function test16_batch_chunking() {
   const calls = [];
   const origFetch = global.fetch;
   global.fetch = async (url, opts) => {
-    if (opts?.method === 'POST') calls.push(JSON.parse(opts.body));
+    if (opts?.method === 'POST') {
+      const body = JSON.parse(opts.body);
+      calls.push(body.rows || body);
+    }
     return { ok: true, text: async () => JSON.stringify(null) };
   };
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
@@ -470,19 +467,16 @@ async function test17_checkpoint_save_load() {
   const storedStates = {};
   const origFetch = global.fetch;
   global.fetch = async (url, opts) => {
-    if (opts?.method === 'POST' && url.includes('ingestion_state_v1')) {
+    if (url.includes('fn_mb_save_ingestion_state')) {
       const body = JSON.parse(opts.body);
-      const k = `${body.entity_type}:${body.import_mode}`;
-      storedStates[k] = body;
+      const k = `${body.p_entity_type}:${body.p_import_mode}`;
+      storedStates[k] = body.p_data;
       return { ok: true, text: async () => JSON.stringify(null) };
     }
-    if (url.includes('ingestion_state_v1')) {
-      const params = new URLSearchParams(url.split('?')[1] || '');
-      const et  = (params.get('entity_type') || '').replace('eq.', '');
-      const im  = (params.get('import_mode') || '').replace('eq.', '');
-      const k   = `${et}:${im}`;
-      const row = storedStates[k];
-      return { ok: true, text: async () => JSON.stringify(row ? [row] : []) };
+    if (url.includes('fn_mb_get_ingestion_state')) {
+      const body = JSON.parse(opts.body);
+      const k = `${body.p_entity_type}:${body.p_import_mode}`;
+      return { ok: true, text: async () => JSON.stringify(storedStates[k] || null) };
     }
     return { ok: true, text: async () => JSON.stringify(null) };
   };
@@ -576,10 +570,10 @@ async function test20_no_mbid_no_api_calls() {
   // recordings_v1 MBID lookup is skipped (no MBID)
   // iswcs_v1 is skipped (no ISWC)
   // title fuzzy: normalize('Hi') = 'hi', length = 2 < 3, so fuzzy skipped too
-  const isrcCalls    = calls.filter(u => u.includes('isrcs_v1'));
-  const mbidCalls    = calls.filter(u => u.includes('recordings_v1') && u.includes('mb_recording_id'));
-  const iswcCalls    = calls.filter(u => u.includes('iswcs_v1'));
-  const titleCalls   = calls.filter(u => u.includes('recordings_v1') && u.includes('ilike'));
+  const isrcCalls    = calls.filter(u => u.includes('fn_mb_lookup_isrc'));
+  const mbidCalls    = calls.filter(u => u.includes('fn_mb_lookup_recording_mbid'));
+  const iswcCalls    = calls.filter(u => u.includes('fn_mb_lookup_iswc'));
+  const titleCalls   = calls.filter(u => u.includes('fn_mb_search_recordings'));
 
   assert(isrcCalls.length  === 0, `no isrcs_v1 calls (got ${isrcCalls.length})`);
   assert(mbidCalls.length  === 0, `no MBID lookup calls (got ${mbidCalls.length})`);
