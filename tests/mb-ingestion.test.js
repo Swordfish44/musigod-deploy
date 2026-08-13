@@ -33,6 +33,7 @@
 //   23. healthCheck() returns false when corpus DB query throws
 //   24. Resolver normalizes hyphenated ISRC before corpus lookup (no hyphen in query param)
 //   25. loadEnrichedTracks() paginates: fetches all pages when first page is full
+//   26. transformReleaseGroup() sets secondary_types:[] — no NOT NULL violation on dump-mode upsert
 
 let passed = 0;
 let failed = 0;
@@ -744,6 +745,41 @@ async function test25_load_enriched_tracks_paginates() {
   assert(catalogCalls[1].includes(`offset=${PAGE_SIZE}`), `second call uses offset=${PAGE_SIZE}`);
 }
 
+// ── Test 26: dump-mode transformReleaseGroup sets secondary_types ─────────────
+
+async function test26_dump_release_group_secondary_types_not_null() {
+  console.log('\n[26] transformReleaseGroup() sets secondary_types:[] — dump-mode upsert never sends NULL');
+
+  const { TRANSFORMERS } = require('../lib/mb-dump-parser');
+  const { pool, calls } = makeSpy();
+  const { upsertReleaseGroups } = loadFreshWriter();
+  const corpusDb = require('../lib/mb-corpus-db');
+  corpusDb._setPool(pool);
+
+  const dumpRow = {
+    gid: 'rg-test-0026', name: 'Test RG', artist_credit: '1',
+    type: '1', comment: '', edits_pending: '0', last_updated: null,
+  };
+  const transformed = TRANSFORMERS.release_group(dumpRow);
+
+  assert(Array.isArray(transformed.secondary_types),     'secondary_types is an array');
+  assert(transformed.secondary_types.length === 0,       'secondary_types defaults to []');
+
+  await upsertReleaseGroups([transformed]);
+
+  const insertCall = calls.find(c => c.sql.includes('release_groups_v1') && c.sql.includes('INSERT'));
+  assert(insertCall !== undefined, 'INSERT was issued');
+
+  // secondary_types is $4 in the column list (mb_release_group_id, title, primary_type, secondary_types, ...)
+  const COLS = ['mb_release_group_id','title','primary_type','secondary_types','mb_artist_id','first_release_date','ingestion_source','provenance'];
+  const secondaryTypesIdx = COLS.indexOf('secondary_types'); // 3 → param index 3
+  const paramValue = insertCall.params[secondaryTypesIdx];
+
+  assert(paramValue !== null && paramValue !== undefined, `secondary_types param is not null (got ${JSON.stringify(paramValue)})`);
+  assert(Array.isArray(paramValue),                      `secondary_types param is an array (got ${typeof paramValue})`);
+  assert(paramValue.length === 0,                        'secondary_types param is empty array');
+}
+
 // ── Runner ────────────────────────────────────────────────────────────────────
 
 (async () => {
@@ -775,6 +811,7 @@ async function test25_load_enriched_tracks_paginates() {
   await test23_health_check_false_on_error();
   await test24_isrc_hyphen_normalized_in_resolver();
   await test25_load_enriched_tracks_paginates();
+  await test26_dump_release_group_secondary_types_not_null();
 
   console.log(`\n${'─'.repeat(50)}`);
   const total = passed + failed;
