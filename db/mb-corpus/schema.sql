@@ -70,7 +70,9 @@ CREATE TABLE IF NOT EXISTS mb_staging.recordings_v1 (
   provenance       JSONB       NOT NULL DEFAULT '{}'
 );
 
-CREATE INDEX IF NOT EXISTS mb_recordings_title_idx  ON mb_staging.recordings_v1 (lower(title));
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS mb_recordings_title_idx      ON mb_staging.recordings_v1 (lower(title));
+CREATE INDEX IF NOT EXISTS mb_recordings_title_trgm_idx ON mb_staging.recordings_v1 USING GIN (title gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS mb_recordings_artist_idx ON mb_staging.recordings_v1 (mb_artist_id) WHERE mb_artist_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS mb_recordings_length_idx ON mb_staging.recordings_v1 (length_ms)    WHERE length_ms IS NOT NULL;
 

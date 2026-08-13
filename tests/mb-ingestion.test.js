@@ -34,6 +34,28 @@
 //   24. Resolver normalizes hyphenated ISRC before corpus lookup (no hyphen in query param)
 //   25. loadEnrichedTracks() paginates: fetches all pages when first page is full
 //   26. transformReleaseGroup() sets secondary_types:[] — no NOT NULL violation on dump-mode upsert
+//   27. buildIdMap() reads TSV and returns Map<intId, gid> with correct entries
+//   28. transformISRC() resolves integer FK via idMap and normalizes ISRC
+//   29. transformISRC() returns null when integer FK is not in idMap
+//   30. transformISRC() normalizes hyphenated ISRC from dump file
+//   31. transformISWC() resolves FK via idMap, normalizes ISWC; returns null when unresolvable
+//   32. transformArtistAlias() maps all fields; primary_alias bool from 't' sentinel
+//   33. batchStream() skips null-transformed rows when idMap cannot resolve FK
+//   34. countTable() queries corpus DB and returns integer count
+//   35. countTable() throws on unknown table name (SQL injection guard)
+//
+// ── Group D: Idempotency & duplicate-prevention ────────────────────────────────
+//   36. Full-fixture single load → correct entity and relationship counts
+//   37. Full-fixture loaded twice → ZERO additional rows in any corpus table
+//   38. Double-load → canonical conflict-key sets identical after both loads
+//   39. Double-load → provenance field not clobbered by second upsert
+//   40. Same ISRC hyphen-formatted (US-RC1-23-00001) → same canonical → no dupe ISRC row
+//   41. Same ISRC lowercase (usrc12300001) → same canonical → no dupe ISRC row
+//   42. Same ISWC with hyphens (T-345246800-1) → same canonical → no dupe ISWC row
+//   43. Same ISWC with dots (T-345.246.800-1) → same canonical → no dupe ISWC row
+//   44. Artist alias loaded twice → 1 artist row, 1 alias row (no phantom duplicates)
+//   45. Recording on two releases → 1 recording, 2 releases, 2 distinct appears_on rels
+//   46. Two similar-titled recordings (different MBIDs) → both preserved; neither overwrites
 
 let passed = 0;
 let failed = 0;
@@ -46,7 +68,7 @@ function assert(cond, label) {
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 const { normalize, titleSimilarity } = require('../lib/mb-entity-resolver');
-const { parseLine, COLUMN_DEFS }     = require('../lib/mb-dump-parser');
+const { parseLine, COLUMN_DEFS, normalizeISWC } = require('../lib/mb-dump-parser');
 
 // ── Mock helpers ──────────────────────────────────────────────────────────────
 
@@ -780,6 +802,785 @@ async function test26_dump_release_group_secondary_types_not_null() {
   assert(paramValue.length === 0,                        'secondary_types param is empty array');
 }
 
+// ── Test 27: buildIdMap() ─────────────────────────────────────────────────────
+
+async function test27_build_id_map() {
+  console.log('\n[27] buildIdMap() reads TSV and returns Map<intId, gid>');
+
+  const os   = require('os');
+  const fs   = require('fs');
+  const path = require('path');
+  const { buildIdMap } = require('../lib/mb-dump-parser');
+
+  // Simulate a recording dump file (9 columns matching COLUMN_DEFS.recording)
+  const lines = [
+    '100\trec-gid-100\tRedrum\t1\t210000\t\\N\t0\t2022-01-01\tf',
+    '200\trec-gid-200\tAcid Rain\t1\t180000\t\\N\t0\t2022-01-02\tf',
+    '300\trec-gid-300\tEscape\t2\t195000\t\\N\t0\t2022-01-03\tf',
+  ];
+  const tmpFile = path.join(os.tmpdir(), `mb_test_idmap_${Date.now()}.tsv`);
+  fs.writeFileSync(tmpFile, lines.join('\n') + '\n', 'utf8');
+
+  let map;
+  try {
+    map = await buildIdMap(tmpFile, 'recording');
+  } finally {
+    fs.unlinkSync(tmpFile);
+  }
+
+  assert(map instanceof Map,                         'returns a Map instance');
+  assert(map.size === 3,                             `3 entries in map (got ${map.size})`);
+  assert(map.get('100') === 'rec-gid-100',           'int 100 → rec-gid-100');
+  assert(map.get('200') === 'rec-gid-200',           'int 200 → rec-gid-200');
+  assert(map.get('999') === undefined,               'unknown int → undefined');
+}
+
+// ── Test 28: transformISRC() resolves FK ──────────────────────────────────────
+
+async function test28_transform_isrc_resolves_fk() {
+  console.log('\n[28] transformISRC() resolves integer FK via idMap, normalizes ISRC');
+
+  const { TRANSFORMERS } = require('../lib/mb-dump-parser');
+  const idMap = new Map([['42', 'rec-gid-042']]);
+
+  const row = { id: '1', recording: '42', isrc: 'USRC12300099', source: '0', edits_pending: '0' };
+  const result = TRANSFORMERS.isrc(row, idMap);
+
+  assert(result !== null,                           'result is not null');
+  assert(result.mb_recording_id === 'rec-gid-042', `mb_recording_id resolved (got ${result?.mb_recording_id})`);
+  assert(result.isrc === 'USRC12300099',            `ISRC preserved (got ${result?.isrc})`);
+}
+
+// ── Test 29: transformISRC() returns null when FK unresolvable ─────────────────
+
+async function test29_transform_isrc_null_on_missing_fk() {
+  console.log('\n[29] transformISRC() returns null when integer FK is not in idMap');
+
+  const { TRANSFORMERS } = require('../lib/mb-dump-parser');
+  const idMap = new Map([['42', 'rec-gid-042']]);
+
+  const row = { id: '9', recording: '999', isrc: 'USRC12300099', source: '0', edits_pending: '0' };
+  const result = TRANSFORMERS.isrc(row, idMap);
+
+  assert(result === null, `null returned for unresolvable FK (got ${JSON.stringify(result)})`);
+}
+
+// ── Test 30: transformISRC() normalizes hyphenated ISRC from dump ─────────────
+
+async function test30_transform_isrc_normalizes_hyphen() {
+  console.log('\n[30] transformISRC() normalizes hyphenated ISRC in dump row');
+
+  const { TRANSFORMERS } = require('../lib/mb-dump-parser');
+  const idMap = new Map([['7', 'rec-gid-007']]);
+
+  const row = { id: '2', recording: '7', isrc: 'US-RC1-23-00030', source: '0', edits_pending: '0' };
+  const result = TRANSFORMERS.isrc(row, idMap);
+
+  assert(result !== null,                       'result is not null');
+  assert(result.isrc === 'USRC12300030',        `hyphens stripped and uppercased (got ${result?.isrc})`);
+}
+
+// ── Test 31: transformISWC() resolves FK; null when unresolvable ───────────────
+
+async function test31_transform_iswc() {
+  console.log('\n[31] transformISWC() resolves FK via idMap, normalizes ISWC; returns null when unresolvable');
+
+  const { TRANSFORMERS } = require('../lib/mb-dump-parser');
+  const idMap = new Map([['55', 'work-gid-055']]);
+
+  const hitRow  = { id: '1', work: '55', iswc: 'T-345246800-1', source: '0', edits_pending: '0' };
+  const missRow = { id: '2', work: '99', iswc: 'T-000000000-0', source: '0', edits_pending: '0' };
+
+  const hit  = TRANSFORMERS.iswc(hitRow,  idMap);
+  const miss = TRANSFORMERS.iswc(missRow, idMap);
+
+  assert(hit !== null,                         'hit: result not null');
+  assert(hit?.mb_work_id === 'work-gid-055',   `hit: mb_work_id resolved (got ${hit?.mb_work_id})`);
+  assert(hit?.iswc === 'T3452468001',          `hit: iswc normalized (stripped hyphens) (got ${hit?.iswc})`);
+  assert(miss === null,                        'miss: null returned for unresolvable FK');
+}
+
+// ── Test 32: transformArtistAlias() maps all fields ──────────────────────────
+
+async function test32_transform_artist_alias() {
+  console.log('\n[32] transformArtistAlias() maps all fields; primary_alias bool from "t"');
+
+  const { TRANSFORMERS } = require('../lib/mb-dump-parser');
+  const idMap = new Map([['11', 'artist-gid-011']]);
+
+  const row = {
+    id: '501', artist: '11', name: 'Eric Gulley', locale: 'en',
+    edits_pending: '0', last_updated: null,
+    type: '1', sort_name: 'Gulley, Eric',
+    begin_date_year: '1972', begin_date_month: null, begin_date_day: null,
+    end_date_year: null, end_date_month: null, end_date_day: null,
+    primary_for_locale: 't',
+  };
+
+  const result = TRANSFORMERS.artist_alias(row, idMap);
+
+  assert(result !== null,                            'result is not null');
+  assert(result.mb_artist_id === 'artist-gid-011',  `mb_artist_id resolved (got ${result?.mb_artist_id})`);
+  assert(result.alias_name   === 'Eric Gulley',      `alias_name correct (got ${result?.alias_name})`);
+  assert(result.locale       === 'en',               `locale correct (got ${result?.locale})`);
+  assert(result.primary_alias === true,              `primary_alias: "t" → true (got ${result?.primary_alias})`);
+  assert(result.begin_date   === '1972',             `begin_date assembled (got ${result?.begin_date})`);
+  assert(result.end_date     === null,               `end_date null when all parts null (got ${result?.end_date})`);
+}
+
+// ── Test 33: batchStream() skips null rows from FK-linked transformer ──────────
+
+async function test33_batch_stream_skips_null_rows() {
+  console.log('\n[33] batchStream() skips null-transformed rows when idMap cannot resolve FK');
+
+  const os   = require('os');
+  const fs   = require('fs');
+  const path = require('path');
+  const { batchStream } = require('../lib/mb-dump-parser');
+
+  // 3 ISRC rows; columns: id, recording, isrc, source, edits_pending
+  const lines = [
+    '1\t42\tUSRC12300001\t0\t0',   // recording 42 → resolvable
+    '2\t99\tUSRC12300002\t0\t0',   // recording 99 → NOT in idMap
+    '3\t42\tUSRC12300003\t0\t0',   // recording 42 → resolvable
+  ];
+  const tmpFile = path.join(os.tmpdir(), `mb_test_batchstream_${Date.now()}.tsv`);
+  fs.writeFileSync(tmpFile, lines.join('\n') + '\n', 'utf8');
+
+  const idMap = new Map([['42', 'rec-gid-042']]);
+  const batches = [];
+  try {
+    for await (const { batch } of batchStream(tmpFile, 'isrc', 100, 0, idMap)) {
+      batches.push(...batch);
+    }
+  } finally {
+    fs.unlinkSync(tmpFile);
+  }
+
+  assert(batches.length === 2,                         `2 rows emitted (unresolvable skipped), got ${batches.length}`);
+  assert(batches.every(r => r.mb_recording_id === 'rec-gid-042'), 'all emitted rows have resolved UUID');
+  assert(batches[0].isrc === 'USRC12300001',           `first ISRC correct (got ${batches[0]?.isrc})`);
+  assert(batches[1].isrc === 'USRC12300003',           `second ISRC correct (got ${batches[1]?.isrc})`);
+}
+
+// ── Test 34: countTable() queries corpus DB and returns integer ───────────────
+
+async function test34_count_table_returns_integer() {
+  console.log('\n[34] countTable() queries corpus DB and returns integer count');
+
+  const { pool, calls } = makeSpy([['COUNT', [{ n: '42000' }]]]);
+  const { countTable } = loadFreshWriter();
+  const corpusDb = require('../lib/mb-corpus-db');
+  corpusDb._setPool(pool);
+
+  const n = await countTable('recordings_v1');
+
+  assert(calls.length === 1,                       `1 query issued (got ${calls.length})`);
+  assert(calls[0].sql.includes('COUNT(*)'),        `query uses COUNT(*) (got "${calls[0].sql.trim()}")`);
+  assert(calls[0].sql.includes('mb_staging'),      'query targets mb_staging schema');
+  assert(calls[0].sql.includes('recordings_v1'),  'query targets correct table');
+  assert(n === 42000,                              `returns integer 42000 (got ${n})`);
+}
+
+// ── Test 35: countTable() throws on unknown table (injection guard) ───────────
+
+async function test35_count_table_rejects_unknown_table() {
+  console.log('\n[35] countTable() throws on unknown table name (SQL injection guard)');
+
+  const { pool } = makeSpy();
+  const { countTable } = loadFreshWriter();
+  const corpusDb = require('../lib/mb-corpus-db');
+  corpusDb._setPool(pool);
+
+  let threw = false;
+  let msg   = '';
+  try {
+    await countTable('unknown_evil_table; DROP TABLE mb_staging.recordings_v1;--');
+  } catch (e) {
+    threw = true;
+    msg   = e.message;
+  }
+
+  assert(threw,                          'throws on unknown table name');
+  assert(msg.includes('unknown table'),  `error message mentions "unknown table" (got "${msg}")`);
+}
+
+// ── Stateful mock pool (Group D) ──────────────────────────────────────────────
+//
+// Simulates PostgreSQL ON CONFLICT DO NOTHING / DO UPDATE behaviour in memory.
+// Parses INSERT INTO mb_staging.<table> SQL from batchInsert(), maintains a
+// Map<conflictKey, row> per table, and exposes an inspection API.
+
+function makeStatefulPool() {
+  // Mirrors the conflict keys declared in mb-staging-writer.js batchInsert calls.
+  const CONFLICT_KEYS = {
+    artists_v1:         ['mb_artist_id'],
+    artist_aliases_v1:  ['mb_artist_id', 'alias_name'],
+    recordings_v1:      ['mb_recording_id'],
+    isrcs_v1:           ['mb_recording_id', 'isrc'],
+    works_v1:           ['mb_work_id'],
+    iswcs_v1:           ['mb_work_id', 'iswc'],
+    releases_v1:        ['mb_release_id'],
+    release_groups_v1:  ['mb_release_group_id'],
+    relationships_v1:   ['source_type', 'source_mb_id', 'target_type', 'target_mb_id', 'relationship_type'],
+    ingestion_state_v1: ['entity_type', 'import_mode'],
+  };
+
+  // store[tableName] → Map<conflictKey, rowObject>
+  const store = {};
+
+  function applyInsert(sql, params) {
+    const tableMatch = sql.match(/INSERT INTO mb_staging\.(\w+)\s*\(([^)]+)\)/);
+    if (!tableMatch) return;
+
+    const tableName = tableMatch[1];
+    const colNames  = tableMatch[2].split(',').map(s => s.trim());
+    const n         = colNames.length;
+    if (n === 0 || params.length === 0) return;
+    const numRows   = Math.round(params.length / n);
+
+    const confKeys    = CONFLICT_KEYS[tableName] || [];
+    const isDoNothing = /DO NOTHING/i.test(sql);
+    const updateCols  = [];
+
+    if (!isDoNothing) {
+      const setMatch = sql.match(/DO UPDATE SET\s+(.+)$/is);
+      if (setMatch) {
+        for (const part of setMatch[1].split(',')) {
+          const m = part.match(/^\s*(\w+)\s*=/);
+          if (m) updateCols.push(m[1]);
+        }
+      }
+    }
+
+    if (!store[tableName]) store[tableName] = new Map();
+
+    for (let r = 0; r < numRows; r++) {
+      const row = {};
+      for (let c = 0; c < n; c++) row[colNames[c]] = params[r * n + c];
+
+      const key = confKeys.map(k => String(row[k] ?? '')).join('\x00');
+
+      if (store[tableName].has(key)) {
+        if (!isDoNothing && updateCols.length) {
+          const existing = store[tableName].get(key);
+          for (const col of updateCols) {
+            if (col in row) existing[col] = row[col];
+          }
+        }
+      } else {
+        store[tableName].set(key, { ...row });
+      }
+    }
+  }
+
+  const pool = {
+    async query(sql, params = []) {
+      if (sql.includes('INSERT INTO mb_staging.')) applyInsert(sql, params);
+      return { rows: [] };
+    },
+    on()        {},
+    async end() {},
+    // Inspection API
+    count:     (table)      => store[table]?.size      || 0,
+    rows:      (table)      => store[table] ? [...store[table].values()] : [],
+    snapshot:  ()           => Object.fromEntries(Object.entries(store).map(([t, m]) => [t, m.size])),
+    allKeys:   (table)      => store[table] ? [...store[table].keys()]   : [],
+    getByKey:  (table, key) => store[table]?.get(key),
+  };
+  return pool;
+}
+
+// ── Fixture & loader (Group D) ────────────────────────────────────────────────
+//
+// Canonical mini-corpus: 1 artist, 4 recordings, 2 works, 2 releases, 1 release group,
+// 1 alias, 4 ISRCs, 2 ISWCs, 5 relationships.
+
+const FIXTURE = {
+  artists: [{
+    mb_artist_id: 'artist-esham-001', name: 'Esham', sort_name: 'Esham',
+    artist_type: 'Person', country: 'US', area: null,
+    begin_date: '1973', end_date: null, comment: 'Detroit rapper', ended: false,
+    mb_last_updated: '2020-01-01T00:00:00.000Z', ingestion_source: 'dump',
+    provenance: { source: 'musicbrainz', data_license: 'CC0' },
+  }],
+
+  aliases: [{
+    mb_artist_id: 'artist-esham-001', alias_name: 'Eric Gulley',
+    alias_type: '1', locale: 'en', primary_alias: false,
+    begin_date: null, end_date: null,
+  }],
+
+  recordings: [
+    {
+      mb_recording_id: 'rec-001-acid-rain', title: 'Acid Rain', length_ms: 214000,
+      artist_credit: 'Esham', mb_artist_id: 'artist-esham-001', comment: null, video: false,
+      mb_last_updated: '2020-01-01T00:00:00.000Z', ingestion_source: 'dump',
+      provenance: { source: 'musicbrainz', data_license: 'CC0' },
+    },
+    {
+      mb_recording_id: 'rec-002-redrum', title: 'Redrum', length_ms: 197000,
+      artist_credit: 'Esham', mb_artist_id: 'artist-esham-001', comment: null, video: false,
+      mb_last_updated: '2020-01-01T00:00:00.000Z', ingestion_source: 'dump',
+      provenance: { source: 'musicbrainz', data_license: 'CC0' },
+    },
+    {
+      mb_recording_id: 'rec-003-deathwish', title: 'Deathwish', length_ms: 182000,
+      artist_credit: 'Esham', mb_artist_id: 'artist-esham-001', comment: null, video: false,
+      mb_last_updated: '2020-01-01T00:00:00.000Z', ingestion_source: 'dump',
+      provenance: { source: 'musicbrainz', data_license: 'CC0' },
+    },
+    // Similar title to rec-001 — different MBID, must remain a distinct canonical entity.
+    {
+      mb_recording_id: 'rec-004-acid-reign', title: 'Acid Reign', length_ms: 203000,
+      artist_credit: 'Esham', mb_artist_id: 'artist-esham-001', comment: null, video: false,
+      mb_last_updated: '2020-01-01T00:00:00.000Z', ingestion_source: 'dump',
+      provenance: { source: 'musicbrainz', data_license: 'CC0' },
+    },
+  ],
+
+  isrcs: [
+    { mb_recording_id: 'rec-001-acid-rain',  isrc: 'USRC12300001' },
+    { mb_recording_id: 'rec-002-redrum',      isrc: 'USRC12300002' },
+    { mb_recording_id: 'rec-003-deathwish',   isrc: 'USRC12300003' },
+    { mb_recording_id: 'rec-004-acid-reign',  isrc: 'USRC12300004' },
+  ],
+
+  works: [
+    {
+      mb_work_id: 'work-001-acid-rain', title: 'Acid Rain', work_type: null, language: 'eng',
+      comment: null, mb_last_updated: '2020-01-01T00:00:00.000Z', ingestion_source: 'dump',
+      provenance: { source: 'musicbrainz', data_license: 'CC0' },
+    },
+    {
+      mb_work_id: 'work-002-redrum', title: 'Redrum', work_type: null, language: 'eng',
+      comment: null, mb_last_updated: '2020-01-01T00:00:00.000Z', ingestion_source: 'dump',
+      provenance: { source: 'musicbrainz', data_license: 'CC0' },
+    },
+  ],
+
+  iswcs: [
+    // Stored in canonical (normalized, no-hyphen) form — the transformer normalizes on write.
+    { mb_work_id: 'work-001-acid-rain', iswc: 'T3452468001' },
+    { mb_work_id: 'work-002-redrum',    iswc: 'T0000000020' },
+  ],
+
+  releaseGroups: [{
+    mb_release_group_id: 'rg-001-acid', title: 'Acid Rain EP', primary_type: 'EP',
+    secondary_types: [], mb_artist_id: 'artist-esham-001', first_release_date: '1995',
+    ingestion_source: 'dump', provenance: { source: 'musicbrainz', data_license: 'CC0' },
+  }],
+
+  // Both releases contain rec-001 — exercises the multi-release recording scenario.
+  releases: [
+    {
+      mb_release_id: 'rel-001-us', mb_release_group_id: 'rg-001-acid',
+      title: 'Acid Rain EP (US)', artist_credit: 'Esham', mb_artist_id: 'artist-esham-001',
+      release_date: '1995-03-01', country: 'US', status: 'Official', barcode: null,
+      mb_last_updated: '2020-01-01T00:00:00.000Z', ingestion_source: 'dump',
+      provenance: { source: 'musicbrainz', data_license: 'CC0' },
+    },
+    {
+      mb_release_id: 'rel-002-uk', mb_release_group_id: 'rg-001-acid',
+      title: 'Acid Rain EP (UK)', artist_credit: 'Esham', mb_artist_id: 'artist-esham-001',
+      release_date: '1995-06-01', country: 'GB', status: 'Official', barcode: null,
+      mb_last_updated: '2020-01-01T00:00:00.000Z', ingestion_source: 'dump',
+      provenance: { source: 'musicbrainz', data_license: 'CC0' },
+    },
+  ],
+
+  relationships: [
+    { source_type: 'recording', source_mb_id: 'rec-001-acid-rain',
+      target_type: 'artist',    target_mb_id: 'artist-esham-001',
+      relationship_type: 'performer', attributes: {}, direction: 'forward' },
+    { source_type: 'recording', source_mb_id: 'rec-002-redrum',
+      target_type: 'artist',    target_mb_id: 'artist-esham-001',
+      relationship_type: 'performer', attributes: {}, direction: 'forward' },
+    { source_type: 'recording', source_mb_id: 'rec-001-acid-rain',
+      target_type: 'work',      target_mb_id: 'work-001-acid-rain',
+      relationship_type: 'recording_of', attributes: {}, direction: 'forward' },
+    // rec-001 appears on BOTH releases — two distinct appears_on relationships.
+    { source_type: 'recording', source_mb_id: 'rec-001-acid-rain',
+      target_type: 'release',   target_mb_id: 'rel-001-us',
+      relationship_type: 'appears_on', attributes: {}, direction: 'forward' },
+    { source_type: 'recording', source_mb_id: 'rec-001-acid-rain',
+      target_type: 'release',   target_mb_id: 'rel-002-uk',
+      relationship_type: 'appears_on', attributes: {}, direction: 'forward' },
+  ],
+};
+
+// Load all fixture tables in dependency order using the provided writer module.
+async function loadFixture(writer, fixture) {
+  const {
+    upsertArtists, upsertArtistAliases, upsertRecordings, upsertISRCs,
+    upsertWorks, upsertISWCs, upsertReleaseGroups, upsertReleases, upsertRelationships,
+  } = writer;
+  await upsertArtists(fixture.artists);
+  await upsertArtistAliases(fixture.aliases);
+  await upsertRecordings(fixture.recordings);
+  await upsertISRCs(fixture.isrcs);
+  await upsertWorks(fixture.works);
+  await upsertISWCs(fixture.iswcs);
+  await upsertReleaseGroups(fixture.releaseGroups);
+  await upsertReleases(fixture.releases);
+  await upsertRelationships(fixture.relationships);
+}
+
+// Parse a stored provenance value (may be serialized JSON string from serializeValue).
+function getProv(val) {
+  if (!val) return null;
+  if (typeof val === 'string') { try { return JSON.parse(val); } catch { return null; } }
+  return val;
+}
+
+// ── Test 36: Full-fixture single load → correct entity counts ─────────────────
+
+async function test36_fixture_load_correct_counts() {
+  console.log('\n[36] Full-fixture single load → correct entity and relationship counts');
+
+  const writer = loadFreshWriter();
+  const corpusDb = require('../lib/mb-corpus-db');
+  const pool = makeStatefulPool();
+  corpusDb._setPool(pool);
+
+  await loadFixture(writer, FIXTURE);
+
+  assert(pool.count('artists_v1')        === 1, `artists:        1 (got ${pool.count('artists_v1')})`);
+  assert(pool.count('artist_aliases_v1') === 1, `aliases:        1 (got ${pool.count('artist_aliases_v1')})`);
+  assert(pool.count('recordings_v1')     === 4, `recordings:     4 (got ${pool.count('recordings_v1')})`);
+  assert(pool.count('isrcs_v1')          === 4, `ISRCs:          4 (got ${pool.count('isrcs_v1')})`);
+  assert(pool.count('works_v1')          === 2, `works:          2 (got ${pool.count('works_v1')})`);
+  assert(pool.count('iswcs_v1')          === 2, `ISWCs:          2 (got ${pool.count('iswcs_v1')})`);
+  assert(pool.count('release_groups_v1') === 1, `release groups: 1 (got ${pool.count('release_groups_v1')})`);
+  assert(pool.count('releases_v1')       === 2, `releases:       2 (got ${pool.count('releases_v1')})`);
+  assert(pool.count('relationships_v1')  === 5, `relationships:  5 (got ${pool.count('relationships_v1')})`);
+}
+
+// ── Test 37: Same fixture loaded twice → ZERO new rows ───────────────────────
+
+async function test37_double_load_zero_new_rows() {
+  console.log('\n[37] Full-fixture loaded twice → ZERO additional rows in any corpus table');
+
+  const writer = loadFreshWriter();
+  const corpusDb = require('../lib/mb-corpus-db');
+  const pool = makeStatefulPool();
+  corpusDb._setPool(pool);
+
+  await loadFixture(writer, FIXTURE);
+  const snapAfterFirst = pool.snapshot();
+
+  await loadFixture(writer, FIXTURE);
+  const snapAfterSecond = pool.snapshot();
+
+  const tables = Object.keys(snapAfterFirst);
+  for (const t of tables) {
+    assert(
+      snapAfterSecond[t] === snapAfterFirst[t],
+      `${t}: count unchanged after second load (${snapAfterFirst[t]} → ${snapAfterSecond[t]})`
+    );
+  }
+  // All 9 corpus entity tables checked
+  assert(tables.length >= 9, `all entity tables checked (got ${tables.length})`);
+}
+
+// ── Test 38: Double-load → canonical conflict-key sets identical ──────────────
+
+async function test38_double_load_canonical_ids_stable() {
+  console.log('\n[38] Double-load → canonical conflict-key sets identical after both loads');
+
+  const writer = loadFreshWriter();
+  const corpusDb = require('../lib/mb-corpus-db');
+  const pool = makeStatefulPool();
+  corpusDb._setPool(pool);
+
+  await loadFixture(writer, FIXTURE);
+  const keysFirst = {
+    artists:    pool.allKeys('artists_v1').sort(),
+    recordings: pool.allKeys('recordings_v1').sort(),
+    isrcs:      pool.allKeys('isrcs_v1').sort(),
+    works:      pool.allKeys('works_v1').sort(),
+    rels:       pool.allKeys('relationships_v1').sort(),
+  };
+
+  await loadFixture(writer, FIXTURE);
+  const keysSecond = {
+    artists:    pool.allKeys('artists_v1').sort(),
+    recordings: pool.allKeys('recordings_v1').sort(),
+    isrcs:      pool.allKeys('isrcs_v1').sort(),
+    works:      pool.allKeys('works_v1').sort(),
+    rels:       pool.allKeys('relationships_v1').sort(),
+  };
+
+  for (const k of Object.keys(keysFirst)) {
+    assert(
+      JSON.stringify(keysFirst[k]) === JSON.stringify(keysSecond[k]),
+      `${k} conflict-key set unchanged: [${keysFirst[k]}]`
+    );
+  }
+  // Spot-check: artist key is exactly the MBID
+  assert(keysSecond.artists[0] === 'artist-esham-001', 'artist conflict key is the MBID');
+}
+
+// ── Test 39: Provenance not clobbered by second upsert ───────────────────────
+
+async function test39_provenance_preserved_across_upserts() {
+  console.log('\n[39] Double-load → provenance field preserved (DO UPDATE does not blank it)');
+
+  const writer = loadFreshWriter();
+  const corpusDb = require('../lib/mb-corpus-db');
+  const pool = makeStatefulPool();
+  corpusDb._setPool(pool);
+
+  await loadFixture(writer, FIXTURE);
+  await loadFixture(writer, FIXTURE);
+
+  const artistRow     = pool.rows('artists_v1')[0];
+  const recordingRow  = pool.rows('recordings_v1').find(r => r.mb_recording_id === 'rec-001-acid-rain');
+  const workRow       = pool.rows('works_v1')[0];
+
+  const aProv = getProv(artistRow?.provenance);
+  const rProv = getProv(recordingRow?.provenance);
+  const wProv = getProv(workRow?.provenance);
+
+  assert(aProv?.source        === 'musicbrainz', `artist provenance.source preserved (got ${aProv?.source})`);
+  assert(aProv?.data_license  === 'CC0',         `artist provenance.data_license preserved (got ${aProv?.data_license})`);
+  assert(rProv?.source        === 'musicbrainz', `recording provenance.source preserved (got ${rProv?.source})`);
+  assert(wProv?.data_license  === 'CC0',         `work provenance.data_license preserved (got ${wProv?.data_license})`);
+}
+
+// ── Test 40: ISRC with hyphens → same canonical → no duplicate ISRC row ───────
+
+async function test40_isrc_hyphen_variant_no_dupe() {
+  console.log('\n[40] Same ISRC hyphen-formatted (US-RC1-23-00001) → normalizes → zero dupe ISRC rows');
+
+  const { TRANSFORMERS } = require('../lib/mb-dump-parser');
+  const idMap = new Map([['42', 'rec-001-acid-rain']]);
+
+  // Two dump rows: same recording, same logical ISRC — different formatting.
+  const canonicalRow = { id: '1', recording: '42', isrc: 'USRC12300001', source: '0', edits_pending: '0' };
+  const hyphenRow    = { id: '2', recording: '42', isrc: 'US-RC1-23-00001', source: '0', edits_pending: '0' };
+
+  const canonical = TRANSFORMERS.isrc(canonicalRow, idMap);
+  const withHyphen = TRANSFORMERS.isrc(hyphenRow,   idMap);
+
+  assert(canonical?.isrc   === 'USRC12300001', `canonical ISRC normalized (got ${canonical?.isrc})`);
+  assert(withHyphen?.isrc  === 'USRC12300001', `hyphenated ISRC normalized to same form (got ${withHyphen?.isrc})`);
+
+  // Loading both into the stateful pool should produce only 1 ISRC row.
+  const writer = loadFreshWriter();
+  const corpusDb = require('../lib/mb-corpus-db');
+  const pool = makeStatefulPool();
+  corpusDb._setPool(pool);
+  await writer.upsertISRCs([canonical, withHyphen]);
+
+  assert(pool.count('isrcs_v1') === 1,
+    `1 ISRC row after loading canonical + hyphenated variant (got ${pool.count('isrcs_v1')})`);
+}
+
+// ── Test 41: ISRC lowercase → same canonical → no duplicate ISRC row ─────────
+
+async function test41_isrc_lowercase_variant_no_dupe() {
+  console.log('\n[41] Same ISRC lowercase (usrc12300001) → same canonical → zero dupe ISRC rows');
+
+  const { TRANSFORMERS } = require('../lib/mb-dump-parser');
+  const idMap = new Map([['42', 'rec-001-acid-rain']]);
+
+  const upperRow = { id: '1', recording: '42', isrc: 'USRC12300001', source: '0', edits_pending: '0' };
+  const lowerRow = { id: '2', recording: '42', isrc: 'usrc12300001', source: '0', edits_pending: '0' };
+
+  const upper = TRANSFORMERS.isrc(upperRow, idMap);
+  const lower = TRANSFORMERS.isrc(lowerRow, idMap);
+
+  assert(upper?.isrc === 'USRC12300001', `uppercase: normalized (got ${upper?.isrc})`);
+  assert(lower?.isrc === 'USRC12300001', `lowercase: normalized to same form (got ${lower?.isrc})`);
+
+  const writer = loadFreshWriter();
+  const corpusDb = require('../lib/mb-corpus-db');
+  const pool = makeStatefulPool();
+  corpusDb._setPool(pool);
+  await writer.upsertISRCs([upper, lower]);
+
+  assert(pool.count('isrcs_v1') === 1,
+    `1 ISRC row after loading uppercase + lowercase variant (got ${pool.count('isrcs_v1')})`);
+}
+
+// ── Test 42: ISWC with hyphens → same canonical → no duplicate ISWC row ───────
+
+async function test42_iswc_hyphen_variant_no_dupe() {
+  console.log('\n[42] Same ISWC with hyphens (T-345246800-1) → normalizes → zero dupe ISWC rows');
+
+  const withHyphens   = normalizeISWC('T-345246800-1');
+  const withoutHyphens = normalizeISWC('T3452468001');
+
+  assert(withHyphens   === 'T3452468001', `T-345246800-1 normalizes to T3452468001 (got ${withHyphens})`);
+  assert(withoutHyphens === 'T3452468001', `T3452468001 normalizes to T3452468001 (got ${withoutHyphens})`);
+  assert(withHyphens === withoutHyphens,   'both variants produce the same canonical string');
+
+  // Loading both (post-normalization) into the corpus produces only 1 row.
+  const writer = loadFreshWriter();
+  const corpusDb = require('../lib/mb-corpus-db');
+  const pool = makeStatefulPool();
+  corpusDb._setPool(pool);
+  await writer.upsertISWCs([
+    { mb_work_id: 'work-001', iswc: withHyphens   },
+    { mb_work_id: 'work-001', iswc: withoutHyphens },
+  ]);
+
+  assert(pool.count('iswcs_v1') === 1,
+    `1 ISWC row after loading hyphenated + canonical variant (got ${pool.count('iswcs_v1')})`);
+}
+
+// ── Test 43: ISWC with dots → same canonical → no duplicate ISWC row ─────────
+
+async function test43_iswc_dots_variant_no_dupe() {
+  console.log('\n[43] Same ISWC with dots (T-345.246.800-1) → normalizes → zero dupe ISWC rows');
+
+  const withDots    = normalizeISWC('T-345.246.800-1');
+  const canonical   = normalizeISWC('T3452468001');
+  const lowercase   = normalizeISWC('t-345246800-1');
+
+  assert(withDots  === 'T3452468001', `dots stripped (got ${withDots})`);
+  assert(lowercase === 'T3452468001', `lowercase uppercased (got ${lowercase})`);
+  assert(withDots  === canonical,      'dot variant equals canonical');
+
+  const writer = loadFreshWriter();
+  const corpusDb = require('../lib/mb-corpus-db');
+  const pool = makeStatefulPool();
+  corpusDb._setPool(pool);
+  // Load all three variants: should collapse to 1 row.
+  await writer.upsertISWCs([
+    { mb_work_id: 'work-001', iswc: withDots },
+    { mb_work_id: 'work-001', iswc: canonical },
+    { mb_work_id: 'work-001', iswc: lowercase },
+  ]);
+
+  assert(pool.count('iswcs_v1') === 1,
+    `1 ISWC row after loading dots + canonical + lowercase variants (got ${pool.count('iswcs_v1')})`);
+}
+
+// ── Test 44: Artist with alias loaded twice → exactly 1 artist, 1 alias ───────
+
+async function test44_artist_alias_double_load_no_dupe() {
+  console.log('\n[44] Artist with alias loaded twice → 1 artist row, 1 alias row (no phantom duplicates)');
+
+  const writer = loadFreshWriter();
+  const corpusDb = require('../lib/mb-corpus-db');
+  const pool = makeStatefulPool();
+  corpusDb._setPool(pool);
+
+  const artist = FIXTURE.artists[0];
+  const alias  = FIXTURE.aliases[0];
+
+  // First load
+  await writer.upsertArtists([artist]);
+  await writer.upsertArtistAliases([alias]);
+  const after1 = { artists: pool.count('artists_v1'), aliases: pool.count('artist_aliases_v1') };
+
+  // Second load (same data)
+  await writer.upsertArtists([artist]);
+  await writer.upsertArtistAliases([alias]);
+  const after2 = { artists: pool.count('artists_v1'), aliases: pool.count('artist_aliases_v1') };
+
+  assert(after1.artists  === 1, `1 artist after first load (got ${after1.artists})`);
+  assert(after1.aliases  === 1, `1 alias after first load (got ${after1.aliases})`);
+  assert(after2.artists  === 1, `still 1 artist after second load (got ${after2.artists})`);
+  assert(after2.aliases  === 1, `still 1 alias after second load (got ${after2.aliases})`);
+
+  // The alias conflict key includes both mb_artist_id and alias_name — verify it.
+  const aliasKeys = pool.allKeys('artist_aliases_v1');
+  assert(aliasKeys.length === 1, '1 unique alias conflict key');
+  assert(aliasKeys[0].includes('artist-esham-001') && aliasKeys[0].includes('Eric Gulley'),
+    `alias key contains both artist ID and alias name (got "${aliasKeys[0]}")`);
+}
+
+// ── Test 45: Recording on two releases → 1 recording, 2 releases, 2 rels ──────
+
+async function test45_recording_on_multiple_releases() {
+  console.log('\n[45] Same recording on two releases → 1 recording, 2 releases, 2 distinct appears_on rels');
+
+  const writer = loadFreshWriter();
+  const corpusDb = require('../lib/mb-corpus-db');
+  const pool = makeStatefulPool();
+  corpusDb._setPool(pool);
+
+  const recording = FIXTURE.recordings[0]; // rec-001-acid-rain
+  const releases  = FIXTURE.releases;      // rel-001-us, rel-002-uk
+  const appearsOnRels = FIXTURE.relationships.filter(r => r.relationship_type === 'appears_on');
+
+  await writer.upsertRecordings([recording]);
+  await writer.upsertReleases(releases);
+  await writer.upsertRelationships(appearsOnRels);
+
+  assert(pool.count('recordings_v1')    === 1, `1 recording (got ${pool.count('recordings_v1')})`);
+  assert(pool.count('releases_v1')      === 2, `2 releases (got ${pool.count('releases_v1')})`);
+  assert(pool.count('relationships_v1') === 2, `2 distinct appears_on rels (got ${pool.count('relationships_v1')})`);
+
+  // Both relationships reference the same source recording but different target releases.
+  const relKeys = pool.allKeys('relationships_v1');
+  const hasUS = relKeys.some(k => k.includes('rel-001-us'));
+  const hasUK = relKeys.some(k => k.includes('rel-002-uk'));
+  assert(hasUS, 'appears_on rel-001-us exists');
+  assert(hasUK, 'appears_on rel-002-uk exists');
+
+  // Second load: still 1 recording, 2 releases, 2 rels.
+  await writer.upsertRecordings([recording]);
+  await writer.upsertReleases(releases);
+  await writer.upsertRelationships(appearsOnRels);
+
+  assert(pool.count('recordings_v1')    === 1, `still 1 recording after second load (got ${pool.count('recordings_v1')})`);
+  assert(pool.count('releases_v1')      === 2, `still 2 releases after second load (got ${pool.count('releases_v1')})`);
+  assert(pool.count('relationships_v1') === 2, `still 2 rels after second load (got ${pool.count('relationships_v1')})`);
+}
+
+// ── Test 46: Two similar-titled recordings → both preserved as distinct ────────
+
+async function test46_similar_titles_distinct_canonical_rows() {
+  console.log('\n[46] Two similar-titled recordings (different MBIDs) → both preserved; neither overwrites');
+
+  const writer = loadFreshWriter();
+  const corpusDb = require('../lib/mb-corpus-db');
+  const pool = makeStatefulPool();
+  corpusDb._setPool(pool);
+
+  const acidRain   = FIXTURE.recordings.find(r => r.mb_recording_id === 'rec-001-acid-rain');
+  const acidReign  = FIXTURE.recordings.find(r => r.mb_recording_id === 'rec-004-acid-reign');
+  const isrcAcidRain  = FIXTURE.isrcs.find(i => i.mb_recording_id === 'rec-001-acid-rain');
+  const isrcAcidReign = FIXTURE.isrcs.find(i => i.mb_recording_id === 'rec-004-acid-reign');
+
+  // Load both recordings and their ISRCs.
+  await writer.upsertRecordings([acidRain, acidReign]);
+  await writer.upsertISRCs([isrcAcidRain, isrcAcidReign]);
+
+  assert(pool.count('recordings_v1') === 2, `2 distinct recording rows (got ${pool.count('recordings_v1')})`);
+  assert(pool.count('isrcs_v1')      === 2, `2 distinct ISRC rows (got ${pool.count('isrcs_v1')})`);
+
+  // Both canonical IDs present.
+  const recKeys = pool.allKeys('recordings_v1');
+  assert(recKeys.includes('rec-001-acid-rain'),  '"Acid Rain" MBID present');
+  assert(recKeys.includes('rec-004-acid-reign'), '"Acid Reign" MBID present');
+
+  // ISRCs are bound to their respective recordings — not cross-linked.
+  const isrcRows = pool.rows('isrcs_v1');
+  const rainISRC  = isrcRows.find(r => r.mb_recording_id === 'rec-001-acid-rain');
+  const reignISRC = isrcRows.find(r => r.mb_recording_id === 'rec-004-acid-reign');
+  assert(rainISRC?.isrc  === 'USRC12300001', `Acid Rain  ISRC correct (got ${rainISRC?.isrc})`);
+  assert(reignISRC?.isrc === 'USRC12300004', `Acid Reign ISRC correct (got ${reignISRC?.isrc})`);
+
+  // Load both again — counts still 2.
+  await writer.upsertRecordings([acidRain, acidReign]);
+  await writer.upsertISRCs([isrcAcidRain, isrcAcidReign]);
+
+  assert(pool.count('recordings_v1') === 2, `still 2 recordings after second load (got ${pool.count('recordings_v1')})`);
+  assert(pool.count('isrcs_v1')      === 2, `still 2 ISRCs after second load (got ${pool.count('isrcs_v1')})`);
+
+  // Titles are preserved as distinct — neither overwrote the other.
+  const recRows = pool.rows('recordings_v1');
+  const titles  = recRows.map(r => r.title).sort();
+  assert(titles.includes('Acid Rain'),  '"Acid Rain" title preserved');
+  assert(titles.includes('Acid Reign'), '"Acid Reign" title preserved');
+  assert(titles[0] !== titles[1],       'two distinct titles in store');
+}
+
 // ── Runner ────────────────────────────────────────────────────────────────────
 
 (async () => {
@@ -812,6 +1613,26 @@ async function test26_dump_release_group_secondary_types_not_null() {
   await test24_isrc_hyphen_normalized_in_resolver();
   await test25_load_enriched_tracks_paginates();
   await test26_dump_release_group_secondary_types_not_null();
+  await test27_build_id_map();
+  await test28_transform_isrc_resolves_fk();
+  await test29_transform_isrc_null_on_missing_fk();
+  await test30_transform_isrc_normalizes_hyphen();
+  await test31_transform_iswc();
+  await test32_transform_artist_alias();
+  await test33_batch_stream_skips_null_rows();
+  await test34_count_table_returns_integer();
+  await test35_count_table_rejects_unknown_table();
+  await test36_fixture_load_correct_counts();
+  await test37_double_load_zero_new_rows();
+  await test38_double_load_canonical_ids_stable();
+  await test39_provenance_preserved_across_upserts();
+  await test40_isrc_hyphen_variant_no_dupe();
+  await test41_isrc_lowercase_variant_no_dupe();
+  await test42_iswc_hyphen_variant_no_dupe();
+  await test43_iswc_dots_variant_no_dupe();
+  await test44_artist_alias_double_load_no_dupe();
+  await test45_recording_on_multiple_releases();
+  await test46_similar_titles_distinct_canonical_rows();
 
   console.log(`\n${'─'.repeat(50)}`);
   const total = passed + failed;

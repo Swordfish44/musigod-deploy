@@ -65,7 +65,7 @@ const {
   checkpointProgress, getIngestionState,
 } = require('../lib/mb-staging-writer');
 
-const { batchStream } = require('../lib/mb-dump-parser');
+const { batchStream, buildIdMap } = require('../lib/mb-dump-parser');
 const { resolveAllTracks } = require('../lib/mb-entity-resolver');
 
 // ─── Arg parsing ──────────────────────────────────────────────────────────────
@@ -73,41 +73,52 @@ const { resolveAllTracks } = require('../lib/mb-entity-resolver');
 function parseArgs(argv) {
   const args = argv.slice(2);
   const opts = {
-    artists:      false,
-    recordings:   false,
-    works:        false,
-    releases:     false,
+    artists:       false,
+    recordings:    false,
+    works:         false,
+    releases:      false,
+    releaseGroups: false,
+    isrcs:         false,
+    iswcs:         false,
+    aliases:       false,
     relationships: false,
-    resolve:      false,
-    all:          false,
-    resume:       false,
-    dryRun:       false,
-    dumpFile:     null,
-    artistName:   null,
-    batchSize:    500,
+    resolve:       false,
+    all:           false,
+    resume:        false,
+    dryRun:        false,
+    dumpFile:      null,
+    idMapDump:     null,
+    artistName:    null,
+    batchSize:     500,
   };
 
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
-      case '--artists':       opts.artists       = true; break;
-      case '--recordings':    opts.recordings    = true; break;
-      case '--works':         opts.works         = true; break;
-      case '--releases':      opts.releases      = true; break;
-      case '--relationships': opts.relationships = true; break;
-      case '--resolve':       opts.resolve       = true; break;
-      case '--all':           opts.all           = true; break;
-      case '--resume':        opts.resume        = true; break;
-      case '--dry-run':       opts.dryRun        = true; break;
-      case '--dump-file':     opts.dumpFile      = args[++i]; break;
-      case '--artist-name':   opts.artistName    = args[++i]; break;
-      case '--batch-size':    opts.batchSize     = parseInt(args[++i], 10) || 500; break;
-    case '--health-check':  opts.healthCheck   = true; break;
+      case '--artists':        opts.artists       = true; break;
+      case '--recordings':     opts.recordings    = true; break;
+      case '--works':          opts.works         = true; break;
+      case '--releases':       opts.releases      = true; break;
+      case '--release-groups': opts.releaseGroups = true; break;
+      case '--isrcs':          opts.isrcs         = true; break;
+      case '--iswcs':          opts.iswcs         = true; break;
+      case '--aliases':        opts.aliases       = true; break;
+      case '--relationships':  opts.relationships = true; break;
+      case '--resolve':        opts.resolve       = true; break;
+      case '--all':            opts.all           = true; break;
+      case '--resume':         opts.resume        = true; break;
+      case '--dry-run':        opts.dryRun        = true; break;
+      case '--dump-file':      opts.dumpFile      = args[++i]; break;
+      case '--id-map-dump':    opts.idMapDump     = args[++i]; break;
+      case '--artist-name':    opts.artistName    = args[++i]; break;
+      case '--batch-size':     opts.batchSize     = parseInt(args[++i], 10) || 500; break;
+      case '--health-check':   opts.healthCheck   = true; break;
     }
   }
 
   if (opts.all) {
     opts.artists = opts.recordings = opts.works =
-      opts.releases = opts.relationships = opts.resolve = true;
+      opts.releases = opts.releaseGroups = opts.isrcs = opts.iswcs =
+      opts.aliases = opts.relationships = opts.resolve = true;
   }
 
   return opts;
@@ -440,8 +451,11 @@ async function ingestDumpFile(entityType, dumpFile, opts) {
 
   const upsertFn = {
     artist:        upsertArtists,
+    artist_alias:  upsertArtistAliases,
     recording:     upsertRecordings,
+    isrc:          upsertISRCs,
     work:          upsertWorks,
+    iswc:          upsertISWCs,
     release:       upsertReleases,
     release_group: upsertReleaseGroups,
   }[entityType];
@@ -450,8 +464,22 @@ async function ingestDumpFile(entityType, dumpFile, opts) {
     throw new Error(`No upsert function for dump entity type: ${entityType}`);
   }
 
+  // FK-linked entities need an idMap to resolve integer parent IDs to corpus GUIDs.
+  // Caller supplies opts.idMapDump (path to the parent dump) + opts.idMapEntity (type).
+  let idMap = null;
+  const idMapConfig = { isrc: 'recording', iswc: 'work', artist_alias: 'artist' }[entityType];
+  if (idMapConfig) {
+    const parentDump = opts.idMapDump;
+    if (!parentDump) {
+      throw new Error(`--id-map-dump <path> is required for entity type "${entityType}"`);
+    }
+    console.log(`[mb-import] Building ${idMapConfig} ID map from ${parentDump}…`);
+    idMap = await buildIdMap(parentDump, idMapConfig);
+    console.log(`[mb-import] ID map ready: ${idMap.size.toLocaleString()} entries`);
+  }
+
   try {
-    for await (const { batch, totalProcessed: processed, lineNum } of batchStream(dumpFile, entityType, batchSize, startOffset)) {
+    for await (const { batch, totalProcessed: processed, lineNum } of batchStream(dumpFile, entityType, batchSize, startOffset, idMap)) {
       try {
         await upsertFn(batch, dryRun);
         totalProcessed += batch.length;
@@ -546,10 +574,14 @@ async function main() {
   if (opts.dumpFile) {
     // Infer entity type from the requested flag
     const entityMap = {
-      artists:    'artist',
-      recordings: 'recording',
-      works:      'work',
-      releases:   'release',
+      artists:       'artist',
+      recordings:    'recording',
+      works:         'work',
+      releases:      'release',
+      releaseGroups: 'release_group',
+      isrcs:         'isrc',
+      iswcs:         'iswc',
+      aliases:       'artist_alias',
     };
     for (const [flag, entityType] of Object.entries(entityMap)) {
       if (opts[flag]) {
