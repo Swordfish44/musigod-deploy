@@ -313,7 +313,7 @@ async function ingestArtistViaApi(artist, opts) {
         });
 
         for (const isrc of (rec.isrcs || [])) {
-          if (isrc) isrcRows.push({ mb_recording_id: rec.id, isrc: isrc.toUpperCase() });
+          if (isrc) isrcRows.push({ mb_recording_id: rec.id, isrc: isrc.toUpperCase().replace(/[-\s]/g, '') });
         }
       }
     }

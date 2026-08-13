@@ -31,6 +31,8 @@
 //   21. Corpus DB not configured → writer throws clear error
 //   22. Corpus DB outage → resolver degrades gracefully (empty candidates, no throw)
 //   23. healthCheck() returns false when corpus DB query throws
+//   24. Resolver normalizes hyphenated ISRC before corpus lookup (no hyphen in query param)
+//   25. loadEnrichedTracks() paginates: fetches all pages when first page is full
 
 let passed = 0;
 let failed = 0;
@@ -681,6 +683,67 @@ async function test23_health_check_false_on_error() {
   assert(healthy === false, 'healthCheck returns false on DB error');
 }
 
+// ── Test 24: ISRC hyphen normalization in resolver lookup ─────────────────────
+
+async function test24_isrc_hyphen_normalized_in_resolver() {
+  console.log('\n[24] resolveTrack() normalizes hyphenated ISRC before corpus lookup');
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
+
+  const { pool, calls } = makeSpy([
+    ['isrcs_v1', [{ mb_recording_id: 'mb-rec-0024' }]],
+  ]);
+  const { resolveTrack } = loadFreshResolver();
+  const corpusDb = require('../lib/mb-corpus-db');
+  corpusDb._setPool(pool);
+
+  const candidates = await resolveTrack({
+    id:             'track-0024',
+    isrcs:          ['US-RC1-23-00024'],  // hyphenated input
+    recording_mbid: null,
+    iswc:           null,
+    track_title:    'Hyphen Test',
+  });
+
+  const isrcCall = calls.find(c => c.sql.includes('isrcs_v1'));
+  assert(isrcCall !== undefined, 'isrcs_v1 was queried');
+  assert(isrcCall?.params[0] === 'USRC12300024', `ISRC bare-normalized in query param (got "${isrcCall?.params[0]}")`);
+  assert(candidates.length === 1,    'candidate found despite hyphenated input');
+  assert(candidates[0]?.confidence === 1.0, 'confidence 1.0 on normalized ISRC match');
+  assert(candidates[0]?.mb_entity_id === 'mb-rec-0024', 'correct MB entity returned');
+}
+
+// ── Test 25: loadEnrichedTracks() pagination ──────────────────────────────────
+
+async function test25_load_enriched_tracks_paginates() {
+  console.log('\n[25] loadEnrichedTracks() fetches all pages when first page is full');
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
+
+  const { loadEnrichedTracks, PAGE_SIZE } = loadFreshResolver();
+
+  // Page 1: exactly PAGE_SIZE rows (signals more may exist)
+  const page1 = Array.from({ length: PAGE_SIZE }, (_, i) => ({ id: i, track_title: `Track ${i}` }));
+  // Page 2: 2 rows (signals end of results)
+  const page2 = [{ id: PAGE_SIZE, track_title: 'Track Extra 1' }, { id: PAGE_SIZE + 1, track_title: 'Track Extra 2' }];
+
+  const fetchUrls = [];
+  const origFetch = global.fetch;
+  global.fetch = async (url) => {
+    fetchUrls.push(url);
+    return { ok: true, text: async () => JSON.stringify(fetchUrls.length === 1 ? page1 : page2) };
+  };
+
+  const tracks = await loadEnrichedTracks();
+
+  global.fetch = origFetch;
+
+  const catalogCalls = fetchUrls.filter(u => u.includes('catalog_enriched_tracks_v1'));
+  assert(catalogCalls.length === 2, `2 fetch calls for 2-page catalog (got ${catalogCalls.length})`);
+  assert(tracks.length === PAGE_SIZE + 2, `all ${PAGE_SIZE + 2} tracks returned (got ${tracks.length})`);
+  assert(catalogCalls[0].includes(`limit=${PAGE_SIZE}`), 'first call includes limit');
+  assert(catalogCalls[0].includes('offset=0'),           'first call starts at offset=0');
+  assert(catalogCalls[1].includes(`offset=${PAGE_SIZE}`), `second call uses offset=${PAGE_SIZE}`);
+}
+
 // ── Runner ────────────────────────────────────────────────────────────────────
 
 (async () => {
@@ -710,6 +773,8 @@ async function test23_health_check_false_on_error() {
   await test21_corpus_db_not_configured();
   await test22_corpus_outage_graceful_degradation();
   await test23_health_check_false_on_error();
+  await test24_isrc_hyphen_normalized_in_resolver();
+  await test25_load_enriched_tracks_paginates();
 
   console.log(`\n${'─'.repeat(50)}`);
   const total = passed + failed;
