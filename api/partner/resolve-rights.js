@@ -10,6 +10,9 @@
 // No money movement. No consent state writes. Agent-buildable per CLAUDE.md.
 
 const crypto = require('crypto');
+const path   = require('path');
+
+const { checkConsent, VALID_CONSENT_TYPES } = require(path.join(__dirname, '../../lib/consent-gate'));
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -313,10 +316,13 @@ module.exports = async function handler(req, res) {
   const t0 = Date.now();
   const url = new URL(req.url, 'https://musigod.com');
 
-  const rawKey = req.headers['x-partner-key'] || url.searchParams.get('api_key');
-  const isrc   = url.searchParams.get('isrc');
-  const iswc   = url.searchParams.get('iswc');
-  const id     = url.searchParams.get('id');
+  const rawKey   = req.headers['x-partner-key'] || url.searchParams.get('api_key');
+  const isrc     = url.searchParams.get('isrc');
+  const iswc     = url.searchParams.get('iswc');
+  const id       = url.searchParams.get('id');
+  // ?for=<consent_type> — when present, consent is enforced (not just informational).
+  // Returns 403 if consent is not granted for that AI use type.
+  const forAiUse = url.searchParams.get('for') || null;
 
   let partner = null;
   let httpStatus = 200;
@@ -343,6 +349,12 @@ module.exports = async function handler(req, res) {
     if (!isrc && !iswc && !id) {
       httpStatus = 400;
       throw new Error('Provide one of: isrc, iswc, or id');
+    }
+
+    // Validate ?for= consent type when specified
+    if (forAiUse && !VALID_CONSENT_TYPES.includes(forAiUse)) {
+      httpStatus = 400;
+      throw new Error(`'for' must be one of: ${VALID_CONSENT_TYPES.join(', ')}`);
     }
 
     // Resolve
@@ -372,7 +384,24 @@ module.exports = async function handler(req, res) {
 
     // Fetch live AI consent state (Lane A). Falls back to 'unset' if
     // the migration hasn't been applied yet — never throws.
-    result.consent = await fetchConsentState(compNodeId || result.work?.musigod_id || null);
+    const workNodeId = compNodeId || result.work?.musigod_id || null;
+    result.consent = await fetchConsentState(workNodeId);
+
+    // Consent gate: when ?for=<type> is specified, enforce consent before returning
+    // work data. Blocked if status is denied, unset, or expired.
+    if (forAiUse) {
+      const gate = await checkConsent(workNodeId, forAiUse);
+      if (!gate.allowed) {
+        httpStatus = 403;
+        return res.status(403).json({
+          error:            'consent_required',
+          message:          `AI use type '${forAiUse}' not permitted: ${gate.reason}`,
+          consent_type:     forAiUse,
+          effective_status: gate.effective_status,
+          lookup:           { type: identifierType, value: identifierValue },
+        });
+      }
+    }
 
     return res.status(200).json(result);
 
