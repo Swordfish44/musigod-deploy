@@ -629,6 +629,19 @@ DECLARE
   v_eng_id uuid;
   v_result jsonb;
 BEGIN
+  -- Guard: trust_authorization tables (recovery_authorizations_v1,
+  -- required_documents_v1) are created by the next migration file.
+  -- Skip this seed block if they don't exist yet (fresh local DB).
+  -- In production these tables pre-exist; the block runs normally.
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'registrations'
+      AND table_name   = 'recovery_authorizations_v1'
+  ) THEN
+    RAISE NOTICE 'recovery_authorizations_v1 not yet created — skipping onboarding seed';
+    RETURN;
+  END IF;
+
   SELECT id INTO v_eng_id FROM registrations.recovery_engagements_v1
   WHERE artist_email = 'swordfishlp44@proton.me'
   AND service_type = 'PUBLISHING_ADMIN'

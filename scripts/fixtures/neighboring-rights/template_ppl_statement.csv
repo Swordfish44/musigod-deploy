@@ -1,0 +1,2 @@
+isrc,title,performer_name,rightsholder_name,statement_period,gross_royalties,net_royalties,paid_amount,held_amount,currency,original_currency,original_amount,exchange_rate,usage_type,territory,payment_date,statement_ref
+USASN0802524,Example Track Title,Performer Name,Rightsholder Name,2023-Q1,95.00,85.50,85.50,0.00,USD,GBP,75.00,1.27,broadcast,GB,2023-05-01,PPL-STMT-2023-Q1

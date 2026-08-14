@@ -1,0 +1,3 @@
+isrc,title,artist_name,statement_period,gross_royalties,net_royalties,paid_amount,held_amount,adjustment_amount,currency,original_currency,original_amount,exchange_rate,usage_type,territory,payment_date,payment_ref,reversal,claimant_type,statement_ref,withholding_amount
+USASN0802524,Example Track Title,Artist Name,2023-Q1,150.00,135.00,135.00,0.00,,USD,USD,150.00,1.00,digital_performance,US,2023-04-15,PAY-001,false,featured_performer,SX-STMT-2023-Q1,15.00
+USASN0802525,Second Track,Artist Name,2023-Q1,75.50,68.00,0.00,68.00,,USD,USD,75.50,1.00,digital_performance,US,,PAY-002,false,featured_performer,SX-STMT-2023-Q1,7.50

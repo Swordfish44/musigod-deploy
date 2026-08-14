@@ -1,8 +1,108 @@
 .vercel
-.env*.local
-.env.codex.local
 
-# MusicBrainz local staging — dumps and extracted data must never be committed
+# ── Environment and credential files ─────────────────────────────────────────
+# Broad glob first, then explicit overrides for any variant not covered
+.env*.local
+.env.local
+.env.codex.local
+.env.production
+.env.prod
+.env.prod.tmp
+.env.prod.bak
+.env.vercel-pull
+.env.staging
+.env.preview
+.env.remote
+# Catch any other .env.* that doesn't end in .local
+.env.*
+# But allow .env.example and .env.template (safe reference files)
+!.env.example
+!.env.template
+
+# ── Private royalty statements and CMO exports ────────────────────────────────
+# Never commit SoundExchange, PPL, or any CMO statement exports
+*_statement*.csv
+*_statement*.xlsx
+*_statement*.pdf
+*soundexchange*.csv
+*soundexchange*.xlsx
+*ppl_statement*.csv
+*ppl_statement*.xlsx
+*royalty_statement*
+*royalties_statement*
+# Distributor and label statements
+*_dist_statement*
+*distributor_statement*.csv
+*distributor_statement*.xlsx
+# Raw CMO export files
+*_cmo_export*
+*_unclaimed_export*
+
+# ── Client contracts and ownership agreements ─────────────────────────────────
+*_contract*.pdf
+*_agreement*.pdf
+*_mandate*.pdf
+*_ownership_declaration*.pdf
+*_license_agreement*.pdf
+*_engagement_letter*.pdf
+# Client-signed documents
+*_signed*.pdf
+*_executed*.pdf
+
+# ── Tax documents ─────────────────────────────────────────────────────────────
+*1099*.pdf
+*1099*.csv
+*W-9*.pdf
+*W9*.pdf
+*W-8*.pdf
+*tax_form*.pdf
+*tax_document*
+
+# ── Artist/client writer-recovery pre-flight snapshots ────────────────────────
+esham_writer_recovery_before_*.json
+*_writer_recovery_before_*.json
+*_recovery_snapshot_*.json
+
+# ── Secure client-import staging directories ──────────────────────────────────
+# Operators stage private evidence files here before running the audit pipeline
+audit-staging/
+client-staging/
+neighboring-rights-staging/
+statement-staging/
+private-imports/
+secure-drop/
+
+# ── Other private or generated credential files ───────────────────────────────
+*.pem
+*.p12
+*.pfx
+*.key
+*.crt
+*.cer
+# API key exports and service-account files
+*service-account*.json
+*service_account*.json
+*credentials*.json
+# Exception: public known-safe credential reference files
+!scripts/fixtures/**/*.json
+
+# ── Local tool configuration with embedded secrets ───────────────────────────
+fn_sync_merged_body.txt
+fn_sync_production_body.txt
+fn_sync_*_body.txt
+*.private.*
+Do\ not\ commit.txt
+"Do not commit.txt"
+
+# ── Temporary and backup files ────────────────────────────────────────────────
+*.tmp
+*.bak
+*.backup
+*.orig
+apply_migration_changes.py
+fix_schema_and_verify.py
+
+# ── MusicBrainz local staging — dumps and extracted data ─────────────────────
 data/musicbrainz/dumps/
 data/musicbrainz/staging/*.sql
 data/musicbrainz/staging/*.dump

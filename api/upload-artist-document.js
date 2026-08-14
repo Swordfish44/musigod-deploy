@@ -1,8 +1,13 @@
 const { captureException, withSentry } = require('./_sentry')
+const { hashToken, verifyToken, buildConsumptionUpdate, TOKEN_TYPES } = require('../lib/intake-tokens')
+const { checkRateLimit } = require('../lib/intake-rate-limit')
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY
+
+const TOKEN_TABLE  = 'intake_upload_tokens_v1'
+const TOKEN_SCHEMA = 'registrations'
 
 const ALLOWED_MIME_TYPES = new Set([
   'application/pdf',
@@ -26,6 +31,30 @@ module.exports = withSentry(async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   if (!SB_KEY) return res.status(500).json({ error: 'Supabase service key not configured' })
+
+  // ── Rate limit: 10 uploads per IP per hour ───────────────────────────────
+  const callerIp = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown'
+  const rl = checkRateLimit(`upload:${callerIp}`, { windowSecs: 3600, maxRequests: 10 })
+  if (!rl.allowed) {
+    return res.status(429).json({
+      error: 'Rate limit exceeded — too many uploads from this IP',
+      retry_after_secs: rl.retryAfterSecs,
+    })
+  }
+
+  // ── Token verification ────────────────────────────────────────────────────
+  const rawToken = String(req.headers['x-intake-token'] || '').trim()
+  if (!rawToken) return res.status(401).json({ error: 'x-intake-token header is required' })
+
+  let tokenRecord
+  try {
+    const tokenHash = hashToken(rawToken)
+    tokenRecord = await sbFetchToken(tokenHash)
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid token format' })
+  }
+
+  if (!tokenRecord) return res.status(401).json({ error: 'Token not found' })
 
   try {
     // Parse multipart form data manually
@@ -53,6 +82,19 @@ module.exports = withSentry(async function handler(req, res) {
     if (!document_type || !ALLOWED_DOCUMENT_TYPES.has(document_type)) {
       return res.status(400).json({ error: `document_type must be one of: ${[...ALLOWED_DOCUMENT_TYPES].join(', ')}` })
     }
+
+    // ── Token scope check — after we have artist_email from form fields ──────
+    const tokenCheck = verifyToken(rawToken, tokenRecord, {
+      artistEmail: artist_email,
+      tokenType:   TOKEN_TYPES.DOCUMENT_UPLOAD,
+      engagementId: clean(fields.engagement_id) || null,
+    })
+    if (!tokenCheck.valid) {
+      return res.status(401).json({ error: `Token invalid: ${tokenCheck.reason}` })
+    }
+
+    // Mark token consumed before storage write — fail-closed
+    await sbConsumeToken(tokenRecord.token_hash, 'upload-artist-document')
     if (!file) {
       return res.status(400).json({ error: 'File is required' })
     }
@@ -224,6 +266,50 @@ function indexOf(buf, search, start = 0) {
     if (found) return i
   }
   return -1
+}
+
+// ---------------------------------------------------------------------------
+// Token helpers
+// ---------------------------------------------------------------------------
+async function sbFetchToken(tokenHash) {
+  const encoded = encodeURIComponent(tokenHash)
+  const res = await fetch(
+    `${SB_URL}/rest/v1/${TOKEN_TABLE}?token_hash=eq.${encoded}&limit=1`,
+    {
+      headers: {
+        apikey:           SB_KEY,
+        Authorization:    `Bearer ${SB_KEY}`,
+        'Accept-Profile': TOKEN_SCHEMA,
+      },
+    }
+  )
+  if (!res.ok) throw new Error(`Token lookup failed: ${res.status}`)
+  const rows = await res.json()
+  return rows?.[0] || null
+}
+
+async function sbConsumeToken(tokenHash, consumedBy) {
+  const update = buildConsumptionUpdate(consumedBy)
+  const encoded = encodeURIComponent(tokenHash)
+  const res = await fetch(
+    `${SB_URL}/rest/v1/${TOKEN_TABLE}?token_hash=eq.${encoded}`,
+    {
+      method: 'PATCH',
+      headers: {
+        apikey:            SB_KEY,
+        Authorization:     `Bearer ${SB_KEY}`,
+        'Content-Type':    'application/json',
+        'Accept-Profile':  TOKEN_SCHEMA,
+        'Content-Profile': TOKEN_SCHEMA,
+        Prefer:            'return=minimal',
+      },
+      body: JSON.stringify(update),
+    }
+  )
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Token consumption update failed: ${res.status} ${text}`)
+  }
 }
 
 // ---------------------------------------------------------------------------

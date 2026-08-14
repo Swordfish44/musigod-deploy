@@ -1,0 +1,2 @@
+title,artist_name,isrc,upc,album_title,platform,territory,statement_period,gross_royalties,fee_amount,net_royalties,currency,streams,downloads,payment_date,statement_ref
+Example Track Title,Artist Name,USASN0802524,123456789012,Album Title,Spotify,US,2023-Q1,50.00,5.00,45.00,USD,12500,0,2023-04-30,DIST-2023-Q1

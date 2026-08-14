@@ -1,15 +1,43 @@
 const { captureException, withSentry } = require('./_sentry')
+const { hashToken, verifyToken, buildConsumptionUpdate, TOKEN_TYPES } = require('../lib/intake-tokens')
+const { checkRateLimit } = require('../lib/intake-rate-limit')
 
-const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
-const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
+const SB_URL        = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
+const SB_KEY        = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
 const RESEND_API_KEY = process.env.RESEND_API_KEY
-const FROM_EMAIL = process.env.FROM_EMAIL || 'MusiGod <noreply@musigod.com>'
+const FROM_EMAIL    = process.env.FROM_EMAIL || 'MusiGod <noreply@musigod.com>'
+
+const TOKEN_TABLE  = 'intake_upload_tokens_v1'
+const TOKEN_SCHEMA = 'registrations'
 
 module.exports = withSentry(async function handler(req, res) {
   setCors(req, res)
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   if (!SB_KEY) return res.status(500).json({ error: 'Supabase key not configured' })
+
+  // ── Rate limit: 5 signing attempts per IP per hour ───────────────────────
+  const callerIp = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown'
+  const rl = checkRateLimit(`sign:${callerIp}`, { windowSecs: 3600, maxRequests: 5 })
+  if (!rl.allowed) {
+    return res.status(429).json({
+      error: 'Rate limit exceeded — too many signing attempts from this IP',
+      retry_after_secs: rl.retryAfterSecs,
+    })
+  }
+
+  // ── Token verification ────────────────────────────────────────────────────
+  const rawToken = String(req.headers['x-intake-token'] || '').trim()
+  if (!rawToken) return res.status(401).json({ error: 'x-intake-token header is required' })
+
+  let tokenRecord
+  try {
+    const tokenHash = hashToken(rawToken)
+    tokenRecord = await sbFetchToken(tokenHash)
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid token format' })
+  }
+  if (!tokenRecord) return res.status(401).json({ error: 'Token not found' })
 
   let body
   try { body = JSON.parse((await getRawBody(req)).toString()) }
@@ -23,6 +51,19 @@ module.exports = withSentry(async function handler(req, res) {
   if (!artist_email)           return res.status(400).json({ error: 'artist_email is required' })
   if (!service_type)           return res.status(400).json({ error: 'service_type is required' })
   if (!disclosure_acknowledged) return res.status(400).json({ error: 'disclosure_acknowledged must be true' })
+
+  // ── Token scope check — after we have artist_email from body ─────────────
+  const tokenCheck = verifyToken(rawToken, tokenRecord, {
+    artistEmail:  artist_email,
+    tokenType:    TOKEN_TYPES.AGREEMENT_SIGN,
+    engagementId: engagement_id || null,
+  })
+  if (!tokenCheck.valid) {
+    return res.status(401).json({ error: `Token invalid: ${tokenCheck.reason}` })
+  }
+
+  // Mark consumed before DB write — fail-closed
+  await sbConsumeToken(tokenRecord.token_hash, 'sign-agreement')
 
   const ip_address = clean(req.headers['x-forwarded-for']).split(',')[0] || null
   const user_agent = clean(req.headers['user-agent']) || null
@@ -135,6 +176,32 @@ async function sendSignedEmail({ artist_email, agreement, result }) {
       html,
     }),
   })
+}
+
+async function sbFetchToken(tokenHash) {
+  const encoded = encodeURIComponent(tokenHash)
+  const r = await fetch(`${SB_URL}/rest/v1/${TOKEN_TABLE}?token_hash=eq.${encoded}&limit=1`, {
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Accept-Profile': TOKEN_SCHEMA },
+  })
+  if (!r.ok) throw new Error(`Token lookup failed: ${r.status}`)
+  const rows = await r.json()
+  return rows?.[0] || null
+}
+
+async function sbConsumeToken(tokenHash, consumedBy) {
+  const update = buildConsumptionUpdate(consumedBy)
+  const encoded = encodeURIComponent(tokenHash)
+  const r = await fetch(`${SB_URL}/rest/v1/${TOKEN_TABLE}?token_hash=eq.${encoded}`, {
+    method: 'PATCH',
+    headers: {
+      apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
+      'Content-Type': 'application/json',
+      'Accept-Profile': TOKEN_SCHEMA, 'Content-Profile': TOKEN_SCHEMA,
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify(update),
+  })
+  if (!r.ok) { const t = await r.text(); throw new Error(`Token consumption failed: ${r.status} ${t}`) }
 }
 
 async function sbFetch(path, schema, options = {}) {

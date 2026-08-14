@@ -207,6 +207,6 @@ INSERT INTO crm.contacts (full_name, company, type, source, pipeline_stage, prio
 ('Hypebot Editor','Hypebot','press','cold_outreach','identified','high','US','Indie music industry daily read. Startup-friendly coverage.',ARRAY['press','tier1']),
 ('Trapital - Dan Runcie','Trapital','press','cold_outreach','identified','vip','US','Hip-hop business analysis podcast. Perfect demographic alignment.',ARRAY['press','podcast','tier1']),
 ('Berklee Online Partnerships','Berklee College of Music','education','cold_outreach','identified','high','US','Co-develop Music Business & Publishing Admin certificate module.',ARRAY['education','tier2']),
-('NMBA Executive Director','National Music Bar Association','legal','cold_outreach','identified','high','US','Music attorney referral network. $200/activation + white-glove onboarding.',ARRAY['legal','attorneys','tier1']),
+('NMBA Executive Director','National Music Bar Association','attorney','cold_outreach','identified','high','US','Music attorney referral network. $200/activation + white-glove onboarding.',ARRAY['legal','attorneys','tier1']),
 ('A2IM Membership','A2IM','partner','cold_outreach','identified','high','US','American Association of Independent Music. 700+ indie label members.',ARRAY['association','labels','tier2']),
 ('WIN Global','Worldwide Independent Network','partner','cold_outreach','identified','high','UK','1,200+ indie labels globally. International market entry vehicle.',ARRAY['association','international','tier1']);

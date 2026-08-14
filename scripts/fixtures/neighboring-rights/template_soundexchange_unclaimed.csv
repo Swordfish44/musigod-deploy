@@ -1,0 +1,3 @@
+artist_name,title,isrc,album_title,release_year,territory,unclaimed_since,search_ref
+Artist Name,Example Track Title,USASN0802524,Album Title,2008,US,2018,SE-SEARCH-001
+Artist Name,Second Track,,Album Title,2009,US,2019,SE-SEARCH-002
