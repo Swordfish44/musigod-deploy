@@ -112,3 +112,6 @@ data/musicbrainz/staging/*.zip
 data/musicbrainz/postgres-data/
 *.mbdump
 *.mbdump.tar.bz2
+# musigod-packet-generator is a separate Render service with its own git repo
+# It was accidentally staged as a gitlink (mode 160000) in 3c15f28 — never add it again
+musigod-packet-generator/
