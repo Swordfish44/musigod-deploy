@@ -1,0 +1,208 @@
+name: Enterprise Migration Validation
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/20260816000000_enterprise_foundation_v1.sql'
+      - 'supabase/migrations/20260816000001_enterprise_authenticated_reads_v1.sql'
+      - '.github/workflows/enterprise-migration-validation.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  validate-enterprise-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGDATABASE: postgres
+      PGUSER: postgres
+      PGPASSWORD: postgres
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bootstrap Supabase-compatible roles and auth schema
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE service_role NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE SCHEMA auth;
+          CREATE TABLE auth.users (
+            id uuid PRIMARY KEY,
+            email text
+          );
+          CREATE OR REPLACE FUNCTION auth.uid()
+          RETURNS uuid
+          LANGUAGE sql
+          STABLE
+          AS $$
+            SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid
+          $$;
+          GRANT USAGE ON SCHEMA auth TO authenticated, service_role;
+          GRANT SELECT ON auth.users TO authenticated, service_role;
+          SQL
+
+      - name: Apply enterprise migrations
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260816000000_enterprise_foundation_v1.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260816000001_enterprise_authenticated_reads_v1.sql
+
+      - name: Validate schema, RLS, constraints, and seeded controls
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $test$
+          DECLARE
+            v_count integer;
+            v_org_a uuid := '10000000-0000-0000-0000-000000000001';
+            v_org_b uuid := '10000000-0000-0000-0000-000000000002';
+            v_user uuid := '20000000-0000-0000-0000-000000000001';
+            v_source uuid;
+            v_control uuid;
+            v_evidence uuid;
+          BEGIN
+            SELECT count(*) INTO v_count
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name LIKE 'enterprise_%_v1';
+            IF v_count <> 12 THEN
+              RAISE EXCEPTION 'expected 12 enterprise tables, got %', v_count;
+            END IF;
+
+            SELECT count(*) INTO v_count
+            FROM public.enterprise_security_controls_v1;
+            IF v_count <> 12 THEN
+              RAISE EXCEPTION 'expected 12 MESA controls, got %', v_count;
+            END IF;
+
+            SELECT count(*) INTO v_count
+            FROM pg_class
+            WHERE relnamespace = 'public'::regnamespace
+              AND relname LIKE 'enterprise_%_v1'
+              AND relrowsecurity;
+            IF v_count <> 12 THEN
+              RAISE EXCEPTION 'expected RLS on 12 enterprise tables, got %', v_count;
+            END IF;
+
+            INSERT INTO auth.users(id, email) VALUES (v_user, 'pilot@example.test');
+            INSERT INTO public.enterprise_organizations_v1(id, name, slug)
+              VALUES (v_org_a, 'Pilot A', 'pilot-a'), (v_org_b, 'Pilot B', 'pilot-b');
+            INSERT INTO public.enterprise_memberships_v1(organization_id, user_id, role)
+              VALUES (v_org_a, v_user, 'reviewer');
+            INSERT INTO public.enterprise_data_sources_v1(
+              organization_id, source_name, source_type, transport
+            ) VALUES (v_org_a, 'Authorized A', 'acquisition', 'csv');
+
+            INSERT INTO public.enterprise_data_sources_v1(
+              organization_id, source_name, source_type, transport
+            ) VALUES (v_org_b, 'Authorized B', 'acquisition', 'csv')
+            RETURNING id INTO v_source;
+
+            INSERT INTO public.enterprise_import_batches_v1(
+              organization_id, data_source_id, content_sha256
+            ) VALUES (
+              v_org_b, v_source, repeat('a', 64)
+            );
+
+            BEGIN
+              INSERT INTO public.enterprise_import_batches_v1(
+                organization_id, data_source_id, content_sha256
+              ) VALUES (v_org_b, v_source, repeat('a', 64));
+              RAISE EXCEPTION 'duplicate import hash was accepted';
+            EXCEPTION WHEN unique_violation THEN
+              NULL;
+            END;
+
+            BEGIN
+              INSERT INTO public.enterprise_royalty_rules_v1(
+                rule_code, territory, rights_type, usage_type, effective_from,
+                authority_sources, review_status
+              ) VALUES (
+                'INVALID-APPROVAL', 'US', 'master', 'digital', CURRENT_DATE,
+                '[{"source":"test"}]'::jsonb, 'approved'
+              );
+              RAISE EXCEPTION 'approved rule without reviewer was accepted';
+            EXCEPTION WHEN check_violation THEN
+              NULL;
+            END;
+
+            BEGIN
+              INSERT INTO public.enterprise_title_findings_v1(
+                organization_id, finding_type, summary, confidence, legal_effect
+              ) VALUES (
+                v_org_a, 'system_inference', 'test', 0.5, true
+              );
+              RAISE EXCEPTION 'unreviewed legal-effect finding was accepted';
+            EXCEPTION WHEN check_violation THEN
+              NULL;
+            END;
+
+            SELECT id INTO v_control
+            FROM public.enterprise_security_controls_v1
+            WHERE control_code = 'MESA-01';
+            INSERT INTO public.enterprise_security_evidence_v1(
+              control_id, evidence_type, artifact_reference
+            ) VALUES (v_control, 'test', 'ci-validation')
+            RETURNING id INTO v_evidence;
+
+            BEGIN
+              UPDATE public.enterprise_security_evidence_v1
+              SET artifact_reference = 'mutated'
+              WHERE id = v_evidence;
+              RAISE EXCEPTION 'append-only security evidence was mutable';
+            EXCEPTION WHEN raise_exception THEN
+              IF SQLERRM <> 'enterprise security evidence is append-only' THEN
+                RAISE;
+              END IF;
+            END;
+          END
+          $test$;
+          SQL
+
+      - name: Validate authenticated tenant isolation
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE authenticated;
+          SET request.jwt.claim.sub = '20000000-0000-0000-0000-000000000001';
+
+          DO $test$
+          DECLARE v_count integer;
+          BEGIN
+            SELECT count(*) INTO v_count
+            FROM public.enterprise_organizations_v1;
+            IF v_count <> 1 THEN
+              RAISE EXCEPTION 'member should see exactly one organization, got %', v_count;
+            END IF;
+
+            SELECT count(*) INTO v_count
+            FROM public.enterprise_data_sources_v1;
+            IF v_count <> 1 THEN
+              RAISE EXCEPTION 'member should see exactly one organization source, got %', v_count;
+            END IF;
+          END
+          $test$;
+
+          RESET ROLE;
+          SQL
+
+      - name: Reapply migrations to prove idempotency
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260816000000_enterprise_foundation_v1.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260816000001_enterprise_authenticated_reads_v1.sql
