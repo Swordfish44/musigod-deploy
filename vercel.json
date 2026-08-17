@@ -110,6 +110,10 @@
         {
             "source": "/recovery-tracker",
             "destination": "/recovery-tracker.html"
+        },
+        {
+            "source": "/enterprise/harbourview",
+            "destination": "/harbourview-pilot.html"
         }
     ],
     "crons": [
@@ -145,6 +149,12 @@
         },
         "api/get-recovery-cases.js": {
             "maxDuration": 10
+        },
+        "api/enterprise/harbourview-workspace.js": {
+            "maxDuration": 15
+        },
+        "api/enterprise/import-batch.js": {
+            "maxDuration": 30
         }
     }
 }
