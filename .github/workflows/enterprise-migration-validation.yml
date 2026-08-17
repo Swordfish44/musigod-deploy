@@ -108,9 +108,11 @@ jobs:
               VALUES (v_org_a, v_user, 'reviewer');
             INSERT INTO public.enterprise_data_sources_v1(
               organization_id, source_name, source_type, transport
-            ) VALUES
-              (v_org_a, 'Authorized A', 'acquisition', 'csv'),
-              (v_org_b, 'Authorized B', 'acquisition', 'csv')
+            ) VALUES (v_org_a, 'Authorized A', 'acquisition', 'csv');
+
+            INSERT INTO public.enterprise_data_sources_v1(
+              organization_id, source_name, source_type, transport
+            ) VALUES (v_org_b, 'Authorized B', 'acquisition', 'csv')
             RETURNING id INTO v_source;
 
             INSERT INTO public.enterprise_import_batches_v1(
