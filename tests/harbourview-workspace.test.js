@@ -1,5 +1,6 @@
 'use strict';
 const assert=require('assert'),crypto=require('crypto'),fs=require('fs'),path=require('path'),pilot=require('../lib/harbourview-workspace');
+const upload=require('../lib/enterprise-portfolio-upload');
 let passed=0;function test(name,fn){try{fn();console.log(`  ✅ ${name}`);passed++}catch(error){console.error(`  ❌ ${name}: ${error.message}`);process.exitCode=1}}
 console.log('=== HarbourView Pilot Workspace Tests ===');
 test('catalog input is normalized and starts in intake',()=>{const r=pilot.validateCatalog({catalog_code:'hv-test-1',name:'Controlled Sample',asset_type:'mixed'});assert.equal(r.catalog_code,'HV-TEST-1');assert.equal(r.status,'intake')});
@@ -8,6 +9,12 @@ test('legal chain-of-title review task is accepted',()=>assert.equal(pilot.valid
 test('authorized import plan preserves provenance',()=>{const p=pilot.buildImportPlan({manifest:{source_name:'HarbourView authorized portfolio export',transport:'csv',content_sha256:crypto.createHash('sha256').update('pilot').digest('hex')},record_type:'recording',records:[{title:' Test ',isrc:'US-ABC-12-12345'}]},{organization_id:'11111111-1111-1111-1111-111111111111',imported_at:'2026-08-17T00:00:00Z'});assert.equal(p.records[0].normalized_payload.title,'Test');assert.equal(p.records[0].provenance.source_name,'HarbourView authorized portfolio export')});
 test('empty imports are rejected',()=>assert.throws(()=>pilot.buildImportPlan({records:[]},{}),/at least one/));
 test('pilot import row cap is enforced',()=>assert.throws(()=>pilot.buildImportPlan({records:Array.from({length:pilot.MAX_IMPORT_ROWS+1},()=>({title:'x'}))},{}),/limited/));
+test('named reviewer identity is normalized',()=>{const r=pilot.validateReviewer({display_name:'Naim Salaam',email:'NAIM@example.com',role:'administrator'});assert.equal(r.email,'naim@example.com');assert.equal(r.role,'administrator')});
+test('reviewer role must satisfy task gate',()=>assert.throws(()=>pilot.validateTaskAssignment({}, {status:'open',required_reviewer_role:'administrator'}, {id:'r',active:true,role:'analyst'}),/does not satisfy/));
+test('source approval requires administrator and resolution evidence',()=>{const v=pilot.validateSourceApproval({authorization_reference:'HV-LOA-001',resolution_notes:'Written authorization reviewed and confirmed.'},{status:'open',required_reviewer_role:'administrator',task_type:'security'},{id:'r',active:true,role:'administrator'});assert.equal(v.authorization_reference,'HV-LOA-001')});
+test('generic resolution requires assigned-role evidence',()=>{const v=pilot.validateTaskResolution({decision:'rejected',resolution_notes:'Evidence conflict requires correction.'},{status:'in_progress',required_reviewer_role:'reviewer',task_type:'metadata'},{id:'r',active:true,role:'reviewer'});assert.equal(v.decision,'rejected')});
+test('CSV parser supports quoted commas',()=>assert.deepEqual(upload.parseCsv('title,isrc\n"Song, One",USABC1200001\n'),[['title','isrc'],['Song, One','USABC1200001']]));
+test('secure upload preview hashes and normalizes rows',()=>{const data=Buffer.from('title,isrc\n Test Song ,US-ABC-12-00001\n');const p=upload.buildPreview({filename:'pilot.csv',mimeType:'text/csv',data},'recording',{source_name:'authorized'});assert.equal(p.row_count,1);assert.equal(p.preview[0].title,'Test Song');assert.match(p.content_sha256,/^[a-f0-9]{64}$/)});
 const migration=fs.readFileSync(path.join(__dirname,'../supabase/migrations/20260817000000_harbourview_pilot_workspace_v1.sql'),'utf8');
 test('five pilot tables are created',()=>assert.equal((migration.match(/CREATE TABLE IF NOT EXISTS public\.enterprise_(pilot_workspaces|catalogs|assets|review_tasks|activity_events)_v1/g)||[]).length,5));
 test('pilot tables receive organization-scoped reads',()=>assert(migration.includes('fn_enterprise_has_org_access(organization_id)')));
@@ -15,4 +22,9 @@ test('activity history is immutable',()=>assert(migration.includes('enterprise a
 test('HarbourView seed is idempotent',()=>assert(migration.includes('ON CONFLICT (slug) DO UPDATE')&&migration.includes('ON CONFLICT (organization_id, workspace_code) DO UPDATE')));
 test('external submissions and legal automation are disabled',()=>assert(migration.includes("'external_submission_enabled', false")&&migration.includes("'legal_determination_automation', false")));
 test('resolved tasks require a named resolver',()=>assert(migration.includes("status NOT IN ('approved','rejected','closed') OR (resolved_by IS NOT NULL AND resolved_at IS NOT NULL)")));
+const authorizationMigration=fs.readFileSync(path.join(__dirname,'../supabase/migrations/20260817000001_harbourview_authorization_workflow_v1.sql'),'utf8');
+test('import has a database authorization trigger',()=>assert(authorizationMigration.includes('trg_enterprise_import_requires_authorization')&&authorizationMigration.includes('approved source authorization is required before import')));
+test('approval RPC requires an active administrator',()=>assert(authorizationMigration.includes("v_reviewer.role <> 'administrator'")&&authorizationMigration.includes('resolution notes must contain at least 12 characters')));
+test('generic task resolution is assigned and fail-closed',()=>assert(authorizationMigration.includes('fn_enterprise_resolve_review_task_v1')&&authorizationMigration.includes('task must be assigned to the resolving reviewer')));
+test('portfolio bucket is private and size limited',()=>assert(authorizationMigration.includes("'enterprise-portfolio-quarantine','enterprise-portfolio-quarantine',false,10485760")));
 if(!process.exitCode)console.log(`\n=== Results: ${passed} passed, 0 failed ===`);
