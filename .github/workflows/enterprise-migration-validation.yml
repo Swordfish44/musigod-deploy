@@ -6,6 +6,7 @@ on:
       - 'supabase/migrations/20260816000000_enterprise_foundation_v1.sql'
       - 'supabase/migrations/20260816000001_enterprise_authenticated_reads_v1.sql'
       - 'supabase/migrations/20260817000000_harbourview_pilot_workspace_v1.sql'
+      - 'supabase/migrations/20260817000001_harbourview_authorization_workflow_v1.sql'
       - '.github/workflows/enterprise-migration-validation.yml'
   workflow_dispatch: {}
 
@@ -66,6 +67,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260816000000_enterprise_foundation_v1.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260816000001_enterprise_authenticated_reads_v1.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260817000000_harbourview_pilot_workspace_v1.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260817000001_harbourview_authorization_workflow_v1.sql
 
       - name: Validate schema, RLS, constraints, and seeded controls
         run: |
@@ -81,13 +83,16 @@ jobs:
             v_evidence uuid;
             v_workspace uuid;
             v_activity uuid;
+            v_workspace_b uuid;
+            v_reviewer_b uuid;
+            v_task_b uuid;
           BEGIN
             SELECT count(*) INTO v_count
             FROM information_schema.tables
             WHERE table_schema = 'public'
               AND table_name LIKE 'enterprise_%_v1';
-            IF v_count <> 17 THEN
-              RAISE EXCEPTION 'expected 17 enterprise tables, got %', v_count;
+            IF v_count <> 20 THEN
+              RAISE EXCEPTION 'expected 20 enterprise tables, got %', v_count;
             END IF;
 
             SELECT count(*) INTO v_count
@@ -101,8 +106,8 @@ jobs:
             WHERE relnamespace = 'public'::regnamespace
               AND relname LIKE 'enterprise_%_v1'
               AND relrowsecurity;
-            IF v_count <> 17 THEN
-              RAISE EXCEPTION 'expected RLS on 17 enterprise tables, got %', v_count;
+            IF v_count <> 20 THEN
+              RAISE EXCEPTION 'expected RLS on 20 enterprise tables, got %', v_count;
             END IF;
 
             SELECT w.id INTO v_workspace
@@ -136,6 +141,25 @@ jobs:
               organization_id, source_name, source_type, transport
             ) VALUES (v_org_b, 'Authorized B', 'acquisition', 'csv')
             RETURNING id INTO v_source;
+
+            INSERT INTO public.enterprise_pilot_workspaces_v1(organization_id, workspace_code, name)
+              VALUES (v_org_b, 'CI-B', 'CI Workspace B') RETURNING id INTO v_workspace_b;
+            INSERT INTO public.enterprise_reviewers_v1(organization_id, display_name, email, role)
+              VALUES (v_org_b, 'CI Administrator', 'ci-admin@example.test', 'administrator') RETURNING id INTO v_reviewer_b;
+            INSERT INTO public.enterprise_review_tasks_v1(organization_id, workspace_id, task_type, title, required_reviewer_role)
+              VALUES (v_org_b, v_workspace_b, 'security', 'Authorize CI source', 'administrator') RETURNING id INTO v_task_b;
+
+            BEGIN
+              INSERT INTO public.enterprise_import_batches_v1(organization_id, data_source_id, content_sha256)
+                VALUES (v_org_b, v_source, repeat('b', 64));
+              RAISE EXCEPTION 'import without source authorization was accepted';
+            EXCEPTION WHEN raise_exception THEN
+              IF SQLERRM <> 'approved source authorization is required before import' THEN RAISE; END IF;
+            END;
+
+            PERFORM public.fn_enterprise_approve_source_authorization_v1(
+              v_task_b, v_reviewer_b, v_source, 'CI-AUTH-001', 'CI reviewed written authorization evidence.'
+            );
 
             INSERT INTO public.enterprise_import_batches_v1(
               organization_id, data_source_id, content_sha256
@@ -229,3 +253,4 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260816000000_enterprise_foundation_v1.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260816000001_enterprise_authenticated_reads_v1.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260817000000_harbourview_pilot_workspace_v1.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260817000001_harbourview_authorization_workflow_v1.sql

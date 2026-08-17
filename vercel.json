@@ -155,6 +155,9 @@
         },
         "api/enterprise/import-batch.js": {
             "maxDuration": 30
+        },
+        "api/enterprise/portfolio-upload.js": {
+            "maxDuration": 30
         }
     }
 }
