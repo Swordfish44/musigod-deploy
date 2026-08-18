@@ -158,6 +158,9 @@
         },
         "api/enterprise/portfolio-upload.js": {
             "maxDuration": 30
+        },
+        "api/enterprise/orchestrate-portfolio-analysis.js": {
+            "maxDuration": 60
         }
     }
 }
