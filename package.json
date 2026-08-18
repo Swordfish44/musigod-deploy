@@ -7,9 +7,10 @@
     "pg": "^8.23.0"
   },
   "scripts": {
-    "test": "node tests/enterprise-foundation.test.js && node tests/harbourview-workspace.test.js && node tests/graph-rls.test.js && node tests/graph-sync-identity.test.js && node tests/graph-sync-enrichment-upsert.test.js && node tests/canary-assert.test.js && node tests/enrich-catalog-budget.test.js && node tests/registration-readiness.test.js && node tests/rpc-signature-alignment.test.js && node tests/readiness-evidence-adapter.test.js && node tests/writer-split-validation.test.js && node tests/writer-recovery-classify.test.js && node tests/genius-search-classify.test.js && node tests/neighboring-rights-audit.test.js && node tests/soundexchange-adapter.test.js && node tests/artist-intake.test.js && node tests/intake-tokens.test.js && node tests/consent-gate.test.js && node tests/no-orphaned-submodules.test.js && node tests/mb-ingestion.test.js && node tests/integration/echo-sandbox.test.js",
-    "test:enterprise": "node tests/enterprise-foundation.test.js && node tests/harbourview-workspace.test.js",
+    "test": "node tests/enterprise-foundation.test.js && node tests/harbourview-workspace.test.js && node tests/portfolio-scale-analysis.test.js && node tests/graph-rls.test.js && node tests/graph-sync-identity.test.js && node tests/graph-sync-enrichment-upsert.test.js && node tests/canary-assert.test.js && node tests/enrich-catalog-budget.test.js && node tests/registration-readiness.test.js && node tests/rpc-signature-alignment.test.js && node tests/readiness-evidence-adapter.test.js && node tests/writer-split-validation.test.js && node tests/writer-recovery-classify.test.js && node tests/genius-search-classify.test.js && node tests/neighboring-rights-audit.test.js && node tests/soundexchange-adapter.test.js && node tests/artist-intake.test.js && node tests/intake-tokens.test.js && node tests/consent-gate.test.js && node tests/no-orphaned-submodules.test.js && node tests/mb-ingestion.test.js && node tests/integration/echo-sandbox.test.js",
+    "test:enterprise": "node tests/enterprise-foundation.test.js && node tests/harbourview-workspace.test.js && node tests/portfolio-scale-analysis.test.js",
     "test:harbourview": "node tests/harbourview-workspace.test.js",
+    "test:portfolio": "node tests/portfolio-scale-analysis.test.js",
     "dns:check": "node scripts/check-dns-state.js",
     "dns:email": "node scripts/check-email-security.js",
     "dns:sync": "node scripts/check-vercel-cloudflare-sync.js",
