@@ -5,9 +5,14 @@ const ingestion = require(path.join(__dirname, '../../lib/enterprise-ingestion')
 const rules = require(path.join(__dirname, '../../lib/royalty-rules-registry'));
 const corrections = require(path.join(__dirname, '../../lib/enterprise-correction-package'));
 const title = require(path.join(__dirname, '../../lib/chain-of-title'));
+const portfolioMatching = require(path.join(__dirname, '../../lib/portfolio-asset-matching'));
+const reconciliation = require(path.join(__dirname, '../../lib/portfolio-royalty-reconciliation'));
+const ownership = require(path.join(__dirname, '../../lib/portfolio-ownership-conflicts'));
+const recovery = require(path.join(__dirname, '../../lib/portfolio-recovery-prioritization'));
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
-const ACTIONS = new Set(['validate_import', 'normalize_record', 'validate_rule', 'match_rules', 'build_correction', 'analyze_title']);
+const ACTIONS = new Set(['validate_import', 'normalize_record', 'validate_rule', 'match_rules', 'build_correction', 'analyze_title',
+  'match_portfolio_assets','reconcile_royalties','detect_ownership_conflicts','score_recovery_opportunity']);
 
 module.exports = async function handler(req, res) {
   setCors(req, res);
@@ -27,6 +32,10 @@ module.exports = async function handler(req, res) {
       case 'match_rules': result = rules.selectApplicableRules(input.rules, input.event); break;
       case 'build_correction': result = corrections.buildCorrectionPackage(input.spec, input.records, input.evidence, input.metadata); break;
       case 'analyze_title': result = title.analyzeTitleDocuments(input.documents); break;
+      case 'match_portfolio_assets': result = portfolioMatching.rankCandidates(input.source, input.candidates); break;
+      case 'reconcile_royalties': result = reconciliation.reconcile(input.lines, input.assets, input.options); break;
+      case 'detect_ownership_conflicts': result = ownership.detect(input.claims); break;
+      case 'score_recovery_opportunity': result = recovery.scoreOpportunity(input); break;
     }
     return res.status(200).json({ enterprise_version: '1.0', action, result });
   } catch (error) {

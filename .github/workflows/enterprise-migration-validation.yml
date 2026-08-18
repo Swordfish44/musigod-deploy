@@ -8,6 +8,7 @@ on:
       - 'supabase/migrations/20260817000000_harbourview_pilot_workspace_v1.sql'
       - 'supabase/migrations/20260817000001_harbourview_authorization_workflow_v1.sql'
       - 'supabase/migrations/20260817000002_harbourview_asset_exceptions_v1.sql'
+      - 'supabase/migrations/20260818000000_harbourview_portfolio_analysis_v1.sql'
       - '.github/workflows/enterprise-migration-validation.yml'
   workflow_dispatch: {}
 
@@ -70,6 +71,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260817000000_harbourview_pilot_workspace_v1.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260817000001_harbourview_authorization_workflow_v1.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260817000002_harbourview_asset_exceptions_v1.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260818000000_harbourview_portfolio_analysis_v1.sql
 
       - name: Validate schema, RLS, constraints, and seeded controls
         run: |
@@ -93,8 +95,8 @@ jobs:
             FROM information_schema.tables
             WHERE table_schema = 'public'
               AND table_name LIKE 'enterprise_%_v1';
-            IF v_count <> 20 THEN
-              RAISE EXCEPTION 'expected 20 enterprise tables, got %', v_count;
+            IF v_count <> 28 THEN
+              RAISE EXCEPTION 'expected 28 enterprise tables, got %', v_count;
             END IF;
 
             SELECT count(*) INTO v_count
@@ -108,8 +110,8 @@ jobs:
             WHERE relnamespace = 'public'::regnamespace
               AND relname LIKE 'enterprise_%_v1'
               AND relrowsecurity;
-            IF v_count <> 20 THEN
-              RAISE EXCEPTION 'expected RLS on 20 enterprise tables, got %', v_count;
+            IF v_count <> 28 THEN
+              RAISE EXCEPTION 'expected RLS on 28 enterprise tables, got %', v_count;
             END IF;
 
             SELECT w.id INTO v_workspace
@@ -257,3 +259,4 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260817000000_harbourview_pilot_workspace_v1.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260817000001_harbourview_authorization_workflow_v1.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260817000002_harbourview_asset_exceptions_v1.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260818000000_harbourview_portfolio_analysis_v1.sql
