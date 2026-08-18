@@ -65,7 +65,15 @@ module.exports = async function handler(req, res) {
       await store.rpc('fn_enterprise_resolve_asset_finding_v1', { p_finding_id:finding.id,p_reviewer_id:reviewer.id,p_decision:resolution.decision,p_resolution_notes:resolution.resolution_notes });
       return res.status(200).json({ finding_id:finding.id,status:resolution.decision });
     }
-    return res.status(400).json({ error: 'unsupported_action', allowed_actions: ['create_catalog','create_review_task','create_reviewer','assign_review_task','approve_source_authorization','resolve_review_task','resolve_asset_finding'] });
+    if (action === 'resolve_ownership_conflict') {
+      await store.rpc('fn_enterprise_resolve_ownership_conflict_v1', { p_conflict_id:input.conflict_id,p_reviewer_id:input.reviewer_id,p_decision:input.decision,p_resolution_notes:input.resolution_notes });
+      return res.status(200).json({ conflict_id:input.conflict_id,status:input.decision });
+    }
+    if (action === 'approve_recovery_opportunity') {
+      await store.rpc('fn_enterprise_approve_recovery_opportunity_v1', { p_opportunity_id:input.opportunity_id,p_reviewer_id:input.reviewer_id,p_approval_notes:input.approval_notes });
+      return res.status(200).json({ opportunity_id:input.opportunity_id,status:'approved',external_submission_enabled:false });
+    }
+    return res.status(400).json({ error: 'unsupported_action', allowed_actions: ['create_catalog','create_review_task','create_reviewer','assign_review_task','approve_source_authorization','resolve_review_task','resolve_asset_finding','resolve_ownership_conflict','approve_recovery_opportunity'] });
   } catch (error) {
     return res.status(422).json({ error: 'workspace_operation_failed', detail: error.message });
   }
@@ -81,7 +89,7 @@ async function getContext() {
 
 async function snapshot(context) {
   const base = `organization_id=eq.${context.organization.id}`;
-  const [catalogs, assets, batches, tasks, findings, packages, activity, reviewers, sources, authorizations, uploads] = await Promise.all([
+  const [catalogs, assets, batches, tasks, findings, packages, activity, reviewers, sources, authorizations, uploads, matches, reconciliations, ownershipConflicts, recoveryOpportunities] = await Promise.all([
     store.select('enterprise_catalogs_v1', `${base}&order=created_at.desc&select=*`),
     store.select('enterprise_assets_v1', `${base}&order=created_at.desc&limit=100&select=*`),
     store.select('enterprise_import_batches_v1', `${base}&order=received_at.desc&limit=25&select=*`),
@@ -93,6 +101,10 @@ async function snapshot(context) {
     store.select('enterprise_data_sources_v1', `${base}&active=eq.true&order=source_name.asc&select=*`),
     store.select('enterprise_source_authorizations_v1', `${base}&select=*`),
     store.select('enterprise_portfolio_uploads_v1', `${base}&order=uploaded_at.desc&limit=25&select=*`),
+    store.select('enterprise_asset_match_candidates_v1', `${base}&order=score.desc&limit=100&select=*`),
+    store.select('enterprise_royalty_reconciliations_v1', `${base}&order=created_at.desc&limit=100&select=*`),
+    store.select('enterprise_ownership_conflicts_v1', `${base}&order=created_at.desc&limit=100&select=*`),
+    store.select('enterprise_recovery_opportunities_v1', `${base}&order=score.desc&limit=100&select=*`),
   ]);
   return {
     organization: context.organization,
@@ -102,7 +114,12 @@ async function snapshot(context) {
       open_reviews: tasks.filter(t => ['open','in_progress','blocked'].includes(t.status)).length,
       unresolved_findings: findings.filter(f => !['resolved','rejected'].includes(f.review_status)).length,
       correction_packages: packages.length,
+      asset_matches: matches.length,
+      reconciliation_exceptions: reconciliations.filter(r=>r.status!=='matched').length,
+      ownership_conflicts: ownershipConflicts.filter(r=>r.resolution_status==='open').length,
+      recovery_opportunities: recoveryOpportunities.filter(r=>r.status!=='rejected').length,
     }, catalogs, assets, findings, batches, review_tasks: tasks, activity, reviewers, sources, source_authorizations: authorizations, uploads,
+    asset_matches:matches, royalty_reconciliations:reconciliations, ownership_conflicts:ownershipConflicts, recovery_opportunities:recoveryOpportunities,
     gates: { external_submission_enabled: false, correction_human_approval_required: true, chain_of_title_legal_review_required: true, source_authorization_approved: authorizations.some(a => a.status === 'approved' && (!a.expires_at || new Date(a.expires_at) > new Date())) },
   };
 }
