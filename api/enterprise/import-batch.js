@@ -3,6 +3,7 @@
 const store = require('../../lib/enterprise-rest');
 const pilot = require('../../lib/harbourview-workspace');
 const portfolio = require('../../lib/enterprise-portfolio-upload');
+const exceptions = require('../../lib/harbourview-exception-analysis');
 
 module.exports = async function handler(req, res) {
   cors(req, res);
@@ -31,17 +32,27 @@ module.exports = async function handler(req, res) {
       content_sha256: manifest.content_sha256, status: 'validated', row_count: parsed.row_count,
       accepted_count: parsed.row_count, rejected_count: 0, validation_summary: { valid: true, upload_id: upload.id }, input_manifest: manifest,
     }))[0];
-    await store.insert('enterprise_import_records_v1', parsed.records.map((record, index) => ({
+    const storedRecords = parsed.records.map((record, index) => ({
       organization_id: organizationId, batch_id: batch.id, row_number: index + 1, record_type: record.record_type,
       source_record_id: record.source_record_id, normalized_payload: record.normalized_payload,
       validation_status: 'accepted', validation_messages: [], provenance: record.provenance,
-    })));
+    }));
+    await store.insert('enterprise_import_records_v1', storedRecords);
+    const analysis = exceptions.analyzeRecords(storedRecords, { organization_id: organizationId, workspace_id: workspaces[0].id, catalog_id: upload.catalog_id, batch_id: batch.id });
+    let createdAssets = [];
+    if (analysis.assets.length) createdAssets = await store.insert('enterprise_assets_v1', analysis.assets);
+    if (analysis.findings.length) {
+      const assetIds = new Map(createdAssets.map(asset => [asset.asset_reference, asset.id]));
+      await store.insert('enterprise_title_findings_v1', analysis.findings.map(finding => ({ organization_id: organizationId,
+        asset_node_id: assetIds.get(finding.asset_reference), finding_type: finding.finding_type, summary: finding.summary,
+        source_document_ids: finding.source_document_ids, confidence: finding.confidence, legal_effect: finding.legal_effect, review_status: finding.review_status })));
+    }
     await store.patch('enterprise_portfolio_uploads_v1', `id=eq.${upload.id}`, { status: 'imported', imported_batch_id: batch.id, imported_at: new Date().toISOString() });
     await store.insert('enterprise_activity_events_v1', {
       organization_id: organizationId, workspace_id: workspaces[0].id, event_type: 'import.validated', entity_type: 'import_batch',
-      entity_id: batch.id, summary: `${parsed.row_count} authorized rows imported`, metadata: { content_sha256: manifest.content_sha256, upload_id: upload.id }
+      entity_id: batch.id, summary: `${parsed.row_count} authorized rows imported; ${analysis.exception_count} exceptions detected`, metadata: { content_sha256: manifest.content_sha256, upload_id: upload.id, assets_created: analysis.analyzed_count, exceptions_detected: analysis.exception_count }
     });
-    return res.status(201).json({ batch, accepted_count: parsed.row_count, external_submission_performed: false });
+    return res.status(201).json({ batch, accepted_count: parsed.row_count, assets_created: analysis.analyzed_count, exceptions_detected: analysis.exception_count, external_submission_performed: false });
   } catch (error) {
     return res.status(422).json({ error: 'import_rejected', detail: error.message });
   }

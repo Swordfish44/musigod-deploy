@@ -7,6 +7,7 @@ on:
       - 'supabase/migrations/20260816000001_enterprise_authenticated_reads_v1.sql'
       - 'supabase/migrations/20260817000000_harbourview_pilot_workspace_v1.sql'
       - 'supabase/migrations/20260817000001_harbourview_authorization_workflow_v1.sql'
+      - 'supabase/migrations/20260817000002_harbourview_asset_exceptions_v1.sql'
       - '.github/workflows/enterprise-migration-validation.yml'
   workflow_dispatch: {}
 
@@ -68,6 +69,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260816000001_enterprise_authenticated_reads_v1.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260817000000_harbourview_pilot_workspace_v1.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260817000001_harbourview_authorization_workflow_v1.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260817000002_harbourview_asset_exceptions_v1.sql
 
       - name: Validate schema, RLS, constraints, and seeded controls
         run: |
@@ -254,3 +256,4 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260816000001_enterprise_authenticated_reads_v1.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260817000000_harbourview_pilot_workspace_v1.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260817000001_harbourview_authorization_workflow_v1.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260817000002_harbourview_asset_exceptions_v1.sql

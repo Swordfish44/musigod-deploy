@@ -2,6 +2,7 @@
 
 const store = require('../../lib/enterprise-rest');
 const pilot = require('../../lib/harbourview-workspace');
+const exceptions = require('../../lib/harbourview-exception-analysis');
 
 module.exports = async function handler(req, res) {
   cors(req, res);
@@ -57,7 +58,14 @@ module.exports = async function handler(req, res) {
       await store.rpc('fn_enterprise_resolve_review_task_v1', { p_task_id: task.id, p_reviewer_id: reviewer.id, p_decision: resolution.decision, p_resolution_notes: resolution.resolution_notes });
       return res.status(200).json({ task_id: task.id, status: resolution.decision });
     }
-    return res.status(400).json({ error: 'unsupported_action', allowed_actions: ['create_catalog','create_review_task','create_reviewer','assign_review_task','approve_source_authorization','resolve_review_task'] });
+    if (action === 'resolve_asset_finding') {
+      const [finding] = await store.select('enterprise_title_findings_v1', `id=eq.${input.finding_id}&organization_id=eq.${context.organization.id}&select=*`);
+      const [reviewer] = await store.select('enterprise_reviewers_v1', `id=eq.${input.reviewer_id}&organization_id=eq.${context.organization.id}&select=*`);
+      const resolution = exceptions.validateFindingResolution(input, finding, reviewer);
+      await store.rpc('fn_enterprise_resolve_asset_finding_v1', { p_finding_id:finding.id,p_reviewer_id:reviewer.id,p_decision:resolution.decision,p_resolution_notes:resolution.resolution_notes });
+      return res.status(200).json({ finding_id:finding.id,status:resolution.decision });
+    }
+    return res.status(400).json({ error: 'unsupported_action', allowed_actions: ['create_catalog','create_review_task','create_reviewer','assign_review_task','approve_source_authorization','resolve_review_task','resolve_asset_finding'] });
   } catch (error) {
     return res.status(422).json({ error: 'workspace_operation_failed', detail: error.message });
   }
@@ -75,10 +83,10 @@ async function snapshot(context) {
   const base = `organization_id=eq.${context.organization.id}`;
   const [catalogs, assets, batches, tasks, findings, packages, activity, reviewers, sources, authorizations, uploads] = await Promise.all([
     store.select('enterprise_catalogs_v1', `${base}&order=created_at.desc&select=*`),
-    store.select('enterprise_assets_v1', `${base}&select=id,review_status`),
+    store.select('enterprise_assets_v1', `${base}&order=created_at.desc&limit=100&select=*`),
     store.select('enterprise_import_batches_v1', `${base}&order=received_at.desc&limit=25&select=*`),
     store.select('enterprise_review_tasks_v1', `${base}&order=created_at.desc&limit=50&select=*`),
-    store.select('enterprise_title_findings_v1', `${base}&select=id,review_status,finding_type`),
+    store.select('enterprise_title_findings_v1', `${base}&order=created_at.desc&limit=100&select=*`),
     store.select('enterprise_correction_packages_v1', `${base}&select=id,status,package_reference`),
     store.select('enterprise_activity_events_v1', `${base}&order=occurred_at.desc&limit=50&select=*`),
     store.select('enterprise_reviewers_v1', `${base}&active=eq.true&order=display_name.asc&select=*`),
@@ -94,7 +102,7 @@ async function snapshot(context) {
       open_reviews: tasks.filter(t => ['open','in_progress','blocked'].includes(t.status)).length,
       unresolved_findings: findings.filter(f => !['resolved','rejected'].includes(f.review_status)).length,
       correction_packages: packages.length,
-    }, catalogs, batches, review_tasks: tasks, activity, reviewers, sources, source_authorizations: authorizations, uploads,
+    }, catalogs, assets, findings, batches, review_tasks: tasks, activity, reviewers, sources, source_authorizations: authorizations, uploads,
     gates: { external_submission_enabled: false, correction_human_approval_required: true, chain_of_title_legal_review_required: true, source_authorization_approved: authorizations.some(a => a.status === 'approved' && (!a.expires_at || new Date(a.expires_at) > new Date())) },
   };
 }

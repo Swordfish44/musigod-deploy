@@ -1,6 +1,7 @@
 'use strict';
 const assert=require('assert'),crypto=require('crypto'),fs=require('fs'),path=require('path'),pilot=require('../lib/harbourview-workspace');
 const upload=require('../lib/enterprise-portfolio-upload');
+const exceptions=require('../lib/harbourview-exception-analysis');
 let passed=0;function test(name,fn){try{fn();console.log(`  ✅ ${name}`);passed++}catch(error){console.error(`  ❌ ${name}: ${error.message}`);process.exitCode=1}}
 console.log('=== HarbourView Pilot Workspace Tests ===');
 test('catalog input is normalized and starts in intake',()=>{const r=pilot.validateCatalog({catalog_code:'hv-test-1',name:'Controlled Sample',asset_type:'mixed'});assert.equal(r.catalog_code,'HV-TEST-1');assert.equal(r.status,'intake')});
@@ -15,6 +16,10 @@ test('source approval requires administrator and resolution evidence',()=>{const
 test('generic resolution requires assigned-role evidence',()=>{const v=pilot.validateTaskResolution({decision:'rejected',resolution_notes:'Evidence conflict requires correction.'},{status:'in_progress',required_reviewer_role:'reviewer',task_type:'metadata'},{id:'r',active:true,role:'reviewer'});assert.equal(v.decision,'rejected')});
 test('CSV parser supports quoted commas',()=>assert.deepEqual(upload.parseCsv('title,isrc\n"Song, One",USABC1200001\n'),[['title','isrc'],['Song, One','USABC1200001']]));
 test('secure upload preview hashes and normalizes rows',()=>{const data=Buffer.from('title,isrc\n Test Song ,US-ABC-12-00001\n');const p=upload.buildPreview({filename:'pilot.csv',mimeType:'text/csv',data},'recording',{source_name:'authorized'});assert.equal(p.row_count,1);assert.equal(p.preview[0].title,'Test Song');assert.match(p.content_sha256,/^[a-f0-9]{64}$/)});
+test('complete recording becomes an asset without an exception',()=>{const r=exceptions.analyzeRecords([{record_type:'recording',source_record_id:'R1',normalized_payload:{title:'Song',isrc:'USABC1200001',artist:'Artist',territory:'US'},provenance:{}}],{organization_id:'o',workspace_id:'w',catalog_id:'c',batch_id:'b'});assert.equal(r.analyzed_count,1);assert.equal(r.exception_count,0)});
+test('missing identifiers and territory create reviewable exceptions',()=>{const r=exceptions.analyzeRecords([{record_type:'recording',source_record_id:'R2',normalized_payload:{title:'Song',artist:'Artist'},provenance:{}}],{});assert.equal(r.assets[0].review_status,'review_required');assert(r.findings.some(f=>f.summary.includes('ISRC')));assert(r.findings.some(f=>f.summary.includes('Territory')))});
+test('duplicate identifiers create conflict findings for both assets',()=>{const rows=['R1','R2'].map(source_record_id=>({record_type:'recording',source_record_id,normalized_payload:{title:'Song',isrc:'USABC1200001',artist:'Artist',territory:'US'},provenance:{}}));assert.equal(exceptions.analyzeRecords(rows,{}).exception_count,2)});
+test('finding resolution requires a named qualified reviewer and notes',()=>assert.throws(()=>exceptions.validateFindingResolution({decision:'resolved',resolution_notes:'short'},{review_status:'open'},{active:true,role:'reviewer'}),/12 characters/));
 const migration=fs.readFileSync(path.join(__dirname,'../supabase/migrations/20260817000000_harbourview_pilot_workspace_v1.sql'),'utf8');
 test('five pilot tables are created',()=>assert.equal((migration.match(/CREATE TABLE IF NOT EXISTS public\.enterprise_(pilot_workspaces|catalogs|assets|review_tasks|activity_events)_v1/g)||[]).length,5));
 test('pilot tables receive organization-scoped reads',()=>assert(migration.includes('fn_enterprise_has_org_access(organization_id)')));
@@ -27,4 +32,6 @@ test('import has a database authorization trigger',()=>assert(authorizationMigra
 test('approval RPC requires an active administrator',()=>assert(authorizationMigration.includes("v_reviewer.role <> 'administrator'")&&authorizationMigration.includes('resolution notes must contain at least 12 characters')));
 test('generic task resolution is assigned and fail-closed',()=>assert(authorizationMigration.includes('fn_enterprise_resolve_review_task_v1')&&authorizationMigration.includes('task must be assigned to the resolving reviewer')));
 test('portfolio bucket is private and size limited',()=>assert(authorizationMigration.includes("'enterprise-portfolio-quarantine','enterprise-portfolio-quarantine',false,10485760")));
+const exceptionMigration=fs.readFileSync(path.join(__dirname,'../supabase/migrations/20260817000002_harbourview_asset_exceptions_v1.sql'),'utf8');
+test('finding review is named and service-role only',()=>assert(exceptionMigration.includes('reviewed_by_reviewer_id')&&exceptionMigration.includes('active qualified organization reviewer')&&exceptionMigration.includes('TO service_role')));
 if(!process.exitCode)console.log(`\n=== Results: ${passed} passed, 0 failed ===`);
