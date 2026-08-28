@@ -1,0 +1,35 @@
+{
+  "authorization": {
+    "reference": "SYNTHETIC-DEMO-AUTH-2026-08-28",
+    "status": "approved",
+    "scope": "Synthetic data only; no external submission"
+  },
+  "organization": { "name": "HarbourView Demonstration Portfolio" },
+  "workspace": { "name": "Portfolio Rights Integrity Diagnostic" },
+  "uploads": [
+    { "filename": "authorized-catalog.csv", "row_count": 3, "status": "imported", "uploaded_at": "2026-08-28T06:00:00.000Z" },
+    { "filename": "authorized-royalty-statement.csv", "row_count": 2, "status": "imported", "uploaded_at": "2026-08-28T06:01:00.000Z" },
+    { "filename": "authorized-ownership-schedule.csv", "row_count": 2, "status": "imported", "uploaded_at": "2026-08-28T06:02:00.000Z" }
+  ],
+  "assets": [
+    { "id": "asset-1", "asset_reference": "HV-DEMO-001", "asset_type": "recording", "title": "Midnight Revenue", "artist": "Synthetic Artist", "isrc": "USMGD2600001", "iswc": null, "ipi": null, "publisher": null },
+    { "id": "asset-2", "asset_reference": "HV-DEMO-002", "asset_type": "recording", "title": "Unmatched Statement", "artist": null, "isrc": null, "iswc": null, "ipi": null, "publisher": null },
+    { "id": "asset-3", "asset_reference": "HV-DEMO-003", "asset_type": "composition", "title": "Conflicting Share", "isrc": null, "iswc": "T1234567890", "ipi": null, "publisher": "Synthetic Publishing" }
+  ],
+  "records": [
+    { "id": "record-1", "row_number": 1, "record_type": "recording", "source_record_id": "CAT-001", "normalized_payload": { "title": "Midnight Revenue", "artist": "Synthetic Artist", "isrc": "US-MGD-26-00001", "duration": "3:42" } },
+    { "id": "record-2", "row_number": 2, "record_type": "royalty", "source_record_id": "ROY-001", "normalized_payload": { "title": "Unknown Alternate Title", "amount": 425, "currency": "USD", "territory": "US" } },
+    { "id": "record-3", "row_number": 3, "record_type": "right", "source_record_id": "OWN-002", "normalized_payload": { "asset_reference": "HV-DEMO-001", "claimant_name": "Synthetic Claimant B", "ownership_share": 50, "territory": "US", "rights_type": "master", "effective_from": "2024-01-01" } },
+    { "id": "record-4", "row_number": 4, "record_type": "agreement", "source_record_id": "OPP-001", "normalized_payload": { "opportunity_reference": "HV-OPP-001", "evidence_quality": 0.8, "potential_value": 0.7, "filing_deadline_score": 0.5, "match_confidence": 0.8, "recovery_complexity": 0.4, "currency": "USD", "assumptions": ["Value cannot be quantified without counterparty statement confirmation"], "evidence": ["Authorized synthetic catalog and statement records"] } }
+  ],
+  "existing_source_records": [
+    { "id": "source-1", "normalized_values": { "title": "midnight revenue", "artist": "synthetic artist", "isrc": "USMGD2600001", "duration_seconds": 222 } }
+  ],
+  "existing_claims": [
+    { "id": "claim-1", "asset_reference": "HV-DEMO-001", "claimant_name": "Synthetic Claimant A", "ownership_share": 100, "territory": "WORLD", "rights_type": "master", "effective_from": "2020-01-01" }
+  ],
+  "reviewers": [
+    { "id": "reviewer-1", "display_name": "Demo Rights Reviewer", "active": true, "role": "reviewer" },
+    { "id": "legal-1", "display_name": "Demo Legal Reviewer", "active": true, "role": "legal" }
+  ]
+}

@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('assert'),child=require('child_process'),path=require('path');
+const output=child.execFileSync(process.execPath,[path.join(__dirname,'../scripts/enterprise/run-paid-diagnostic-demo.js')],{encoding:'utf8'});
+const result=JSON.parse(output);
+assert(Object.values(result.acceptance).every(Boolean));
+assert.equal(result.report.report_reference,'HV-RR-DEMO-20260828');
+assert.equal(result.report.value_summary.unknown_value_count,1);
+assert.deepEqual(result.report.value_summary.verified_payable,{});
+assert(result.report.executive_summary.open_ownership_conflicts>=1);
+assert(result.report.required_actions.some(action=>action.includes('legal review')));
+console.log('=== Paid Diagnostic Demo Test ===\n  ✅ authorized end-to-end diagnostic produces a fail-closed client report\n\n=== Results: 1 passed, 0 failed ===');
