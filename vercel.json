@@ -114,6 +114,10 @@
         {
             "source": "/enterprise/harbourview",
             "destination": "/harbourview-pilot.html"
+        },
+        {
+            "source": "/enterprise/harbourview/report",
+            "destination": "/harbourview-rights-recovery-report.html"
         }
     ],
     "crons": [
