@@ -72,6 +72,10 @@
             "destination": "/dashboard-registrations.html"
         },
         {
+            "source": "/login",
+            "destination": "/login.html"
+        },
+        {
             "source": "/earnings",
             "destination": "/earnings.html"
         },
