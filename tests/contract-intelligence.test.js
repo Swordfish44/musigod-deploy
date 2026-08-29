@@ -1,0 +1,21 @@
+'use strict'
+const assert=require('assert'),fs=require('fs'),path=require('path'),engine=require('../lib/expected-royalty-engine'),fixture=require('../fixtures/contract-intelligence/tha-regime.synthetic.json')
+const root=path.join(__dirname,'..'),migration=fs.readFileSync(path.join(root,'supabase/migrations/20260829000001_contract_intelligence_expected_royalty_v1.sql'),'utf8'),customer=fs.readFileSync(path.join(root,'contract-intelligence.html'),'utf8'),admin=fs.readFileSync(path.join(root,'admin-royalty-intelligence.html'),'utf8'),api=fs.readFileSync(path.join(root,'api/contract-intelligence.js'),'utf8')
+const requiredTables=['contract_records_v1','contract_families_v1','contract_parties_v1','contract_assets_v1','contract_documents_v1','contract_clauses_v1','extracted_terms_v1','term_precedence_v1','review_tasks_v1','calculation_rules_v1','calculation_runs_v1','calculation_inputs_v1','calculation_outputs_v1','statement_sources_v1','statement_imports_v1','statement_lines_v1','payment_records_v1','reconciliation_results_v1','discrepancies_v1','recovery_cases_v1','audit_windows_v1','authorization_records_v1','evidence_records_v1','audit_events_v1']
+for(const table of requiredTables)assert(migration.includes(`royalty_intelligence.${table}`),`missing ${table}`)
+for(const table of requiredTables.filter(x=>x!=='calculation_rules_v1'))assert(migration.includes(`ALTER TABLE royalty_intelligence.%I ENABLE ROW LEVEL SECURITY`)||migration.includes(`ALTER TABLE royalty_intelligence.${table} ENABLE ROW LEVEL SECURITY`),'RLS loop missing')
+assert(migration.includes('fn_immutable_evidence_v1'));assert(migration.includes("external_action_enabled=false OR"));assert(migration.includes("authoritative=false OR execution_status='EXECUTED'"));assert(migration.includes("calculation_authoritative=false OR (status='APPROVED' AND authority_basis='EXPLICIT')"))
+assert.throws(()=>engine.calculateLine({contract_asset_scope:'MASTER',statement_asset_scope:'COMPOSITION'}),/scope mismatch/)
+assert.throws(()=>engine.integer(1.25,'money'),/integer minor-unit/)
+assert.strictEqual(engine.mulRatio(10001n,{n:15n,d:100n}),1500n)
+const correct=engine.calculateLine(fixture.lines[0]);assert.strictEqual(correct.expected_net_minor,'15000');assert.strictEqual(correct.variance_minor,'0');assert.strictEqual(correct.classification,'MATCHED_WITHIN_TOLERANCE')
+const escalation=engine.calculateLine(fixture.lines[1]);assert.strictEqual(escalation.expected_net_minor,'18000');assert.strictEqual(escalation.variance_minor,'3000')
+const fx=engine.calculateLine(fixture.lines[5]);assert.strictEqual(fx.expected_net_minor,'22000');assert.strictEqual(fx.reported_minor,'18700');assert.strictEqual(fx.variance_minor,'3300')
+const blocked=engine.calculateLine(fixture.lines[6]);assert.strictEqual(blocked.status,'BLOCKED');assert.strictEqual(blocked.classification,'BLOCKED_MISSING_CONTRACT_LANGUAGE');assert.strictEqual(blocked.amount_basis,'NO_CALCULATION')
+const unapproved=engine.calculateLine({...fixture.lines[0],term_review_status:'PENDING_REVIEW'});assert.strictEqual(unapproved.status,'BLOCKED')
+const replayA=engine.calculateLine(fixture.lines[7]),replayB=engine.calculateLine(fixture.lines[7]);assert.deepStrictEqual(replayA,replayB);assert.match(replayA.result_hash,/^[0-9a-f]{64}$/)
+const outputs=fixture.lines.map(engine.calculateLine);assert.strictEqual(outputs.length,8);for(const expected of ['MATCHED_WITHIN_TOLERANCE','MISSING_ESCALATION','UNSUPPORTED_DEDUCTION','STALE_RESERVE','BLOCKED_MISSING_CONTRACT_LANGUAGE','CURRENCY_CONVERSION_DISCREPANCY','FORMAL_AUDIT_CANDIDATE'])assert(outputs.some(x=>x.classification===expected),`fixture missing ${expected}`)
+assert.strictEqual(fixture.synthetic,true);assert.strictEqual(fixture.authoritative,false);assert(fixture.disclosures.some(x=>/Not evidence of money owed/.test(x)))
+for(const content of [customer,admin]){assert(/not (money )?owed|No estimate/i.test(content));assert(/not.*law firm|legal advice|legal conclusion/i.test(content))}
+assert(api.includes("status:'PENDING_SIGNATURE'"));assert(api.includes('Named administrative reviewer required'));assert(api.includes("status:'QUARANTINED'"));assert(!api.includes('external_action_enabled:true'))
+console.log('contract intelligence: schema, isolation, deterministic calculations, controls and UX passed')
