@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Royalty Intelligence Admin | MusiGod</title>
+<style>body{margin:0;background:#0b0b0b;color:#eee;font:14px/1.5 system-ui}main{max-width:1100px;margin:auto;padding:28px}h1{font:42px Georgia;color:#d1a84b}.bar,.panel{background:#171717;border:1px solid #343434;border-radius:10px;padding:16px;margin:14px 0}.bar{display:flex;gap:10px}input{flex:1;background:#090909;color:#fff;border:1px solid #555;padding:11px}button{background:#d1a84b;border:0;padding:11px 16px;font-weight:700}.banner{border-left:3px solid #d1a84b;padding:12px;background:#19160f}.row{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:12px;padding:10px;border-bottom:1px solid #333}.tag{color:#d1a84b}</style></head>
+<body><main><div class="tag">MUSIGOD CONTROL ROOM</div><h1>Contract & Royalty Intelligence</h1>
+<p class="banner">No estimate may be labeled owed or recovered, and no output is a legal conclusion. MusiGod is not a law firm and does not provide legal advice. No external communication is enabled without executed client authorization and named administrative approval.</p>
+<div class="bar"><input id="key" type="password" placeholder="Administrative key"><button id="run">Run isolated synthetic pilot</button></div>
+<section class="panel"><h2>“Tha Regime” synthetic validation</h2><div id="status">Not run. This fixture never writes to the live NAIM profile.</div><div id="output"></div></section>
+</main><script>
+run.onclick=async()=>{status.textContent='Running deterministic replay…';output.innerHTML='';const r=await fetch('/api/admin/run-synthetic-royalty-pilot',{method:'POST',headers:{'Content-Type':'application/json','x-admin-key':key.value},body:'{}'}),d=await r.json();if(!r.ok){status.textContent=d.error||'Run failed';return}status.textContent=`${d.outputs.length} controlled scenarios · ${d.engine_version} · live profile mutated: ${d.live_profile_mutated}`;output.innerHTML=d.outputs.map(x=>`<div class="row"><strong>${safe(x.fixture_id)}</strong><span>${safe(x.classification)}</span><span>${safe(x.status)} · variance ${safe(x.variance_minor??'blocked')} minor units</span></div>`).join('')};
+function safe(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+</script></body></html>

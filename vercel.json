@@ -72,6 +72,14 @@
             "destination": "/dashboard-registrations.html"
         },
         {
+            "source": "/dashboard/contracts",
+            "destination": "/contract-intelligence.html"
+        },
+        {
+            "source": "/admin/royalty-intelligence",
+            "destination": "/admin-royalty-intelligence.html"
+        },
+        {
             "source": "/login",
             "destination": "/login.html"
         },
@@ -164,6 +172,12 @@
         },
         "api/rights-registration-center.js": {
             "maxDuration": 15
+        },
+        "api/contract-intelligence.js": {
+            "maxDuration": 30
+        },
+        "api/admin/run-synthetic-royalty-pilot.js": {
+            "maxDuration": 30
         },
         "api/upload-registration-evidence.js": {
             "maxDuration": 30

@@ -1,0 +1,18 @@
+{
+  "fixture_version": "tha-regime-synthetic-v1",
+  "profile": "NAIM",
+  "work": "Tha Regime",
+  "synthetic": true,
+  "authoritative": false,
+  "disclosures": ["Testing only", "Not evidence of money owed", "Not a legal conclusion", "Do not mix with the live NAIM rights profile"],
+  "lines": [
+    {"fixture_id":"correct-line","contract_asset_scope":"MASTER","statement_asset_scope":"MASTER","term_authority":"EXPLICIT","term_review_status":"APPROVED","royalty_base_minor":"100000","rate":{"numerator":"15","denominator":"100"},"reported_minor":"15000","source_currency":"USD","reporting_currency":"USD","classification_hint":"MATCHED_WITHIN_TOLERANCE","evidence":["synthetic clause 4.1"]},
+    {"fixture_id":"missing-escalation","contract_asset_scope":"MASTER","statement_asset_scope":"MASTER","term_authority":"EXPLICIT","term_review_status":"APPROVED","royalty_base_minor":"100000","rate":{"numerator":"18","denominator":"100"},"reported_minor":"15000","source_currency":"USD","reporting_currency":"USD","classification_hint":"MISSING_ESCALATION","evidence":["synthetic amendment A"]},
+    {"fixture_id":"unsupported-deduction","contract_asset_scope":"MASTER","statement_asset_scope":"MASTER","term_authority":"EXPLICIT","term_review_status":"APPROVED","royalty_base_minor":"100000","rate":{"numerator":"20","denominator":"100"},"reported_minor":"17000","source_currency":"USD","reporting_currency":"USD","classification_hint":"UNSUPPORTED_DEDUCTION","evidence":["synthetic statement line 3"]},
+    {"fixture_id":"stale-reserve","contract_asset_scope":"MASTER","statement_asset_scope":"MASTER","term_authority":"EXPLICIT","term_review_status":"APPROVED","royalty_base_minor":"100000","rate":{"numerator":"20","denominator":"100"},"reserve_minor":"5000","reported_minor":"15000","source_currency":"USD","reporting_currency":"USD","classification_hint":"STALE_RESERVE","assumptions":["Synthetic reserve age requires reviewer verification"]},
+    {"fixture_id":"unmatched-recording","source_currency":"USD","reporting_currency":"USD","classification_hint":"UNMATCHED_RECORDING","term_authority":"EXPLICIT","term_review_status":"APPROVED","statement_asset_scope":"MASTER"},
+    {"fixture_id":"currency-conversion","contract_asset_scope":"MASTER","statement_asset_scope":"MASTER","term_authority":"EXPLICIT","term_review_status":"APPROVED","royalty_base_minor":"100000","rate":{"numerator":"20","denominator":"100"},"reported_minor":"17000","source_currency":"EUR","reporting_currency":"USD","fx_rate":{"numerator":"110","denominator":"100"},"classification_hint":"CURRENCY_CONVERSION_DISCREPANCY","evidence":["synthetic FX source dated 2026-06-30"]},
+    {"fixture_id":"missing-language","contract_asset_scope":"MASTER","statement_asset_scope":"MASTER","term_authority":"EXPLICIT","term_review_status":"APPROVED","royalty_base_minor":"100000","reported_minor":"10000","source_currency":"USD","reporting_currency":"USD"},
+    {"fixture_id":"audit-candidate","contract_asset_scope":"MASTER","statement_asset_scope":"MASTER","term_authority":"EXPLICIT","term_review_status":"APPROVED","royalty_base_minor":"500000","rate":{"numerator":"20","denominator":"100"},"reported_minor":"40000","source_currency":"USD","reporting_currency":"USD","classification_hint":"FORMAL_AUDIT_CANDIDATE","evidence":["synthetic multi-period variance pattern"],"assumptions":["Formal audit authority and expert review not yet established"]}
+  ]
+}
