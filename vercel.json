@@ -68,6 +68,10 @@
             "destination": "/portal.html"
         },
         {
+            "source": "/dashboard/registrations",
+            "destination": "/dashboard-registrations.html"
+        },
+        {
             "source": "/earnings",
             "destination": "/earnings.html"
         },
@@ -153,6 +157,12 @@
         },
         "api/get-recovery-cases.js": {
             "maxDuration": 10
+        },
+        "api/rights-registration-center.js": {
+            "maxDuration": 15
+        },
+        "api/upload-registration-evidence.js": {
+            "maxDuration": 30
         },
         "api/enterprise/harbourview-workspace.js": {
             "maxDuration": 15
