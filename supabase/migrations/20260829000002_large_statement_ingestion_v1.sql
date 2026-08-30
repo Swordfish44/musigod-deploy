@@ -46,6 +46,40 @@ CREATE TABLE IF NOT EXISTS royalty_intelligence.processing_checkpoints_v1(
  stage text NOT NULL, chunk_number bigint NOT NULL, byte_offset bigint NOT NULL DEFAULT 0, source_row_number bigint NOT NULL DEFAULT 0,
  checkpoint_fingerprint text NOT NULL, state jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(job_id,stage,chunk_number)
 );
+
+-- Self-repair for processing_checkpoints_v1.profile_id.
+-- The original release of this migration created this table without profile_id,
+-- then unconditionally referenced profile_id in the profile-scoped RLS loop
+-- further down, which failed with 42703 (column "profile_id" does not exist)
+-- on every apply attempt. The block below is safe and a no-op on rerun across
+-- all states this migration can be applied into: a fresh database (column is
+-- added, the backfill UPDATE matches zero rows), an existing table left over
+-- from a failed prior attempt that never got the column, existing checkpoint
+-- rows that need profile_id backfilled from their parent ingestion job, and a
+-- clean rerun after this fix has already applied successfully (every
+-- statement below is already satisfied and changes nothing).
+ALTER TABLE royalty_intelligence.processing_checkpoints_v1 ADD COLUMN IF NOT EXISTS profile_id uuid;
+
+UPDATE royalty_intelligence.processing_checkpoints_v1 c
+SET profile_id = j.profile_id
+FROM royalty_intelligence.ingestion_jobs_v1 j
+WHERE c.job_id = j.id AND c.profile_id IS NULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'processing_checkpoints_v1_profile_id_fkey'
+      AND conrelid = 'royalty_intelligence.processing_checkpoints_v1'::regclass
+  ) THEN
+    ALTER TABLE royalty_intelligence.processing_checkpoints_v1
+      ADD CONSTRAINT processing_checkpoints_v1_profile_id_fkey
+      FOREIGN KEY (profile_id) REFERENCES registrations.rights_registration_profiles_v1(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+
+ALTER TABLE royalty_intelligence.processing_checkpoints_v1 ALTER COLUMN profile_id SET NOT NULL;
+
 CREATE TABLE IF NOT EXISTS royalty_intelligence.import_chunks_v1(
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), profile_id uuid NOT NULL REFERENCES registrations.rights_registration_profiles_v1(id) ON DELETE CASCADE,
  import_id uuid REFERENCES royalty_intelligence.statement_imports_v1(id) ON DELETE CASCADE, source_file_id uuid NOT NULL REFERENCES royalty_intelligence.source_files_v1(id) ON DELETE CASCADE,
@@ -145,12 +179,34 @@ CREATE TRIGGER trg_source_files_append_only BEFORE DELETE ON royalty_intelligenc
 DROP TRIGGER IF EXISTS trg_source_files_evidence_immutable ON royalty_intelligence.source_files_v1;
 CREATE TRIGGER trg_source_files_evidence_immutable BEFORE UPDATE ON royalty_intelligence.source_files_v1 FOR EACH ROW EXECUTE FUNCTION royalty_intelligence.fn_source_file_evidence_immutable_v1();
 
-DO $$ DECLARE t text; BEGIN FOREACH t IN ARRAY ARRAY['statement_packages_v1','upload_sessions_v1','source_files_v1','ingestion_jobs_v1','processing_checkpoints_v1','import_chunks_v1','raw_source_rows_v1','column_mappings_v1','import_exceptions_v1','import_approvals_v1'] LOOP
- EXECUTE format('ALTER TABLE royalty_intelligence.%I ENABLE ROW LEVEL SECURITY',t);
- EXECUTE format('DROP POLICY IF EXISTS profile_read_%I ON royalty_intelligence.%I',t,t);
- EXECUTE format('CREATE POLICY profile_read_%I ON royalty_intelligence.%I FOR SELECT TO authenticated USING (royalty_intelligence.fn_has_profile_access_v1(profile_id))',t,t);
-END LOOP; END $$;
+-- Profile-scoped RLS loop. Audited: before creating a policy that assumes
+-- profile_id, each table's column is verified against information_schema.
+-- A table added to this array in the future without profile_id now fails
+-- with a clear, named exception instead of the opaque 42703 seen in
+-- production — the exact failure mode this migration is fixing.
+DO $$
+DECLARE
+  t text;
+  v_has_profile_id boolean;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['statement_packages_v1','upload_sessions_v1','source_files_v1','ingestion_jobs_v1','processing_checkpoints_v1','import_chunks_v1','raw_source_rows_v1','column_mappings_v1','import_exceptions_v1','import_approvals_v1']
+  LOOP
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'royalty_intelligence' AND table_name = t AND column_name = 'profile_id'
+    ) INTO v_has_profile_id;
+
+    IF NOT v_has_profile_id THEN
+      RAISE EXCEPTION 'royalty_intelligence.% is missing profile_id — cannot create a profile-scoped RLS policy. Add and backfill the column before this migration runs.', t;
+    END IF;
+
+    EXECUTE format('ALTER TABLE royalty_intelligence.%I ENABLE ROW LEVEL SECURITY',t);
+    EXECUTE format('DROP POLICY IF EXISTS profile_read_%I ON royalty_intelligence.%I',t,t);
+    EXECUTE format('CREATE POLICY profile_read_%I ON royalty_intelligence.%I FOR SELECT TO authenticated USING (royalty_intelligence.fn_has_profile_access_v1(profile_id))',t,t);
+  END LOOP;
+END $$;
 ALTER TABLE royalty_intelligence.adapter_versions_v1 ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS adapter_versions_read_v1 ON royalty_intelligence.adapter_versions_v1;
 CREATE POLICY adapter_versions_read_v1 ON royalty_intelligence.adapter_versions_v1 FOR SELECT TO authenticated USING(approval_status IN('TESTED','APPROVED'));
 ALTER TABLE royalty_intelligence.processing_metrics_v1 ENABLE ROW LEVEL SECURITY;
 ALTER TABLE royalty_intelligence.dead_letter_jobs_v1 ENABLE ROW LEVEL SECURITY;
