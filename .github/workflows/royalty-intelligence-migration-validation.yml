@@ -1,0 +1,224 @@
+name: Royalty Intelligence Migration Validation
+
+# Regression coverage for the bug fixed here: PR #33's large-statement-ingestion
+# migration created processing_checkpoints_v1 without profile_id, then a dynamic
+# RLS policy loop unconditionally referenced profile_id on every table in its
+# list, failing with 42703 (column does not exist) on every apply attempt.
+#
+# This workflow proves, against a real Postgres service container (same pattern
+# as enterprise-migration-validation.yml):
+#   1. The migration chain applies cleanly to a fresh database.
+#   2. The migration self-repairs the exact broken shape (processing_checkpoints_v1
+#      pre-existing without profile_id, with rows that need backfilling).
+#   3. The migration is safe to reapply repeatedly after success (idempotency).
+#   4. Tenant isolation on the repaired table is real: the owning profile can
+#      read its own checkpoint row, an unrelated profile cannot.
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/20260829000000_rights_registration_center_v1.sql'
+      - 'supabase/migrations/20260829000001_contract_intelligence_expected_royalty_v1.sql'
+      - 'supabase/migrations/20260829000002_large_statement_ingestion_v1.sql'
+      - 'supabase/fixtures/large_statement_ingestion_partial_state_v1.sql'
+      - 'api/admin/run-ingestion-worker.js'
+      - '.github/workflows/royalty-intelligence-migration-validation.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  validate-royalty-intelligence-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGDATABASE: postgres
+      PGUSER: postgres
+      PGPASSWORD: postgres
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bootstrap Supabase-compatible roles, auth schema, and storage stub
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE service_role NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE anon NOLOGIN;
+          CREATE SCHEMA auth;
+          CREATE TABLE auth.users (id uuid PRIMARY KEY, email text);
+          CREATE OR REPLACE FUNCTION auth.uid()
+          RETURNS uuid LANGUAGE sql STABLE AS $$
+            SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid
+          $$;
+          GRANT USAGE ON SCHEMA auth TO authenticated, service_role, anon;
+          GRANT SELECT ON auth.users TO authenticated, service_role;
+
+          CREATE SCHEMA storage;
+          CREATE TABLE storage.buckets(
+            id text PRIMARY KEY, name text NOT NULL, public boolean NOT NULL DEFAULT false,
+            file_size_limit bigint, allowed_mime_types text[]
+          );
+          CREATE TABLE storage.objects(
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bucket_id text REFERENCES storage.buckets(id),
+            name text, owner uuid, created_at timestamptz DEFAULT now()
+          );
+          ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+          CREATE OR REPLACE FUNCTION storage.foldername(name text) RETURNS text[] LANGUAGE plpgsql AS $$
+          DECLARE _parts text[];
+          BEGIN SELECT string_to_array(name, '/') INTO _parts; RETURN _parts[1:greatest(array_length(_parts,1)-1,0)]; END $$;
+          GRANT USAGE ON SCHEMA storage TO authenticated, service_role, anon;
+          GRANT SELECT, INSERT ON storage.objects TO authenticated, service_role;
+          GRANT ALL ON storage.buckets TO service_role;
+          SQL
+
+      - name: Apply dependency chain (fresh-database proof)
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260500000000_local_dev_bootstrap.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260829000000_rights_registration_center_v1.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260829000001_contract_intelligence_expected_royalty_v1.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260829000002_large_statement_ingestion_v1.sql
+          echo "PASS: fresh-database apply succeeded"
+
+      - name: Grant schema usage (mirrors production PostgREST exposure)
+        run: |
+          psql -v ON_ERROR_STOP=1 -c "GRANT USAGE ON SCHEMA royalty_intelligence TO authenticated; GRANT USAGE ON SCHEMA registrations TO authenticated;"
+
+      - name: Validate post-migration schema state
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $test$
+          DECLARE v_notnull boolean; v_fk_def text; v_count integer;
+          BEGIN
+            SELECT a.attnotnull INTO v_notnull FROM pg_attribute a
+            WHERE a.attrelid = 'royalty_intelligence.processing_checkpoints_v1'::regclass AND a.attname = 'profile_id';
+            IF v_notnull IS DISTINCT FROM true THEN
+              RAISE EXCEPTION 'processing_checkpoints_v1.profile_id is not NOT NULL';
+            END IF;
+
+            SELECT pg_get_constraintdef(oid) INTO v_fk_def FROM pg_constraint
+            WHERE conrelid = 'royalty_intelligence.processing_checkpoints_v1'::regclass
+              AND conname = 'processing_checkpoints_v1_profile_id_fkey';
+            IF v_fk_def IS NULL OR v_fk_def NOT LIKE '%rights_registration_profiles_v1%' OR v_fk_def NOT LIKE '%ON DELETE CASCADE%' THEN
+              RAISE EXCEPTION 'processing_checkpoints_v1.profile_id foreign key missing or malformed: %', v_fk_def;
+            END IF;
+
+            SELECT count(*) INTO v_count FROM pg_class
+            WHERE relnamespace = 'royalty_intelligence'::regnamespace
+              AND relname IN ('statement_packages_v1','upload_sessions_v1','source_files_v1','ingestion_jobs_v1',
+                              'processing_checkpoints_v1','import_chunks_v1','raw_source_rows_v1','column_mappings_v1',
+                              'import_exceptions_v1','import_approvals_v1')
+              AND relrowsecurity;
+            IF v_count <> 10 THEN RAISE EXCEPTION 'expected RLS on 10 profile-scoped tables, got %', v_count; END IF;
+
+            IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='royalty_intelligence' AND tablename='processing_checkpoints_v1' AND policyname='profile_read_processing_checkpoints_v1') THEN
+              RAISE EXCEPTION 'profile_read_processing_checkpoints_v1 policy is missing';
+            END IF;
+
+            IF to_regprocedure('royalty_intelligence.fn_claim_ingestion_job_v1(text,integer)') IS NULL THEN
+              RAISE EXCEPTION 'fn_claim_ingestion_job_v1 is missing';
+            END IF;
+
+            SELECT count(*) INTO v_count FROM royalty_intelligence.adapter_versions_v1 WHERE adapter_key='generic_csv';
+            IF v_count <> 1 THEN RAISE EXCEPTION 'expected exactly 1 generic_csv adapter row, got %', v_count; END IF;
+            SELECT count(*) INTO v_count FROM royalty_intelligence.adapter_versions_v1 WHERE adapter_key='generic_tsv';
+            IF v_count <> 1 THEN RAISE EXCEPTION 'expected exactly 1 generic_tsv adapter row, got %', v_count; END IF;
+
+            IF EXISTS (SELECT 1 FROM storage.buckets WHERE id='artist-documents' AND public = true) THEN
+              RAISE EXCEPTION 'artist-documents storage bucket is public';
+            END IF;
+          END
+          $test$;
+          SQL
+          echo "PASS: post-migration schema state verified"
+
+      - name: Reset database and prove self-repair of the exact reported bug
+        run: |
+          psql -v ON_ERROR_STOP=1 -c "DROP SCHEMA IF EXISTS royalty_intelligence CASCADE; DROP SCHEMA IF EXISTS registrations CASCADE; DROP SCHEMA IF EXISTS catalog CASCADE; DROP SCHEMA IF EXISTS works CASCADE; DROP SCHEMA IF EXISTS graph CASCADE; DROP SCHEMA IF EXISTS rights CASCADE; DROP SCHEMA IF EXISTS royalties CASCADE; DROP SCHEMA IF EXISTS disputes CASCADE; DROP SCHEMA IF EXISTS legal CASCADE; DROP TABLE IF EXISTS public.graph_nodes_v1;"
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260500000000_local_dev_bootstrap.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260829000000_rights_registration_center_v1.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260829000001_contract_intelligence_expected_royalty_v1.sql
+          echo "Injecting the exact broken shape from the PR #33 production failure..."
+          psql -v ON_ERROR_STOP=1 -f supabase/fixtures/large_statement_ingestion_partial_state_v1.sql
+          echo "Applying the fixed migration against that broken state..."
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260829000002_large_statement_ingestion_v1.sql
+          echo "PASS: self-repair of pre-existing profile_id-less table succeeded"
+
+      - name: Validate backfill correctness and tenant isolation
+        run: |
+          psql -v ON_ERROR_STOP=1 -c "GRANT USAGE ON SCHEMA royalty_intelligence TO authenticated; GRANT USAGE ON SCHEMA registrations TO authenticated;"
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $test$
+          DECLARE v_profile_id uuid; v_count integer;
+          BEGIN
+            SELECT profile_id INTO v_profile_id FROM royalty_intelligence.processing_checkpoints_v1
+            WHERE job_id = '33333333-3333-3333-3333-333333333333';
+            IF v_profile_id IS DISTINCT FROM '11111111-1111-1111-1111-111111111111'::uuid THEN
+              RAISE EXCEPTION 'checkpoint backfill did not populate the correct profile_id, got %', v_profile_id;
+            END IF;
+
+            UPDATE registrations.rights_registration_profiles_v1
+            SET auth_user_id = '99999999-9999-9999-9999-999999999999'
+            WHERE id = '11111111-1111-1111-1111-111111111111';
+          END
+          $test$;
+          SQL
+
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE authenticated;
+          SET request.jwt.claim.sub = '99999999-9999-9999-9999-999999999999';
+          DO $test$
+          DECLARE v_count integer;
+          BEGIN
+            SELECT count(*) INTO v_count FROM royalty_intelligence.processing_checkpoints_v1;
+            IF v_count <> 1 THEN RAISE EXCEPTION 'profile owner should see exactly 1 checkpoint row, got %', v_count; END IF;
+          END
+          $test$;
+          RESET ROLE;
+
+          SET ROLE authenticated;
+          SET request.jwt.claim.sub = '00000000-0000-0000-0000-000000000000';
+          DO $test$
+          DECLARE v_count integer;
+          BEGIN
+            SELECT count(*) INTO v_count FROM royalty_intelligence.processing_checkpoints_v1;
+            IF v_count <> 0 THEN RAISE EXCEPTION 'unrelated caller should see 0 rows (tenant isolation broken), got %', v_count; END IF;
+          END
+          $test$;
+          RESET ROLE;
+          SQL
+          echo "PASS: backfill correctness and tenant isolation verified"
+
+      - name: Reapply migration twice to prove idempotency after a successful run
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260829000002_large_statement_ingestion_v1.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260829000002_large_statement_ingestion_v1.sql
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $test$
+          DECLARE v_count integer;
+          BEGIN
+            SELECT count(*) INTO v_count FROM royalty_intelligence.processing_checkpoints_v1;
+            IF v_count <> 1 THEN RAISE EXCEPTION 'reapply duplicated or lost checkpoint rows, count=%', v_count; END IF;
+            SELECT count(*) INTO v_count FROM royalty_intelligence.adapter_versions_v1;
+            IF v_count <> 2 THEN RAISE EXCEPTION 'reapply duplicated adapter_versions_v1 rows, count=%', v_count; END IF;
+          END
+          $test$;
+          SQL
+          echo "PASS: migration is idempotent across repeated reapplication"
