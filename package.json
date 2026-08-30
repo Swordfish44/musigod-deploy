@@ -20,6 +20,7 @@
     "test:statement-ingestion-repair": "node tests/large-statement-ingestion-migration-repair.test.js",
     "fixture:statement-million": "node scripts/generate-million-row-statement-fixture.js",
     "test:contract-intelligence": "node tests/contract-intelligence.test.js",
+    "test:rights-title-report": "node tests/rights-title-report.test.js",
     "test:enterprise": "node tests/enterprise-foundation.test.js && node tests/harbourview-workspace.test.js && node tests/portfolio-scale-analysis.test.js && node tests/enterprise-rights-recovery-report.test.js",
     "test:harbourview": "node tests/harbourview-workspace.test.js",
     "test:portfolio": "node tests/portfolio-scale-analysis.test.js",
