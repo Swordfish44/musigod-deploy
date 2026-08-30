@@ -1,18 +1,22 @@
 {
   "private": true,
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.80",
     "@sentry/browser": "^8.55.0",
     "@sentry/node": "^8.55.0",
+    "@tesseract.js-data/eng": "^1.0.0",
     "csv-stringify": "^6.7.0",
     "exceljs": "^4.4.0",
     "pdfjs-dist": "^4.10.38",
     "pg": "^8.23.0",
+    "tesseract.js": "^6.0.1",
     "yauzl": "^3.2.0"
   },
   "scripts": {
-    "test": "npm run test:contract-intelligence && npm run test:registrations && npm run test:statement-ingestion && npm run test:statement-specialized && node tests/large-statement-ingestion-migration-repair.test.js && node tests/enterprise-foundation.test.js && node tests/harbourview-workspace.test.js && node tests/portfolio-scale-analysis.test.js && node tests/enterprise-rights-recovery-report.test.js && node tests/paid-diagnostic-demo.test.js && node tests/graph-rls.test.js && node tests/graph-sync-identity.test.js && node tests/graph-sync-enrichment-upsert.test.js && node tests/canary-assert.test.js && node tests/enrich-catalog-budget.test.js && node tests/registration-readiness.test.js && node tests/rpc-signature-alignment.test.js && node tests/readiness-evidence-adapter.test.js && node tests/writer-split-validation.test.js && node tests/writer-recovery-classify.test.js && node tests/genius-search-classify.test.js && node tests/neighboring-rights-audit.test.js && node tests/soundexchange-adapter.test.js && node tests/artist-intake.test.js && node tests/intake-tokens.test.js && node tests/consent-gate.test.js && node tests/no-orphaned-submodules.test.js && node tests/mb-ingestion.test.js && node tests/integration/echo-sandbox.test.js",
+    "test": "npm run test:contract-intelligence && npm run test:registrations && npm run test:statement-ingestion && npm run test:statement-specialized && npm run test:statement-ocr && node tests/large-statement-ingestion-migration-repair.test.js && node tests/enterprise-foundation.test.js && node tests/harbourview-workspace.test.js && node tests/portfolio-scale-analysis.test.js && node tests/enterprise-rights-recovery-report.test.js && node tests/paid-diagnostic-demo.test.js && node tests/graph-rls.test.js && node tests/graph-sync-identity.test.js && node tests/graph-sync-enrichment-upsert.test.js && node tests/canary-assert.test.js && node tests/enrich-catalog-budget.test.js && node tests/registration-readiness.test.js && node tests/rpc-signature-alignment.test.js && node tests/readiness-evidence-adapter.test.js && node tests/writer-split-validation.test.js && node tests/writer-recovery-classify.test.js && node tests/genius-search-classify.test.js && node tests/neighboring-rights-audit.test.js && node tests/soundexchange-adapter.test.js && node tests/artist-intake.test.js && node tests/intake-tokens.test.js && node tests/consent-gate.test.js && node tests/no-orphaned-submodules.test.js && node tests/mb-ingestion.test.js && node tests/integration/echo-sandbox.test.js",
     "test:statement-ingestion": "node tests/large-statement-ingestion.test.js",
     "test:statement-specialized": "node tests/specialized-statement-workers.test.js",
+    "test:statement-ocr": "node tests/real-ocr-execution.test.js",
     "test:statement-ingestion-repair": "node tests/large-statement-ingestion-migration-repair.test.js",
     "fixture:statement-million": "node scripts/generate-million-row-statement-fixture.js",
     "test:contract-intelligence": "node tests/contract-intelligence.test.js",
