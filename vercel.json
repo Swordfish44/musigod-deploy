@@ -76,6 +76,10 @@
             "destination": "/contract-intelligence.html"
         },
         {
+            "source": "/dashboard/royalty-statements",
+            "destination": "/royalty-statements.html"
+        },
+        {
             "source": "/admin/royalty-intelligence",
             "destination": "/admin-royalty-intelligence.html"
         },
@@ -140,6 +144,10 @@
         {
             "path": "/api/send-audit-drip",
             "schedule": "0 14 * * *"
+        },
+        {
+            "path": "/api/admin/run-ingestion-worker",
+            "schedule": "* * * * *"
         }
     ],
     "functions": {
@@ -175,6 +183,12 @@
         },
         "api/contract-intelligence.js": {
             "maxDuration": 30
+        },
+        "api/statement-ingestion.js": {
+            "maxDuration": 30
+        },
+        "api/admin/run-ingestion-worker.js": {
+            "maxDuration": 300
         },
         "api/admin/run-synthetic-royalty-pilot.js": {
             "maxDuration": 30
