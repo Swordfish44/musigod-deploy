@@ -37,8 +37,8 @@ module.exports=withSentry(async function(req,res){
    if(b.malware_status!=='CLEAN')return res.status(400).json({error:'A clean malware-scan attestation is required to release quarantine'})
    await sb(`source_files_v1?id=eq.${file.id}`,{schema:SCHEMA,method:'PATCH',body:{malware_status:'CLEAN',quarantine_status:'RELEASED'}})
    await sb(`import_exceptions_v1?source_file_id=eq.${file.id}&rule_key=eq.MALWARE_SCAN_ATTESTATION_REQUIRED&review_status=eq.OPEN`,{schema:SCHEMA,method:'PATCH',body:{review_status:'RESOLVED',named_reviewer:reviewer,resolution_notes:notes,resolved_at:new Date().toISOString()}})
-   const supported=['CSV','TSV','DELIMITED_TEXT'].includes(file.format_key),key=hash(`PARSE:${file.sha256}:generic-delimited-v1`);let job=null
-   if(supported){[job]=await sb('ingestion_jobs_v1',{schema:SCHEMA,method:'POST',prefer:'resolution=ignore-duplicates,return=representation',body:{profile_id:profile.id,package_id:file.package_id,source_file_id:file.id,job_type:'STREAM_DELIMITED',idempotency_key:key}});if(!job)job=(await sb(`ingestion_jobs_v1?idempotency_key=eq.${key}&limit=1`,{schema:SCHEMA}))?.[0]}
+   const jobs={CSV:'STREAM_DELIMITED',TSV:'STREAM_DELIMITED',DELIMITED_TEXT:'STREAM_DELIMITED',XLSX:'STREAM_XLSX',PDF:'EXTRACT_PDF',ZIP:'EXPAND_ZIP'},jobType=jobs[file.format_key],supported=!!jobType,key=hash(`PARSE:${file.sha256}:${jobType||'unsupported'}:v1`);let job=null
+   if(supported){[job]=await sb('ingestion_jobs_v1',{schema:SCHEMA,method:'POST',prefer:'resolution=ignore-duplicates,return=representation',body:{profile_id:profile.id,package_id:file.package_id,source_file_id:file.id,job_type:jobType,idempotency_key:key}});if(!job)job=(await sb(`ingestion_jobs_v1?idempotency_key=eq.${key}&limit=1`,{schema:SCHEMA}))?.[0]}
    await sb(`statement_packages_v1?id=eq.${file.package_id}`,{schema:SCHEMA,method:'PATCH',body:{status:supported?'PROCESSING':'REVIEW_REQUIRED'}});await audit(profile.id,actor,'statement_quarantine.released','source_file',file.id,{reviewer,scan_status:'CLEAN',next_job_id:job?.id||null})
    return res.status(200).json({ok:true,status:supported?'PROCESSING':'SPECIALIZED_WORKER_REQUIRED',job_id:job?.id||null})
   }
