@@ -3,7 +3,17 @@ const SB_URL=process.env.SUPABASE_URL||'https://uykzkrnoetcldeuxzqyy.supabase.co
 const SB_KEY=process.env.SUPABASE_SERVICE_ROLE_KEY||process.env.SUPABASE_SERVICE_KEY
 function bearer(req){ const h=String(req.headers.authorization||''); return h.startsWith('Bearer ')?h.slice(7):'' }
 async function authenticate(req,{admin=false}={}){
-  if(admin && process.env.ADMIN_API_KEY && req.headers['x-admin-key']===process.env.ADMIN_API_KEY) return {admin:true,subject:'admin'}
+  // Admin mode is intentionally fail-closed. A normal Supabase user session is
+  // not sufficient for an admin-only endpoint unless a separate admin-role
+  // system is explicitly introduced. For now, admin access requires the
+  // dedicated X-Admin-Key secret.
+  if(admin){
+    if(process.env.ADMIN_API_KEY && req.headers['x-admin-key']===process.env.ADMIN_API_KEY){
+      return {admin:true,subject:'admin'}
+    }
+    return null
+  }
+
   const token=bearer(req); if(!token) return null
   const r=await fetch(`${SB_URL}/auth/v1/user`,{headers:{apikey:SB_KEY,Authorization:`Bearer ${token}`}})
   if(!r.ok)return null; const u=await r.json(); return {admin:false,subject:u.id,email:u.email}
