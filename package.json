@@ -19,7 +19,7 @@
     "test:statement-ocr": "node tests/real-ocr-execution.test.js",
     "test:statement-ingestion-repair": "node tests/large-statement-ingestion-migration-repair.test.js",
     "fixture:statement-million": "node scripts/generate-million-row-statement-fixture.js",
-    "test:contract-intelligence": "node tests/contract-intelligence.test.js",
+    "test:contract-intelligence": "node tests/contract-intelligence.test.js && node tests/contract-intelligence-v2.test.js",
     "test:rights-title-report": "node tests/rights-title-report.test.js",
     "test:enterprise": "node tests/enterprise-foundation.test.js && node tests/harbourview-workspace.test.js && node tests/portfolio-scale-analysis.test.js && node tests/enterprise-rights-recovery-report.test.js",
     "test:harbourview": "node tests/harbourview-workspace.test.js",

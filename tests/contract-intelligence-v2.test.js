@@ -1,0 +1,14 @@
+'use strict'
+const assert=require('assert'),fs=require('fs'),path=require('path')
+const engine=require('../lib/contract-intelligence-v2')
+const ids={document_id:'00000000-0000-4000-8000-000000000001',contract_id:'00000000-0000-4000-8000-000000000002',profile_id:'00000000-0000-4000-8000-000000000003',source_sha256:'a'.repeat(64)}
+const result=engine.extractClauses({...ids,pages:[{page_number:1,text:'Artist royalty is 15% of net receipts. Territory is worldwide.'},{page_number:2,text:'Company may maintain a reserve. Statements shall be rendered within 45 days.'}]})
+assert.equal(result.engine_version,'contract-intelligence-v2.0.0');assert.equal(result.legal_conclusion,false);assert.equal(result.external_action_enabled,false);assert.ok(result.clauses.length>=4)
+const rate=result.clauses.find(x=>x.clause_type==='royalty_rate');assert.equal(rate.term.normalized_value.percent,15);assert.equal(rate.term.authority_basis,'EXPLICIT');assert.equal(rate.page_number,1);assert.equal(rate.source.source_sha256,ids.source_sha256)
+const inferred=result.clauses.find(x=>x.clause_type==='reserve').term;assert.equal(engine.approveTerm(inferred,{name:'Jane Reviewer',role:'ADMINISTRATOR'},'Language is ambiguous and needs counsel.').status,'LEGAL_REVIEW')
+const approved=engine.approveTerm(rate.term,{name:'Jane Reviewer',role:'ADMINISTRATOR'},'Matched verbatim against the preserved source.');assert.equal(approved.status,'APPROVED');assert.equal(approved.calculation_authoritative,true)
+assert.throws(()=>engine.approveTerm(rate.term,{name:'Jane',role:'ADMINISTRATOR'},'too short'),/notes/)
+const conflicts=engine.detectConflicts([{id:'a',term_key:'royalty_rate',normalized_value:{percent:15}},{id:'b',term_key:'royalty_rate',normalized_value:{percent:18}}]);assert.equal(conflicts.length,1);assert.equal(conflicts[0].status,'LEGAL_REVIEW')
+const root=path.join(__dirname,'..'),api=fs.readFileSync(path.join(root,'api/contract-intelligence.js'),'utf8'),ui=fs.readFileSync(path.join(root,'admin-royalty-intelligence.html'),'utf8'),sql=fs.readFileSync(path.join(root,'supabase/migrations/20260908000000_contract_intelligence_v2.sql'),'utf8')
+for(const action of ['extract_contract','approve_term','calculate_preview'])assert.ok(api.includes(action));for(const marker of ['Contract Intelligence 2.0','Named term review','Controlled royalty preview','review required'])assert.ok(ui.includes(marker));for(const marker of ['contract_extraction_runs_v2','contract_term_conflicts_v2','started_at timestamptz','ENABLE ROW LEVEL SECURITY','fn_has_profile_access_v1'])assert.ok(sql.includes(marker))
+console.log('contract intelligence v2 tests passed')
