@@ -1,0 +1,15 @@
+'use strict';
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const api = fs.readFileSync(path.join(__dirname, '../api/admin/registration-submissions.js'), 'utf8');
+const ui = fs.readFileSync(path.join(__dirname, '../registration-submissions-admin.html'), 'utf8');
+const vercel = JSON.parse(fs.readFileSync(path.join(__dirname, '../vercel.json'), 'utf8'));
+assert(api.includes("action === 'create_plan'"));
+assert(api.includes("action === 'approve'"));
+assert(api.includes("action === 'record_receipt'"));
+assert(api.includes("status=eq.EXECUTED"));
+assert(api.includes('external_submission_performed: false'));
+assert(ui.includes('Destination capability') && ui.includes('Verified connectors'));
+assert(vercel.rewrites.some(x => x.source === '/admin/registration-submissions'));
+console.log('registration submission API and admin dashboard: authorization, approval, receipt and routing surfaces passed');

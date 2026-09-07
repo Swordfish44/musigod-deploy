@@ -84,6 +84,10 @@
             "destination": "/admin-royalty-intelligence.html"
         },
         {
+            "source": "/admin/registration-submissions",
+            "destination": "/registration-submissions-admin.html"
+        },
+        {
             "source": "/login",
             "destination": "/login.html"
         },
