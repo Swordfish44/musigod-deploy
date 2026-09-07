@@ -41,7 +41,7 @@
     "musicbrainz:import:artists": "node scripts/mb-import.js --artists",
     "musicbrainz:resolve": "node scripts/mb-import.js --resolve",
     "musicbrainz:dry-run": "node scripts/mb-import.js --all --dry-run",
-    "test:registrations": "node tests/rights-registration-center.test.js && node tests/rights-registration-schema.test.js",
+    "test:registrations": "node tests/rights-registration-center.test.js && node tests/rights-registration-schema.test.js && node tests/registration-submission-engine.test.js",
     "seed:registrations:pilot": "node scripts/seed-rights-registration-pilot.js"
   },
   "devDependencies": {
