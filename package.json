@@ -24,7 +24,7 @@
     "test:enterprise": "node tests/enterprise-foundation.test.js && node tests/harbourview-workspace.test.js && node tests/portfolio-scale-analysis.test.js && node tests/enterprise-rights-recovery-report.test.js",
     "test:harbourview": "node tests/harbourview-workspace.test.js",
     "test:portfolio": "node tests/portfolio-scale-analysis.test.js",
-    "test:paid-diagnostic": "node tests/paid-diagnostic-demo.test.js",
+    "test:paid-diagnostic": "node tests/paid-diagnostic-demo.test.js && node tests/sample-workspace.test.js",
     "demo:paid-diagnostic": "node scripts/enterprise/run-paid-diagnostic-demo.js",
     "dns:check": "node scripts/check-dns-state.js",
     "dns:email": "node scripts/check-email-security.js",
