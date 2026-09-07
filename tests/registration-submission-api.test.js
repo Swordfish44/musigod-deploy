@@ -8,8 +8,12 @@ const vercel = JSON.parse(fs.readFileSync(path.join(__dirname, '../vercel.json')
 assert(api.includes("action === 'create_plan'"));
 assert(api.includes("action === 'approve'"));
 assert(api.includes("action === 'record_receipt'"));
+assert(api.includes("action === 'begin_portal_delivery'"));
+assert(api.includes("action === 'record_delivery_failure'"));
+assert(api.includes("action === 'record_outcome'"));
+assert(api.includes('X-Content-SHA256'));
 assert(api.includes("status=eq.EXECUTED"));
 assert(api.includes('external_submission_performed: false'));
-assert(ui.includes('Destination capability') && ui.includes('Verified connectors'));
+assert(ui.includes('Create submission package') && ui.includes('downloadArtifact') && ui.includes('Resubmit'));
 assert(vercel.rewrites.some(x => x.source === '/admin/registration-submissions'));
 console.log('registration submission API and admin dashboard: authorization, approval, receipt and routing surfaces passed');

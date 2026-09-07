@@ -3,13 +3,23 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const engine = require('../lib/registration-submission-engine');
-const tracks = [{ id: 'track-1', track_title: 'Ready Work' }];
+const tracks = [{ id: 'track-1', track_title: 'Ready Work', artist_name:'Test Artist', writers:[{name:'Jane Doe',ipi:'00000000001',pro:'ASCAP'}], isrcs:['USABC0100001'], master_rights_holder:'Test Artist LLC', splits_validated:true, publisher_name:'MusiGod Publishing' }];
 const ready = [{ catalog_track_id: 'track-1', destination: 'ASCAP', decision: 'READY', blockers: [] }];
 const auth = { approved: true, reference: 'LOA-2026-001' };
 const plan = engine.buildPlan({ destination: 'ASCAP', catalogId: 'catalog-1', tracks, readinessResults: ready, authorization: auth, requestedBy: 'user-1' });
 assert.equal(plan.status, 'READY_FOR_REVIEW'); assert.equal(plan.summary.ready, 1); assert.equal(plan.external_submission_performed, false); assert.match(plan.payload_sha256, /^[a-f0-9]{64}$/);
+for (const destination of ['ASCAP','BMI','MLC']) {
+  const destinationReady=[{catalog_track_id:'track-1',destination,decision:'READY',blockers:[]}];
+  const p=engine.buildPlan({destination,catalogId:'catalog-1',tracks,readinessResults:destinationReady,authorization:auth,requestedBy:'user-1'});
+  const artifact=engine.buildArtifact(p,tracks,{name:'MusiGod Publishing',ipi:'00099999999'});
+  assert.match(artifact.sha256,/^[a-f0-9]{64}$/);assert(Buffer.from(artifact.content_base64,'base64').toString().includes('Ready Work'));
+}
+const sxReady=[{catalog_track_id:'track-1',destination:'SOUNDEXCHANGE',decision:'READY',blockers:[]}];
+const sxPlan=engine.buildPlan({destination:'SOUNDEXCHANGE',catalogId:'catalog-1',tracks,readinessResults:sxReady,authorization:auth,requestedBy:'user-1'});
+const sxArtifact=engine.buildArtifact(sxPlan,tracks);assert(Buffer.from(sxArtifact.content_base64,'base64').toString().includes('PARTNER-READY'));
 const unevaluated = engine.buildPlan({ destination: 'ASCAP', catalogId: 'catalog-1', tracks, readinessResults: [], authorization: auth, requestedBy: 'user-1' });
 assert.equal(unevaluated.status, 'BLOCKED'); assert.equal(unevaluated.items[0].blockers[0].code, 'READINESS_NOT_EVALUATED');
+assert.throws(()=>engine.buildArtifact(unevaluated,tracks),/READY/);
 const blocked = engine.buildPlan({ destination: 'SOUNDEXCHANGE', catalogId: 'catalog-1', tracks, readinessResults: [], authorization: auth, requestedBy: 'user-1' });
 assert.equal(blocked.status, 'BLOCKED');
 const pending = engine.buildPlan({ destination: 'PPL', catalogId: 'catalog-1', tracks, readinessResults: [{ catalog_track_id: 'track-1', destination: 'NEIGHBORING_RIGHTS', decision: 'READY', blockers: [] }], authorization: auth, requestedBy: 'user-1' });
@@ -21,6 +31,10 @@ const dispatching = engine.dispatch(approved, { verified: true, destination: 'AS
 assert.equal(dispatching.external_submission_performed, false);
 const submitted = engine.recordReceipt(dispatching, { external_reference: 'ASCAP-RECEIPT-1', received_at: new Date().toISOString() });
 assert.equal(submitted.status, 'SUBMITTED'); assert.equal(submitted.external_submission_performed, true);
+assert.equal(engine.recordOutcome(submitted,{status:'ACCEPTED'}).status,'ACCEPTED');
+assert.throws(()=>engine.recordOutcome(submitted,{status:'REJECTED_BY_DESTINATION',reason:'short'}),/reason/);
+const failed=engine.recordDeliveryFailure(dispatching,'Portal session timed out');assert.equal(failed.status,'FAILED');
+const retry=engine.beginPortalDelivery({...approved,status:'FAILED',attempt_count:1},{id:'admin-1'});assert.equal(retry.attempt_count,2);
 assert.throws(() => engine.approve(plan, { id: 'x', role: 'analyst' }, 'Evidence and authorization reviewed.'), /administrator/);
 assert.throws(() => engine.transition('DRAFT', 'SUBMITTED'), /Invalid/);
 assert.equal(Object.keys(engine.DESTINATIONS).length, 11);
