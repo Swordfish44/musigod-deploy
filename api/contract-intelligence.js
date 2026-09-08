@@ -1,6 +1,6 @@
 'use strict'
 const crypto=require('crypto');const {withSentry}=require('./_sentry');const {authenticate,sb}=require('./_registration-auth')
-const intelligence=require('../lib/contract-intelligence-v2');const royalty=require('../lib/expected-royalty-engine')
+const intelligence=require('../lib/contract-intelligence-v2');const royalty=require('../lib/expected-royalty-engine');const sensitive=require('../lib/sensitive-data-detector')
 const SCHEMA='royalty_intelligence'
 module.exports=withSentry(async function(req,res){
  res.setHeader('Cache-Control','no-store');if(!['GET','POST'].includes(req.method))return res.status(405).json({error:'Method not allowed'})
@@ -12,6 +12,7 @@ module.exports=withSentry(async function(req,res){
   const b=req.body||{}
   if(b.action==='register_upload'){
    const kind=String(b.kind||'').toUpperCase();if(!['CONTRACT','STATEMENT'].includes(kind))return res.status(400).json({error:'kind must be CONTRACT or STATEMENT'})
+   if(kind==='CONTRACT'&&b.redaction_attested!==true)return res.status(400).json({error:'Confirm that the contract was reviewed for SSNs, tax IDs, bank details, card numbers and credentials before upload'})
    if(!/^[0-9a-f]{64}$/.test(String(b.sha256||'')))return res.status(400).json({error:'A lowercase SHA-256 source hash is required'})
    if(!String(b.object_path||'').startsWith(`${profile.id}/`))return res.status(400).json({error:'Private object path must be scoped to the profile'})
    const existing=await sb(`${kind==='CONTRACT'?'contract_documents_v1':'statement_imports_v1'}?profile_id=eq.${profile.id}&sha256=eq.${b.sha256}&limit=1`,{schema:SCHEMA});if(existing?.[0])return res.status(200).json({ok:true,id:existing[0].id,status:kind==='CONTRACT'?'PRESERVED':existing[0].status,idempotent:true})
@@ -45,8 +46,12 @@ module.exports=withSentry(async function(req,res){
   }
   if(b.action==='extract_contract'){
    if(!actor.admin)return res.status(403).json({error:'Administrative extraction control required'})
+   if(b.redaction_attested!==true)return res.status(400).json({error:'A redaction-review attestation is required before contract extraction'})
    const documents=await sb(`contract_documents_v1?id=eq.${encodeURIComponent(b.document_id)}&profile_id=eq.${profile.id}&limit=1`,{schema:SCHEMA}),document=documents?.[0]
    if(!document)return res.status(404).json({error:'Contract document not found'});if(b.contract_id&&b.contract_id!==document.contract_id)return res.status(400).json({error:'Document does not belong to the supplied contract'})
+   const scans=(Array.isArray(b.pages)?b.pages:[]).map(page=>sensitive.scanText(String(page.text||''),{documentId:document.id,pageOrRow:`page:${page.page_number}`})),findings=scans.flatMap(x=>x.findings),scan={document_id:document.id,findings,quarantine:findings.some(x=>x.severity==='CRITICAL'),review_required:findings.length>0,finding_count:findings.length},safeScan=sensitive.buildSafeSummary(scan)
+   await sb('contract_document_security_scans_v1',{schema:SCHEMA,method:'POST',body:{profile_id:profile.id,contract_id:document.contract_id,document_id:document.id,scanner_version:'sensitive-data-detector-v1',source_sha256:document.sha256,status:scan.review_required?'QUARANTINED':'CLEARED',safe_summary:safeScan,redaction_attested:true,attested_by:actor.subject}})
+   if(scan.review_required){await audit(profile.id,actor,'contract.security_quarantined','contract_document',document.id,safeScan);return res.status(422).json({error:'Sensitive information detected. Extraction is blocked until a redacted replacement is uploaded.',security_status:'QUARANTINED',scan:safeScan,detected_values_returned:false})}
    const result=intelligence.extractClauses({document_id:document.id,contract_id:document.contract_id,profile_id:profile.id,pages:b.pages,source_sha256:document.sha256})
    const prior=await sb(`contract_extraction_runs_v2?profile_id=eq.${profile.id}&input_hash=eq.${result.input_hash}&limit=1`,{schema:SCHEMA});if(prior?.[0])return res.status(200).json({ok:true,idempotent:true,run:prior[0],summary:prior[0].summary,external_action_enabled:false})
    const [run]=await sb('contract_extraction_runs_v2',{schema:SCHEMA,method:'POST',prefer:'return=representation',body:{profile_id:profile.id,contract_id:document.contract_id,document_id:document.id,engine_version:result.engine_version,input_hash:result.input_hash,source_sha256:document.sha256,status:'COMPLETED',summary:result.summary,started_at:new Date().toISOString(),completed_at:new Date().toISOString()}})
