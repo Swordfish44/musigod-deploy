@@ -75,27 +75,58 @@
 <body>
   <div class="card">
     <div class="logo">MUSI<span>GOD</span></div>
-    <div class="check">&#10003;</div>
-    <div class="headline">Payment Confirmed</div>
-    <p class="sub">
-      Your subscription is active. Welcome to MusiGod Publishing Administration
-      &mdash; your account is being set up now.
-    </p>
+    <div class="check" id="status-icon">&hellip;</div>
+    <div class="headline" id="status-headline">Verifying Payment</div>
+    <p class="sub" id="status-copy">We are confirming your secure Stripe checkout before activating onboarding.</p>
     <div class="notice">
       <strong>WHAT HAPPENS NEXT</strong><br/>
       Our team will begin the registration process for your catalog within 1&ndash;2 business days.
       You&rsquo;ll receive email updates as each registration is completed.
       Questions? Reply to your welcome email.
     </div>
-    <a href="/portal" class="btn" id="portal-link">GO TO YOUR PORTAL</a>
+    <a href="/portal" class="btn" id="portal-link" hidden>GO TO YOUR PORTAL</a>
     <div class="footer">MUSIGOD PUBLISHING ADMINISTRATION &mdash; CONFIDENTIAL</div>
   </div>
   <script>
-    const artistId = new URLSearchParams(window.location.search).get('artist_id');
-    if (artistId) {
-      localStorage.setItem('musigod_artist_id', artistId);
-      document.getElementById('portal-link').href = `/portal?artist_id=${encodeURIComponent(artistId)}`;
+    const params = new URLSearchParams(window.location.search);
+    const artistId = params.get('artist_id');
+    const sessionId = params.get('session_id');
+    const headline = document.getElementById('status-headline');
+    const copy = document.getElementById('status-copy');
+    const icon = document.getElementById('status-icon');
+    const portalLink = document.getElementById('portal-link');
+
+    async function verifyCheckout() {
+      if (!artistId || !sessionId || !sessionId.startsWith('cs_')) {
+        headline.textContent = 'Payment Not Verified';
+        copy.textContent = 'This page is missing secure checkout confirmation. Return to registration or contact support@musigod.com.';
+        icon.textContent = '!';
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/verify-checkout-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ artist_id: artistId, session_id: sessionId }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.verified) throw new Error('unverified');
+
+        localStorage.setItem('musigod_artist_id', artistId);
+        headline.textContent = 'Payment Confirmed';
+        copy.textContent = 'Your subscription is active. Welcome to MusiGod Publishing Administration — your onboarding is now being prepared.';
+        icon.textContent = '\u2713';
+        portalLink.href = `/portal?artist_id=${encodeURIComponent(artistId)}`;
+        portalLink.hidden = false;
+      } catch (_) {
+        headline.textContent = 'Confirmation Pending';
+        copy.textContent = 'Stripe has not confirmed this checkout yet. Refresh shortly or contact support@musigod.com if this continues.';
+        icon.textContent = '!';
+      }
     }
+
+    verifyCheckout();
   </script>
 </body>
 </html>

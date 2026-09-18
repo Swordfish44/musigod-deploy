@@ -798,6 +798,14 @@ function buildReview() {
 
 function v(id) { return (document.getElementById(id)?.value || '').trim(); }
 
+// Carry the selected public pricing tier into onboarding. Only tiers with a
+// configured self-service checkout are accepted; everything else fails closed.
+const requestedPlan = new URLSearchParams(window.location.search).get('plan');
+if (requestedPlan === 'starter' || requestedPlan === 'growth') {
+  const selectedPlan = document.getElementById(`plan-${requestedPlan}`);
+  if (selectedPlan) selectedPlan.checked = true;
+}
+
 // ── SUBMIT ────────────────────────────────────────────────────
 async function submitForm() {
   if (!validateStep(4)) return;
