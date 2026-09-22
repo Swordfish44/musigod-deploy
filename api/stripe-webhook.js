@@ -29,7 +29,7 @@ module.exports = withSentry(async function handler(req, res) {
   }
 
   try {
-    if (event.type === 'checkout.session.completed') {
+    if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       await safeLogAuditEvent({
         audit_id: event.data.object?.metadata?.audit_id || null,
         event_type: 'webhook_received',
@@ -46,6 +46,12 @@ module.exports = withSentry(async function handler(req, res) {
       await handleSubscriptionUpdated(event.data.object)
     } else if (event.type === 'customer.subscription.deleted') {
       await handleSubscriptionDeleted(event.data.object)
+    } else if (event.type === 'invoice.paid') {
+      await handleInvoicePaid(event.data.object)
+    } else if (event.type === 'invoice.payment_failed' || event.type === 'invoice.payment_action_required') {
+      await handleInvoicePaymentFailed(event.data.object)
+    } else if (event.type === 'charge.refunded') {
+      await handleChargeRefunded(event.data.object)
     } else {
       console.info('Stripe webhook ignored event', { eventType: event.type, eventId: event.id })
     }
@@ -102,12 +108,24 @@ async function handleCheckoutComplete(session, requestId) {
     return
   }
 
-  await sbPatch(`registrations_v1?artist_id=eq.${artistId}`, {
+  if (!isPaidCheckout(session)) {
+    console.info('Subscription checkout completed without confirmed payment; activation skipped', {
+      stripe_session_id: session.id,
+      payment_status: session.payment_status || null,
+    })
+    return
+  }
+
+  await syncSubscriptionState(artistId, {
     stripe_customer_id: session.customer,
     stripe_subscription_id: session.subscription,
     plan_status: 'ACTIVE',
     plan_type: plan,
   })
+}
+
+function isPaidCheckout(session) {
+  return session.payment_status === 'paid' || session.payment_status === 'no_payment_required'
 }
 
 function isRightsAuditUnlockSession(session) {
@@ -419,7 +437,7 @@ async function handleRightsAuditUnlock(session, requestId = correlationId('right
 async function handleSubscriptionCreated(subscription) {
   const artistId = subscription.metadata?.artist_id || await artistIdByCustomer(subscription.customer)
   if (!artistId) return
-  await sbPatch(`registrations_v1?artist_id=eq.${artistId}`, {
+  await syncSubscriptionState(artistId, {
     stripe_subscription_id: subscription.id,
     plan_status: normalizeSubscriptionStatus(subscription.status),
     plan_type: subscription.metadata?.plan || undefined,
@@ -429,7 +447,7 @@ async function handleSubscriptionCreated(subscription) {
 async function handleSubscriptionUpdated(subscription) {
   const artistId = subscription.metadata?.artist_id || await artistIdByCustomer(subscription.customer)
   if (!artistId) return
-  await sbPatch(`registrations_v1?artist_id=eq.${artistId}`, {
+  await syncSubscriptionState(artistId, {
     stripe_subscription_id: subscription.id,
     plan_status: normalizeSubscriptionStatus(subscription.status),
     plan_type: subscription.metadata?.plan || undefined,
@@ -439,9 +457,87 @@ async function handleSubscriptionUpdated(subscription) {
 async function handleSubscriptionDeleted(subscription) {
   const artistId = subscription.metadata?.artist_id || await artistIdByCustomer(subscription.customer)
   if (!artistId) return
-  await sbPatch(`registrations_v1?artist_id=eq.${artistId}`, {
+  await syncSubscriptionState(artistId, {
     plan_status: 'SUSPENDED',
   })
+}
+
+async function handleInvoicePaid(invoice) {
+  const artistId = invoiceArtistId(invoice) || await artistIdByCustomer(invoice.customer)
+  if (!artistId) return
+  await syncSubscriptionState(artistId, {
+    stripe_customer_id: invoice.customer || undefined,
+    stripe_subscription_id: invoiceSubscriptionId(invoice) || undefined,
+    plan_status: 'ACTIVE',
+    plan_type: invoicePlan(invoice) || undefined,
+  })
+}
+
+async function handleInvoicePaymentFailed(invoice) {
+  const artistId = invoiceArtistId(invoice) || await artistIdByCustomer(invoice.customer)
+  if (!artistId) return
+  await syncSubscriptionState(artistId, {
+    stripe_customer_id: invoice.customer || undefined,
+    stripe_subscription_id: invoiceSubscriptionId(invoice) || undefined,
+    plan_status: 'PAST_DUE',
+    plan_type: invoicePlan(invoice) || undefined,
+  })
+}
+
+async function handleChargeRefunded(charge) {
+  const isFullRefund = charge.refunded === true || (
+    Number.isFinite(charge.amount) && Number.isFinite(charge.amount_refunded) &&
+    charge.amount > 0 && charge.amount_refunded >= charge.amount
+  )
+  if (!isFullRefund) {
+    console.info('Partial refund received; entitlement unchanged pending operations review', {
+      stripe_charge_id: charge.id || null,
+      amount: charge.amount || null,
+      amount_refunded: charge.amount_refunded || null,
+    })
+    return
+  }
+  const artistId = charge.metadata?.artist_id || await artistIdByCustomer(charge.customer)
+  if (!artistId) return
+  await syncSubscriptionState(artistId, {
+    stripe_customer_id: charge.customer || undefined,
+    plan_status: 'SUSPENDED',
+  })
+}
+
+function invoiceArtistId(invoice) {
+  return invoice.subscription_details?.metadata?.artist_id ||
+    invoice.parent?.subscription_details?.metadata?.artist_id ||
+    invoice.metadata?.artist_id || null
+}
+
+function invoiceSubscriptionId(invoice) {
+  return invoice.subscription || invoice.parent?.subscription_details?.subscription || null
+}
+
+function invoicePlan(invoice) {
+  return invoice.subscription_details?.metadata?.plan ||
+    invoice.parent?.subscription_details?.metadata?.plan ||
+    invoice.metadata?.plan || null
+}
+
+async function syncSubscriptionState(artistId, data) {
+  const registrationData = compact(data)
+  const artistData = compact({
+    plan_status: data.plan_status,
+    plan_tier: data.plan_type ? String(data.plan_type).toUpperCase() : undefined,
+  })
+
+  await Promise.all([
+    sbPatch(`registrations_v1?artist_id=eq.${encodeURIComponent(artistId)}`, registrationData),
+    Object.keys(artistData).length
+      ? sbPatchWithSchema('artists', `artists_v1?id=eq.${encodeURIComponent(artistId)}`, artistData)
+      : Promise.resolve(),
+  ])
+}
+
+function compact(value) {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined && item !== null && item !== ''))
 }
 
 async function artistIdByCustomer(customerId) {
@@ -752,23 +848,30 @@ function sbReadHeaders() {
 
 function verifySignature(payload, header, secret) {
   if (!header || !secret) return false
-  const parts = {}
+  const parts = { v1: [] }
   header.split(',').forEach(p => {
     const idx = p.indexOf('=')
-    parts[p.slice(0, idx)] = p.slice(idx + 1)
+    if (idx <= 0) return
+    const key = p.slice(0, idx)
+    const value = p.slice(idx + 1)
+    if (key === 'v1') parts.v1.push(value)
+    else parts[key] = value
   })
-  const { t, v1 } = parts
-  if (!t || !v1) return false
+  const timestamp = Number(parts.t)
+  if (!Number.isFinite(timestamp) || !parts.v1.length) return false
+  if (Math.abs(Math.floor(Date.now() / 1000) - timestamp) > 300) return false
 
   const expected = crypto
     .createHmac('sha256', secret)
-    .update(`${t}.${payload}`, 'utf8')
+    .update(`${parts.t}.${payload}`, 'utf8')
     .digest('hex')
 
-  const a = Buffer.from(v1, 'hex')
-  const b = Buffer.from(expected, 'hex')
-  if (a.length !== b.length) return false
-  return crypto.timingSafeEqual(a, b)
+  const expectedBuffer = Buffer.from(expected, 'hex')
+  return parts.v1.some(signature => {
+    if (!/^[a-f0-9]{64}$/i.test(signature)) return false
+    const actual = Buffer.from(signature, 'hex')
+    return actual.length === expectedBuffer.length && crypto.timingSafeEqual(actual, expectedBuffer)
+  })
 }
 
 function normalizeSubscriptionStatus(status) {

@@ -546,7 +546,7 @@
         <div class="section-icon">⚡</div>
         <div>
           <div class="section-card-title">Choose Your Plan</div>
-          <div class="section-card-sub">Both plans include full publishing administration</div>
+          <div class="section-card-sub">Every plan includes publishing administration</div>
         </div>
       </div>
       <div class="section-card-body">
@@ -578,6 +578,36 @@
                 <li>13 international PROs</li>
                 <li>Neighboring rights — 40+ territories</li>
                 <li>SoundCharts + Chartmetric analytics</li>
+              </ul>
+            </label>
+          </div>
+          <div class="plan-card">
+            <input type="radio" name="plan" id="plan-pro" value="pro">
+            <label class="plan-label" for="plan-pro">
+              <div class="plan-name">Pro</div>
+              <div class="plan-price">$179<span>/mo</span></div>
+              <ul class="plan-features">
+                <li>Everything in Growth</li>
+                <li>Royalty reconciliation engine</li>
+                <li>Underpayment detection + recovery</li>
+                <li>Airplay monitoring</li>
+                <li>Sync licensing pitching</li>
+                <li>Quarterly royalty reports</li>
+              </ul>
+            </label>
+          </div>
+          <div class="plan-card">
+            <input type="radio" name="plan" id="plan-label" value="label">
+            <label class="plan-label" for="plan-label">
+              <div class="plan-name">Label</div>
+              <div class="plan-price">$699<span>/mo</span></div>
+              <ul class="plan-features">
+                <li>Everything in Pro</li>
+                <li>Multi-artist roster dashboard</li>
+                <li>Bulk catalog registrations</li>
+                <li>Full neighboring rights admin</li>
+                <li>API access</li>
+                <li>Dedicated account support</li>
               </ul>
             </label>
           </div>
@@ -788,7 +818,7 @@ function buildReview() {
     ['Catalog Size', v('catalog_size') || '—'],
     ['Works Registered', v('works_registered') || '—'],
     ['Genre', v('genre') || '—'],
-    ['Plan', plan === 'growth' ? 'Growth - $129/mo' : 'Starter - $79/mo'],
+    ['Plan', ({ starter: 'Starter - $79/mo', growth: 'Growth - $129/mo', pro: 'Pro - $179/mo', label: 'Label - $699/mo' })[plan] || 'Starter - $79/mo'],
     ['Ref Code', v('ref_code') || '—'],
   ];
   document.getElementById('review-summary').innerHTML = rows.map(([k, val]) =>
@@ -801,7 +831,7 @@ function v(id) { return (document.getElementById(id)?.value || '').trim(); }
 // Carry the selected public pricing tier into onboarding. Only tiers with a
 // configured self-service checkout are accepted; everything else fails closed.
 const requestedPlan = new URLSearchParams(window.location.search).get('plan');
-if (requestedPlan === 'starter' || requestedPlan === 'growth') {
+if (['starter', 'growth', 'pro', 'label'].includes(requestedPlan)) {
   const selectedPlan = document.getElementById(`plan-${requestedPlan}`);
   if (selectedPlan) selectedPlan.checked = true;
 }

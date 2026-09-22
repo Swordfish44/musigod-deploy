@@ -9,7 +9,7 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY
 const OPS_EMAIL = process.env.OPS_EMAIL || process.env.VA_EMAIL || 'support@musigod.com'
 const FROM_EMAIL = process.env.FROM_EMAIL || 'MusiGod <support@musigod.com>'
 
-const ALLOWED_PLANS = new Set(['starter', 'growth'])
+const ALLOWED_PLANS = new Set(['starter', 'growth', 'pro', 'label'])
 
 module.exports = withSentry(async function handler(req, res) {
   setCors(req, res)
@@ -84,7 +84,7 @@ function validate(payload) {
   if (!payload.legal_first_name) return 'legal_first_name is required'
   if (!payload.legal_last_name) return 'legal_last_name is required'
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) return 'Valid email is required'
-  if (!ALLOWED_PLANS.has(payload.plan)) return 'plan must be starter or growth'
+  if (!ALLOWED_PLANS.has(payload.plan)) return 'plan must be starter, growth, pro, or label'
   return null
 }
 
@@ -221,4 +221,3 @@ function getRawBody(req) {
     req.on('error', reject)
   })
 }
-
