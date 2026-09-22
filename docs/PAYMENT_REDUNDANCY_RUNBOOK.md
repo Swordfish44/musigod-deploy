@@ -39,7 +39,7 @@ Preview; never copy the client secret into tickets, logs, or chat.
 
 For protected Vercel previews, create a **Protection Bypass for Automation**
 secret in Project Settings. Vercel exposes it to builds as
-`VERCEL_AUTOMATION_BYPASS_SECRET`; the Preview build then registers or updates
+`VERCEL_AUTOMATION_BYPASS_SECRET`; the Preview install step then registers or updates
 the sandbox webhook automatically and bundles its non-secret webhook ID. The
 bypass value is placed only in PayPal's webhook URL and is never printed by the
 build. Production and live PayPal builds always skip this automation.
