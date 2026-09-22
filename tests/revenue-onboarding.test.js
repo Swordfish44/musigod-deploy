@@ -1,0 +1,27 @@
+'use strict'
+
+const assert = require('assert')
+const fs = require('fs')
+const path = require('path')
+
+const root = path.join(__dirname, '..')
+const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8')
+const register = fs.readFileSync(path.join(root, 'register.html'), 'utf8')
+const success = fs.readFileSync(path.join(root, 'success.html'), 'utf8')
+const verifyApi = fs.readFileSync(path.join(root, 'api/verify-checkout-session.js'), 'utf8')
+const vercel = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'))
+
+assert(index.includes('href="/register?plan=starter"'))
+assert(index.includes('href="/register?plan=growth"'))
+assert(register.includes("requestedPlan === 'starter' || requestedPlan === 'growth'"))
+assert(vercel.rewrites.some(route => route.source === '/pricing' && route.destination === '/index.html'))
+assert(vercel.rewrites.some(route => route.source === '/register' && route.destination === '/register.html'))
+assert(success.includes("fetch('/api/verify-checkout-session'"))
+assert(success.includes('portalLink.hidden = false'))
+assert(verifyApi.includes("session.metadata?.artist_id === artistId"))
+assert(verifyApi.includes("session.mode === 'subscription'"))
+assert(verifyApi.includes("session.status === 'complete'"))
+assert(verifyApi.includes("session.payment_status === 'paid'"))
+assert(index.includes('MusiGod does not offer banking, custody, or investment services'))
+
+console.log('revenue onboarding: pricing routes, plan carry-forward, Stripe verification and non-custodial copy passed')

@@ -88,6 +88,14 @@
             "destination": "/registration-submissions-admin.html"
         },
         {
+            "source": "/pricing",
+            "destination": "/index.html"
+        },
+        {
+            "source": "/register",
+            "destination": "/register.html"
+        },
+        {
             "source": "/login",
             "destination": "/login.html"
         },
