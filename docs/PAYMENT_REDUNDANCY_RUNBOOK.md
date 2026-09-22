@@ -23,6 +23,20 @@ Subscribe the webhook to:
 - `PAYMENT.SALE.REFUNDED`
 - `PAYMENT.SALE.REVERSED`
 
+The duplicate-safe bootstrap can create or repair this exact event set without
+printing credentials:
+
+```text
+PAYPAL_WEBHOOK_URL=https://<preview-host>/api/paypal-webhook npm run paypal:webhook:preview
+PAYPAL_WEBHOOK_URL=https://<preview-host>/api/paypal-webhook npm run paypal:webhook:create
+```
+
+The first command is a dry run. The second command requires sandbox
+`PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET`, refuses non-HTTPS URLs, reuses an
+existing webhook for the same URL, and refuses live mode without
+`--allow-live`. Save only the returned ID as `PAYPAL_WEBHOOK_ID` in Vercel
+Preview; never copy the client secret into tickets, logs, or chat.
+
 Set these Vercel environment variables first in Preview:
 
 ```text
