@@ -271,15 +271,18 @@
   .mg-legal-footer__copy { font-size: 11px; color: #4a5a6a; line-height: 1.5; }
   </style>
   <script>
+    window.MUSIGOD_CHECKOUT_PROVIDER = 'stripe';
     window.MUSIGOD_PUBLIC_CONFIG_READY = fetch('/api/public-config', { credentials: 'same-origin' })
       .then(function (response) { return response.ok ? response.json() : {}; })
       .then(function (config) {
         window.MUSIGOD_SENTRY_DSN = config.sentryDsn || '';
         window.MUSIGOD_ENVIRONMENT = config.environment || 'production';
+        window.MUSIGOD_CHECKOUT_PROVIDER = config.checkoutProvider === 'paypal' ? 'paypal' : 'stripe';
       })
       .catch(function () {
         window.MUSIGOD_SENTRY_DSN = '';
         window.MUSIGOD_ENVIRONMENT = 'production';
+        window.MUSIGOD_CHECKOUT_PROVIDER = 'stripe';
       });
   </script>
   <script src="/sentry-browser.js"></script>
@@ -895,7 +898,12 @@ async function submitForm() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     label.textContent = 'Opening checkout...';
-    const checkoutRes = await fetch('/api/create-checkout-session', {
+    await window.MUSIGOD_PUBLIC_CONFIG_READY;
+    const paymentProvider = window.MUSIGOD_CHECKOUT_PROVIDER === 'paypal' ? 'paypal' : 'stripe';
+    const checkoutEndpoint = paymentProvider === 'paypal'
+      ? '/api/create-paypal-subscription'
+      : '/api/create-checkout-session';
+    const checkoutRes = await fetch(checkoutEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ artist_id: artistId, plan }),
