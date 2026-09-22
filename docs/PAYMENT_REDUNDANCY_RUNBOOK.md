@@ -40,7 +40,7 @@ PAYMENT_CHECKOUT_PROVIDER=stripe
 
 ## Controlled activation sequence
 
-1. Apply `20260922000000_provider_neutral_billing.sql` to the Supabase project.
+1. Execute the reviewed preflight, install, verification, and guarded rollback package in `supabase/releases/20260922_provider_neutral_billing/`. Do not apply the migration before the preflight is reviewed.
 2. Deploy this branch to a Vercel Preview deployment.
 3. Complete one sandbox purchase for each plan.
 4. Confirm the verified webhook writes one `registrations.payment_accounts_v1` row and one event receipt, and sets the artist entitlement to `ACTIVE`.
