@@ -37,13 +37,20 @@ existing webhook for the same URL, and refuses live mode without
 `--allow-live`. Save only the returned ID as `PAYPAL_WEBHOOK_ID` in Vercel
 Preview; never copy the client secret into tickets, logs, or chat.
 
+For protected Vercel previews, create a **Protection Bypass for Automation**
+secret in Project Settings. Vercel exposes it to builds as
+`VERCEL_AUTOMATION_BYPASS_SECRET`; the Preview build then registers or updates
+the sandbox webhook automatically and bundles its non-secret webhook ID. The
+bypass value is placed only in PayPal's webhook URL and is never printed by the
+build. Production and live PayPal builds always skip this automation.
+
 Set these Vercel environment variables first in Preview:
 
 ```text
 PAYPAL_ENV=sandbox
 PAYPAL_CLIENT_ID=...
 PAYPAL_CLIENT_SECRET=...
-PAYPAL_WEBHOOK_ID=...
+PAYPAL_WEBHOOK_ID=... # optional when Preview automation is active
 PAYPAL_STARTER_PLAN_ID=...
 PAYPAL_GROWTH_PLAN_ID=...
 PAYPAL_PRO_PLAN_ID=...
