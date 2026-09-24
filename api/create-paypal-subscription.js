@@ -12,7 +12,7 @@ module.exports = withSentry(async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
-  if (process.env.PAYPAL_BILLING_ENABLED !== 'true') {
+  if (String(process.env.PAYPAL_BILLING_ENABLED || '').trim().toLowerCase() !== 'true') {
     return res.status(503).json({ error: 'PayPal checkout is not enabled' })
   }
   if (!paypal.isConfigured()) return res.status(500).json({ error: 'PayPal checkout is not configured' })
