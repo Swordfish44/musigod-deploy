@@ -207,6 +207,18 @@ test('5. existing ACTIVE artist gets a clear 409 and no new rows', async () => {
   assert.strictEqual(db.artists[0].plan_status, 'ACTIVE')
 })
 
+test('5b. paid-awaiting-agreement artist is told to sign, and cannot pay twice', async () => {
+  db.artists.push({ id: 'paid-1', email: 'immobiliers@yahoo.com', plan_status: 'PENDING_CHECKOUT', plan_tier: 'STARTER', meta: { billing_status: 'PAID_AWAITING_AGREEMENT' } })
+  const res = await registerWith()
+  assert.strictEqual(res.statusCode, 409)
+  assert.strictEqual(res.body.code, 'PAID_AWAITING_AGREEMENT')
+  assert.strictEqual(artistInserts(), 0)
+  const checkout = response()
+  await createPaypal(request({ artist_id: 'paid-1', plan: 'starter' }, '/api/create-paypal-subscription'), checkout)
+  assert.strictEqual(checkout.statusCode, 409)
+  assert.strictEqual(checkout.body.code, 'PAID_AWAITING_AGREEMENT')
+})
+
 test('6. pending resume with a different plan updates the pending artist plan', async () => {
   await registerWith({ plan: 'growth' })
   const res = await registerWith({ plan: 'starter' })

@@ -1,6 +1,7 @@
 const { captureException, withSentry } = require('./_sentry')
 const { hashToken, verifyToken, buildConsumptionUpdate, TOKEN_TYPES } = require('../lib/intake-tokens')
 const { checkRateLimit } = require('../lib/intake-rate-limit')
+const { activatePaidArtist, findArtistIdByEmail } = require('../lib/paid-entitlement')
 
 const SB_URL        = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
 const SB_KEY        = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
@@ -85,6 +86,17 @@ module.exports = withSentry(async function handler(req, res) {
       'registrations'
     )
     const agreement = signed?.[0]
+
+    // If payment already arrived, signing completes activation. Never blocks signing.
+    try {
+      const paidArtistId = artist_id || await findArtistIdByEmail(artist_email)
+      if (paidArtistId) {
+        const activation = await activatePaidArtist(paidArtistId)
+        console.info('POST_SIGN_ACTIVATION', { artist_id: paidArtistId, ...activation })
+      }
+    } catch (activationErr) {
+      captureException(activationErr, { route: 'sign-agreement', stage: 'post-sign-activation' })
+    }
 
     // Send signed agreement confirmation email
     if (RESEND_API_KEY && agreement) {

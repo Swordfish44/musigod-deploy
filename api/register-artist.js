@@ -152,6 +152,10 @@ async function resolveArtist(payload) {
 
 async function resumePendingArtist(artist, payload, resolution) {
   const status = String(artist.plan_status || '').toUpperCase()
+  if (artist.meta?.billing_status === 'PAID_AWAITING_AGREEMENT') {
+    throw publicError(409, 'PAID_AWAITING_AGREEMENT',
+      'Your payment has been received. Check your email to sign your Publishing Administration Agreement and activate your account.')
+  }
   if (!RESUMABLE_STATUSES.has(status)) throw publicError(409, 'ACCOUNT_ACTIVE', ACCOUNT_ACTIVE_MESSAGE)
 
   const desiredTier = payload.plan.toUpperCase()

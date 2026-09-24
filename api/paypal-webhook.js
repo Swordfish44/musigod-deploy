@@ -2,6 +2,7 @@
 
 const { captureException, withSentry } = require('./_sentry')
 const paypal = require('../lib/paypal-billing')
+const entitlement = require('../lib/paid-entitlement')
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
@@ -89,8 +90,10 @@ async function handleEvent(event) {
   await upsertPaymentAccount({ artistId, subscriptionId, plan, status, paypalStatus: resource.status })
 
   const entitlementStatus = entitlementStatusFor(status)
-  if (entitlementStatus) await syncEntitlement(artistId, plan, entitlementStatus)
-  return { handled: true, artistId, subscriptionId, plan, status }
+  const effective = entitlementStatus
+    ? await syncEntitlement(artistId, plan, entitlementStatus, subscriptionId)
+    : status
+  return { handled: true, artistId, subscriptionId, plan, status: effective }
 }
 
 function statusForEvent(type, resourceStatus) {
@@ -110,17 +113,23 @@ function entitlementStatusFor(status) {
   return null
 }
 
-async function syncEntitlement(artistId, plan, status) {
-  await Promise.all([
-    sbPatch('registrations', `registrations_v1?artist_id=eq.${encodeURIComponent(artistId)}`, {
-      plan_status: status,
-      plan_type: plan,
-    }),
-    sbPatch('artists', `artists_v1?id=eq.${encodeURIComponent(artistId)}`, {
+async function syncEntitlement(artistId, plan, status, subscriptionId) {
+  // ACTIVE goes through the agreement-aware path; the DB refuses ACTIVE until
+  // the Publishing Administration Agreement is signed.
+  const effective = status === 'ACTIVE'
+    ? await entitlement.activateOrHoldForAgreement({ artistId, plan, provider: 'paypal', subscriptionId })
+    : status
+  if (status !== 'ACTIVE') {
+    await sbPatch('artists', `artists_v1?id=eq.${encodeURIComponent(artistId)}`, {
       plan_status: status,
       plan_tier: plan.toUpperCase(),
-    }),
-  ])
+    })
+  }
+  await sbPatch('registrations', `registrations_v1?artist_id=eq.${encodeURIComponent(artistId)}`, {
+    plan_status: effective,
+    plan_type: plan,
+  })
+  return effective
 }
 
 async function upsertPaymentAccount({ artistId, subscriptionId, plan, status, paypalStatus }) {
@@ -185,7 +194,7 @@ async function sbPatch(schema, path, data) {
     headers: sbHeaders(schema),
     body: JSON.stringify(data),
   })
-  if (!response.ok) throw new Error(`Supabase PATCH failed: ${response.status}`)
+  if (!response.ok) throw new Error(`Supabase PATCH ${path.split('?')[0]} failed: ${response.status} ${await response.text().catch(() => '')}`)
 }
 
 function sbHeaders(schema, extra = {}) {

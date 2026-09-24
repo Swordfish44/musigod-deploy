@@ -43,6 +43,9 @@ module.exports = withSentry(async function handler(req, res) {
     if (artist.plan_status === 'ACTIVE') {
       return res.status(409).json({ error: 'Subscription is already active' })
     }
+    if (artist.meta?.billing_status === 'PAID_AWAITING_AGREEMENT') {
+      return res.status(409).json({ error: 'Payment already received. Sign your Publishing Administration Agreement to activate your account.', code: 'PAID_AWAITING_AGREEMENT' })
+    }
 
     const subscription = await paypal.createSubscription({
       artistId,
@@ -68,7 +71,7 @@ module.exports = withSentry(async function handler(req, res) {
 
 async function getArtist(artistId) {
   const response = await fetch(
-    `${SB_URL}/rest/v1/artists_v1?id=eq.${encodeURIComponent(artistId)}&select=id,email,plan_tier,plan_status&limit=1`,
+    `${SB_URL}/rest/v1/artists_v1?id=eq.${encodeURIComponent(artistId)}&select=id,email,plan_tier,plan_status,meta&limit=1`,
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Accept-Profile': 'artists' } }
   )
   if (!response.ok) throw new Error(`Artist billing lookup failed: ${response.status}`)
