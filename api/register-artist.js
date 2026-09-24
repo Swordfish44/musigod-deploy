@@ -10,6 +10,7 @@ const OPS_EMAIL = process.env.OPS_EMAIL || process.env.VA_EMAIL || 'support@musi
 const FROM_EMAIL = process.env.FROM_EMAIL || 'MusiGod <support@musigod.com>'
 
 const ALLOWED_PLANS = new Set(['starter', 'growth', 'pro', 'label'])
+const BUILD_SHA = process.env.VERCEL_GIT_COMMIT_SHA || 'local'
 
 module.exports = withSentry(async function handler(req, res) {
   setCors(req, res)
@@ -28,13 +29,23 @@ module.exports = withSentry(async function handler(req, res) {
   const validationError = validate(normalized)
   if (validationError) return res.status(400).json({ error: validationError })
 
+  res.setHeader('X-MusiGod-Build', BUILD_SHA)
   try {
-    const artist = await createArtist(normalized)
+    const { artist, resolution } = await resolveArtist(normalized)
     const registration = await createRegistration(artist.id, normalized)
+    const resumed = resolution !== 'created'
+    console.info('REGISTER_ARTIST_RESOLVED', {
+      resolution,
+      artist_id: artist.id,
+      registration_id: registration?.id || null,
+      plan_status: artist.plan_status,
+      build: BUILD_SHA,
+      key_role: keyRole(),
+    })
 
     await Promise.allSettled([
-      syncArtistToGraph(artist),
-      notifyN8n(artist.id, registration?.id, normalized),
+      resumed ? null : syncArtistToGraph(artist),
+      resumed ? null : notifyN8n(artist.id, registration?.id, normalized),
       sendEmail({
         to: normalized.email,
         subject: 'Action required: Complete your MusiGod checkout',
@@ -47,13 +58,25 @@ module.exports = withSentry(async function handler(req, res) {
       }),
       sendEmail({
         to: OPS_EMAIL,
-        subject: `New MusiGod signup: ${normalized.legal_first_name} ${normalized.legal_last_name}`,
-        html: `<p>New signup submitted.</p><p><strong>Artist ID:</strong> ${artist.id}<br><strong>Email:</strong> ${normalized.email}<br><strong>Plan:</strong> ${normalized.plan}</p>`,
+        subject: `${resumed ? 'Resumed' : 'New'} MusiGod signup: ${normalized.legal_first_name} ${normalized.legal_last_name}`,
+        html: `<p>${resumed ? 'Pending registration resumed (no new artist created).' : 'New signup submitted.'}</p><p><strong>Artist ID:</strong> ${artist.id}<br><strong>Email:</strong> ${escapeHtml(normalized.email)}<br><strong>Plan:</strong> ${normalized.plan}</p>`,
       }),
     ])
 
-    return res.status(200).json({ artist_id: artist.id, registration_id: registration?.id || null, plan: normalized.plan })
+    return res.status(200).json({
+      artist_id: artist.id,
+      registration_id: registration?.id || null,
+      plan: normalized.plan,
+      status: 'PENDING_CHECKOUT',
+      payment_required: true,
+      resumed,
+    })
   } catch (err) {
+    const statusCode = Number(err.statusCode) || 500
+    if (err.publicCode) {
+      console.info('REGISTER_ARTIST_REJECTED', { code: err.publicCode, build: BUILD_SHA })
+      return res.status(statusCode).json({ error: err.publicMessage, code: err.publicCode })
+    }
     console.error('register-artist error:', err)
     captureException(err, {
       route: 'register-artist',
@@ -62,8 +85,7 @@ module.exports = withSentry(async function handler(req, res) {
       statusCode: 500,
       plan: normalized.plan,
     })
-    const statusCode = Number(err.statusCode) || 500
-    return res.status(statusCode).json({ error: err.publicMessage || 'Registration failed' })
+    return res.status(500).json({ error: 'Registration failed' })
   }
 }, 'register-artist')
 
@@ -94,14 +116,65 @@ function validate(payload) {
   return null
 }
 
-async function createArtist(payload) {
-  // A registration may be retried after checkout or UI failure. Reuse the
-  // canonical unpaid artist record instead of burning the email address or
-  // creating a duplicate artist.
-  const existing = await findArtistByEmail(payload.email)
-  if (existing) return reusableArtistOrThrow(existing)
+// ── Artist resolution state machine ──────────────────────────────────────────
+// artists.artists_v1 has UNIQUE(email) (artists_v1_email_key). Registration is
+// idempotent around it:
+//   no artist                        -> INSERT            (resolution: created)
+//   artist PENDING_CHECKOUT/PENDING  -> reuse, no INSERT  (resolution: existing)
+//   INSERT loses a race (23505)      -> re-read, reuse    (resolution: race_recovered)
+//   artist ACTIVE / PAST_DUE / ...   -> 409 ACCOUNT_ACTIVE, never a new row
+const RESUMABLE_STATUSES = new Set(['PENDING_CHECKOUT', 'PENDING', ''])
+const ACCOUNT_ACTIVE_MESSAGE = 'This MusiGod account is already active. Please sign in.'
 
-  const artistPayload = {
+async function resolveArtist(payload) {
+  const existing = await findArtistByEmail(payload.email)
+  if (existing) return resumePendingArtist(existing, payload, 'existing')
+
+  try {
+    const rows = await sbFetch('artists_v1', 'artists', {
+      method: 'POST',
+      body: newArtistPayload(payload),
+      prefer: 'return=representation',
+    })
+    if (!rows?.[0]?.id) throw new Error('Artist insert returned no id')
+    return { artist: rows[0], resolution: 'created' }
+  } catch (err) {
+    if (!isUniqueEmailViolation(err)) throw err
+    const raced = await findArtistByEmail(payload.email)
+    if (raced) return resumePendingArtist(raced, payload, 'race_recovered')
+    // Constraint says the email exists but the service-role read cannot see it:
+    // an environment problem (wrong key/schema), not a customer error.
+    console.error('REGISTER_ARTIST_LOOKUP_MISS', { key_role: keyRole(), build: BUILD_SHA })
+    throw publicError(409, 'EMAIL_ALREADY_REGISTERED',
+      'This email is already registered. Check your inbox for the secure checkout link, or contact support@musigod.com.')
+  }
+}
+
+async function resumePendingArtist(artist, payload, resolution) {
+  const status = String(artist.plan_status || '').toUpperCase()
+  if (!RESUMABLE_STATUSES.has(status)) throw publicError(409, 'ACCOUNT_ACTIVE', ACCOUNT_ACTIVE_MESSAGE)
+
+  const desiredTier = payload.plan.toUpperCase()
+  if (artist.plan_tier === desiredTier && status === 'PENDING_CHECKOUT') return { artist, resolution }
+
+  // Keep the pending artist in step with the plan the customer just chose,
+  // otherwise checkout rejects the plan mismatch. The status filter makes this
+  // a no-op if the account was activated concurrently.
+  const rows = await sbFetch(
+    `artists_v1?id=eq.${encodeURIComponent(artist.id)}&plan_status=in.(PENDING_CHECKOUT,PENDING)`,
+    'artists',
+    { method: 'PATCH', body: { plan_tier: desiredTier, plan_status: 'PENDING_CHECKOUT' }, prefer: 'return=representation' }
+  )
+  if (rows?.[0]?.id) return { artist: rows[0], resolution }
+  const current = await findArtistByEmail(payload.email)
+  if (current && RESUMABLE_STATUSES.has(String(current.plan_status || '').toUpperCase())) {
+    return { artist: current, resolution }
+  }
+  throw publicError(409, 'ACCOUNT_ACTIVE', ACCOUNT_ACTIVE_MESSAGE)
+}
+
+function newArtistPayload(payload) {
+  return {
     legal_first_name: payload.legal_first_name,
     legal_last_name: payload.legal_last_name,
     artist_name: payload.artist_name,
@@ -122,43 +195,39 @@ async function createArtist(payload) {
       registered_at: new Date().toISOString(),
     },
   }
-
-  try {
-    const rows = await sbFetch('artists_v1', 'artists', {
-      method: 'POST',
-      body: artistPayload,
-      prefer: 'return=representation',
-    })
-    if (!rows?.[0]?.id) throw new Error('Artist insert returned no id')
-    return rows[0]
-  } catch (err) {
-    // A retry can race with an earlier successful registration. If the
-    // canonical unique email constraint wins, resolve the existing artist
-    // and continue instead of returning a generic registration failure.
-    if (err.statusCode === 409 || err.code === '23505') {
-      const racedExisting = await findArtistByEmail(payload.email)
-      if (racedExisting) return reusableArtistOrThrow(racedExisting)
-    }
-    throw err
-  }
 }
 
+// Exact match on the normalized email first; then a case-insensitive match so
+// legacy rows stored with mixed case (the old client-side form did not
+// lowercase) are reused instead of spawning a case-variant duplicate.
 async function findArtistByEmail(email) {
-  const rows = await sbFetch(
-    `artists_v1?email=eq.${encodeURIComponent(email)}&select=*&limit=1`,
-    'artists'
-  )
-  return rows?.[0] || null
+  const exact = await sbFetch(`artists_v1?email=eq.${encodeURIComponent(email)}&select=*&limit=1`, 'artists')
+  if (exact?.[0]) return exact[0]
+  if (/[*%_\\,()]/.test(email)) return null
+  const insensitive = await sbFetch(
+    `artists_v1?email=ilike.${encodeURIComponent(email)}&select=*&order=created_at.asc&limit=1`, 'artists')
+  return insensitive?.[0] || null
 }
 
-function reusableArtistOrThrow(existing) {
-  const status = String(existing.plan_status || '').toUpperCase()
-  if (status === 'PENDING_CHECKOUT' || status === 'PENDING' || !status) return existing
+function isUniqueEmailViolation(err) {
+  if (err.code === '23505') return true
+  return err.statusCode === 409 && /artists_v1_email_key|\(email\)/.test(String(err.message))
+}
 
-  const err = new Error('An active MusiGod account already exists for this email. Please sign in or contact support.')
-  err.statusCode = 409
-  err.publicMessage = err.message
-  throw err
+function publicError(statusCode, code, message) {
+  const err = new Error(message)
+  err.statusCode = statusCode
+  err.publicCode = code
+  err.publicMessage = message
+  return err
+}
+
+function keyRole() {
+  try {
+    const part = String(SB_KEY || '').split('.')[1]
+    if (!part) return String(SB_KEY || '').startsWith('sb_secret_') ? 'secret' : 'unknown'
+    return JSON.parse(Buffer.from(part.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()).role || 'unknown'
+  } catch { return 'unknown' }
 }
 
 async function createRegistration(artistId, payload) {
@@ -312,6 +381,7 @@ function setCors(req, res) {
   res.setHeader('Vary', 'Origin')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Expose-Headers', 'X-MusiGod-Build')
 }
 
 function getRawBody(req) {

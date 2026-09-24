@@ -92,7 +92,7 @@ async function main() {
   let res = response()
   await handler(request(body), res)
   assert.strictEqual(res.statusCode, 200, JSON.stringify(res.body))
-  assert.deepStrictEqual(res.body, { artist_id: 'a1', registration_id: 'r1', plan: 'starter' })
+  assert.deepStrictEqual(res.body, { artist_id: 'a1', registration_id: 'r1', plan: 'starter', status: 'PENDING_CHECKOUT', payment_required: true, resumed: false })
   const artistCall = calls.find(c => c.url.endsWith('/rest/v1/artists_v1'))
   assert.strictEqual(artistCall.opts.headers['Content-Profile'], 'artists')
   assert.strictEqual(artistCall.opts.headers['Accept-Profile'], 'artists')

@@ -28,7 +28,11 @@ module.exports = withSentry(async function handler(req, res) {
   const artistId = String(body.artist_id || '')
   const plan = String(body.plan || '').toLowerCase()
   if (!artistId) return res.status(400).json({ error: 'artist_id required' })
-  if (!paypal.planIdFor(plan)) return res.status(400).json({ error: 'configured plan required' })
+  if (!paypal.PLAN_ENV[plan]) return res.status(400).json({ error: 'configured plan required' })
+  if (!paypal.planIdFor(plan)) {
+    console.error('PAYPAL_PLAN_NOT_CONFIGURED', { plan, env_var: paypal.PLAN_ENV[plan], vercel_env: process.env.VERCEL_ENV || null })
+    return res.status(503).json({ error: `PayPal ${plan} plan is not configured on this deployment (${paypal.PLAN_ENV[plan]})` })
+  }
 
   try {
     const artist = await getArtist(artistId)
