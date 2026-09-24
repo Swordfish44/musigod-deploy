@@ -37,8 +37,13 @@ module.exports = withSentry(async function handler(req, res) {
       notifyN8n(artist.id, registration?.id, normalized),
       sendEmail({
         to: normalized.email,
-        subject: 'MusiGod registration received',
-        html: `<p>We received your MusiGod registration.</p><p>Your next step is completing checkout so onboarding can begin.</p><p><strong>Artist ID:</strong> ${artist.id}</p>`,
+        subject: 'Action required: Complete your MusiGod checkout',
+        html: registrationEmail({
+          req,
+          artistId: artist.id,
+          plan: normalized.plan,
+          firstName: normalized.legal_first_name,
+        }),
       }),
       sendEmail({
         to: OPS_EMAIL,
@@ -189,6 +194,57 @@ async function notifyN8n(artistId, registrationId, payload) {
       ref_code: payload.ref_code,
     }),
   })
+}
+
+
+function registrationEmail({ req, artistId, plan, firstName }) {
+  const prices = { starter: '$79/month', growth: '$129/month', pro: '$179/month', label: '$699/month' }
+  const labels = { starter: 'Starter', growth: 'Growth', pro: 'Pro', label: 'Label' }
+  const checkoutUrl = `${baseUrlForRequest(req)}/checkout.html?artist_id=${encodeURIComponent(artistId)}&plan=${encodeURIComponent(plan)}`
+  const safeFirstName = escapeHtml(firstName || 'there')
+  const safeArtistId = escapeHtml(artistId)
+  const safePlan = escapeHtml(labels[plan] || plan)
+  const safePrice = escapeHtml(prices[plan] || '')
+
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;color:#111;line-height:1.55">
+      <h2 style="margin-bottom:8px">Registration received. Payment is still required.</h2>
+      <p>Hi ${safeFirstName},</p>
+      <p>We received your MusiGod registration successfully. <strong>You have not been charged yet, and your membership is not active yet.</strong></p>
+      <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:20px 0">
+        <div><strong>Selected plan:</strong> ${safePlan}${safePrice ? ` — ${safePrice}` : ''}</div>
+        <div><strong>Artist ID:</strong> ${safeArtistId}</div>
+      </div>
+      <p><strong>Next step:</strong> complete secure checkout to activate your MusiGod account and begin onboarding.</p>
+      <p style="margin:24px 0">
+        <a href="${checkoutUrl}" style="display:inline-block;background:#e8262a;color:#fff;text-decoration:none;font-weight:700;padding:13px 20px;border-radius:6px">Complete Secure Checkout</a>
+      </p>
+      <p>After payment is confirmed:</p>
+      <ol>
+        <li>Your MusiGod membership is activated.</li>
+        <li>You receive your activation and onboarding instructions.</li>
+        <li>You complete your rights and catalog intake.</li>
+        <li>MusiGod begins the applicable administration, audit, and registration workflow for your plan.</li>
+      </ol>
+      <p style="font-size:13px;color:#666">If you already completed payment, do not pay again. Your activation confirmation will arrive separately after payment is verified.</p>
+    </div>`
+}
+
+function baseUrlForRequest(req) {
+  const forwardedHost = String(req.headers['x-forwarded-host'] || '').split(',')[0].trim()
+  const host = forwardedHost || String(req.headers.host || '').trim()
+  const allowed = host === 'musigod.com' || host === 'www.musigod.com' || host.endsWith('.vercel.app')
+  const safeHost = allowed ? host : 'musigod.com'
+  return `https://${safeHost}`
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 async function sendEmail({ to, subject, html }) {
