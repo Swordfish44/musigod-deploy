@@ -35,7 +35,13 @@ global.fetch = async (url, opts = {}) => {
     Object.assign(db.artist, body); return ok([db.artist])
   }
   if (u.includes('/registrations_v1')) { Object.assign(db.registration, body); return ok([]) }
-  if (u.includes('/payment_accounts_v1')) { if (method === 'POST') db.accounts.push(body); return ok([]) }
+  if (u.includes('/payment_accounts_v1')) {
+    if (method === 'GET') return ok(db.accounts.filter(a => a.is_primary))
+    if (method === 'PATCH') { db.accounts.filter(a => a.is_primary).forEach(a => Object.assign(a, body)); return ok([]) }
+    const existing = db.accounts.find(a => a.provider_subscription_id === body.provider_subscription_id)
+    if (existing) Object.assign(existing, body); else db.accounts.push({ ...body })
+    return ok([])
+  }
   if (u.includes('/payment_event_receipts_v1')) {
     if (method === 'GET') return ok(db.receipts.filter(r => u.includes(encodeURIComponent(r.provider_event_id))))
     db.receipts.push(body); return ok([])
@@ -88,6 +94,16 @@ const quiet = console.info; console.info = () => {}
   reset(true)
   assert.deepStrictEqual(await entitlement.activatePaidArtist('a1'), { activated: false, reason: 'not-paid-awaiting-agreement' })
   assert.strictEqual(db.artist.plan_status, 'PENDING_CHECKOUT')
+
+  // 6. An abandoned (unpaid) subscription never displaces the paid primary
+  reset(false)
+  await send({ ...activated, id: 'WH-3' })
+  await send({ id: 'WH-4', event_type: 'BILLING.SUBSCRIPTION.CREATED', resource: { id: 'I-ABANDONED', custom_id: 'a1', plan_id: 'P-STARTER', status: 'APPROVAL_PENDING' } })
+  const primary = db.accounts.filter(a => a.is_primary)
+  assert.strictEqual(primary.length, 1)
+  assert.strictEqual(primary[0].provider_subscription_id, 'I-SUB')
+  assert.strictEqual(db.accounts.find(a => a.provider_subscription_id === 'I-ABANDONED').is_primary, false)
+  assert.strictEqual(db.artist.meta.billing_status, 'PAID_AWAITING_AGREEMENT')
 
   console.info = quiet
   console.log('paid-entitlement tests passed')

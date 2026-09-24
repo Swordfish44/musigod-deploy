@@ -133,11 +133,21 @@ async function syncEntitlement(artistId, plan, status, subscriptionId) {
 }
 
 async function upsertPaymentAccount({ artistId, subscriptionId, plan, status, paypalStatus }) {
-  await sbPatch(
-    'registrations',
-    `payment_accounts_v1?artist_id=eq.${encodeURIComponent(artistId)}&is_primary=eq.true`,
-    { is_primary: false, updated_at: new Date().toISOString() }
-  )
+  // Only a paid (ACTIVE) subscription, or one replacing a non-paid primary,
+  // may take over as primary. A pending/abandoned subscription never displaces
+  // a paid one.
+  const current = await currentPrimaryAccount(artistId)
+  const isPrimary = !current ||
+    current.provider_subscription_id === subscriptionId ||
+    status === 'ACTIVE' ||
+    current.status !== 'ACTIVE'
+  if (isPrimary && current && current.provider_subscription_id !== subscriptionId) {
+    await sbPatch(
+      'registrations',
+      `payment_accounts_v1?artist_id=eq.${encodeURIComponent(artistId)}&is_primary=eq.true`,
+      { is_primary: false, updated_at: new Date().toISOString() }
+    )
+  }
   const response = await fetch(
     `${SB_URL}/rest/v1/payment_accounts_v1?on_conflict=provider,provider_subscription_id`,
     {
@@ -149,13 +159,22 @@ async function upsertPaymentAccount({ artistId, subscriptionId, plan, status, pa
         provider_subscription_id: subscriptionId,
         plan_code: plan,
         status,
-        is_primary: true,
+        is_primary: isPrimary,
         metadata: { paypal_status: paypalStatus || null },
         updated_at: new Date().toISOString(),
       }),
     }
   )
   if (!response.ok) throw new Error(`Payment account upsert failed: ${response.status}`)
+}
+
+async function currentPrimaryAccount(artistId) {
+  const response = await fetch(
+    `${SB_URL}/rest/v1/payment_accounts_v1?artist_id=eq.${encodeURIComponent(artistId)}&is_primary=eq.true&select=provider_subscription_id,status&limit=1`,
+    { headers: sbHeaders('registrations') }
+  )
+  if (!response.ok) throw new Error(`Payment account lookup failed: ${response.status}`)
+  return (await response.json())?.[0] || null
 }
 
 async function eventAlreadyProcessed(eventId) {
