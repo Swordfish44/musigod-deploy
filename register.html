@@ -681,24 +681,29 @@
     </div>
   </div>
 
-  <!-- SUCCESS -->
+  <!-- SUCCESS / PAYMENT REQUIRED -->
   <div class="success-screen" id="success-screen">
     <div class="success-icon">✓</div>
-    <h2>Registration received.</h2>
-    <p>Redirecting you to secure checkout. Your onboarding starts as soon as payment is confirmed.</p>
+    <h2>Registration received. Payment required.</h2>
+    <p><strong>You have not been charged yet.</strong> Complete secure checkout to activate your MusiGod membership and begin onboarding.</p>
     <div class="success-id" id="success-artist-id">—</div>
+    <div id="success-plan" style="margin:.8rem 0 1.25rem;color:var(--text-dim);font-size:.85rem"></div>
+    <a id="checkout-continue" href="#" class="btn-next" style="display:inline-flex;text-decoration:none;margin:0 auto 1.5rem;justify-content:center;max-width:320px">
+      Continue to Secure Checkout <span>→</span>
+    </a>
+    <p id="checkout-status" style="font-size:.75rem;color:var(--text-muted);margin-bottom:1.5rem">Preparing secure checkout…</p>
     <div class="success-next">
       <div class="success-step">
         <div class="success-step-num">01</div>
-        <p><strong>Check your email</strong> — confirmation with your next steps is on the way to the address you provided.</p>
+        <p><strong>Complete payment</strong> — your membership stays pending until payment is verified.</p>
       </div>
       <div class="success-step">
         <div class="success-step-num">02</div>
-        <p><strong>DocuSign agreement</strong> arrives within 1 business day — sign electronically to complete onboarding.</p>
+        <p><strong>Account activation</strong> — after payment, we send your activation and onboarding instructions.</p>
       </div>
       <div class="success-step">
         <div class="success-step-num">03</div>
-        <p><strong>VA begins your setup</strong> — PRO registrations, rights infrastructure, and retroactive recovery kick off.</p>
+        <p><strong>Rights &amp; catalog intake</strong> — then MusiGod begins the administration, audit, and registration workflow included in your plan.</p>
       </div>
     </div>
   </div>
@@ -839,6 +844,13 @@ if (['starter', 'growth', 'pro', 'label'].includes(requestedPlan)) {
   if (selectedPlan) selectedPlan.checked = true;
 }
 
+const PLAN_DISPLAY = {
+  starter: 'Starter — $79/month',
+  growth: 'Growth — $129/month',
+  pro: 'Pro — $179/month',
+  label: 'Label — $699/month',
+};
+
 // ── SUBMIT ────────────────────────────────────────────────────
 async function submitForm() {
   if (!validateStep(4)) return;
@@ -895,29 +907,51 @@ async function submitForm() {
     document.querySelectorAll('.progress-steps, .section-card').forEach(el => el.style.opacity = '0.3');
     document.getElementById('success-screen').classList.add('show');
     document.getElementById('success-artist-id').textContent = `Artist ID: ${artistId}`;
+    document.getElementById('success-plan').textContent = PLAN_DISPLAY[plan] || plan;
+    const continueBtn = document.getElementById('checkout-continue');
+    const checkoutStatus = document.getElementById('checkout-status');
+    const resumeUrl = `/checkout.html?artist_id=${encodeURIComponent(artistId)}&plan=${encodeURIComponent(plan)}`;
+    continueBtn.href = resumeUrl;
+    checkoutStatus.textContent = 'Preparing secure checkout… If it does not open automatically, use the button above.';
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     label.textContent = 'Opening checkout...';
-    await window.MUSIGOD_PUBLIC_CONFIG_READY;
-    const paymentProvider = window.MUSIGOD_CHECKOUT_PROVIDER === 'paypal' ? 'paypal' : 'stripe';
-    const checkoutEndpoint = paymentProvider === 'paypal'
-      ? '/api/create-paypal-subscription'
-      : '/api/create-checkout-session';
-    const checkoutRes = await fetch(checkoutEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ artist_id: artistId, plan }),
-    });
-    const checkoutBody = await checkoutRes.json().catch(() => ({}));
-    if (!checkoutRes.ok || !checkoutBody.url) throw new Error(checkoutBody.error || `Checkout failed (${checkoutRes.status})`);
-
-    window.location.href = checkoutBody.url;
+    try {
+      const checkoutUrl = await createCheckoutForArtist(artistId, plan);
+      continueBtn.href = checkoutUrl;
+      checkoutStatus.textContent = 'Secure checkout is ready. Opening now…';
+      setTimeout(() => { window.location.href = checkoutUrl; }, 1200);
+    } catch (checkoutErr) {
+      console.error('checkout preparation failed:', checkoutErr);
+      checkoutStatus.textContent = 'Your registration is saved, but checkout did not open automatically. Click “Continue to Secure Checkout” to retry safely.';
+      label.textContent = 'Registration Saved';
+      btn.disabled = true;
+      return;
+    }
   } catch (err) {
     console.error(err);
     toast(`Error: ${err.message}`, true);
     btn.disabled = false;
     label.textContent = 'Submit Registration';
   }
+}
+
+async function createCheckoutForArtist(artistId, plan) {
+  await window.MUSIGOD_PUBLIC_CONFIG_READY;
+  const paymentProvider = window.MUSIGOD_CHECKOUT_PROVIDER === 'paypal' ? 'paypal' : 'stripe';
+  const checkoutEndpoint = paymentProvider === 'paypal'
+    ? '/api/create-paypal-subscription'
+    : '/api/create-checkout-session';
+  const checkoutRes = await fetch(checkoutEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ artist_id: artistId, plan }),
+  });
+  const checkoutBody = await checkoutRes.json().catch(() => ({}));
+  if (!checkoutRes.ok || !checkoutBody.url) {
+    throw new Error(checkoutBody.error || `Checkout failed (${checkoutRes.status})`);
+  }
+  return checkoutBody.url;
 }
 
 async function legacySubmitForm() {
