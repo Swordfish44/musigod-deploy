@@ -48,6 +48,7 @@ module.exports = withSentry(async function handler(req, res) {
       artistId,
       plan,
       email: artist.email,
+      siteUrl: siteUrlForRequest(req),
     })
     console.info('PAYPAL_SUBSCRIPTION_CREATED', {
       artist_id: artistId,
@@ -72,6 +73,14 @@ async function getArtist(artistId) {
   )
   if (!response.ok) throw new Error(`Artist billing lookup failed: ${response.status}`)
   return (await response.json())?.[0] || null
+}
+
+// Send PayPal's return/cancel back to the deployment the buyer started on, so a
+// Preview checkout returns to the Preview (not production). Only trusted hosts.
+function siteUrlForRequest(req) {
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim().toLowerCase()
+  if (host === 'musigod.com' || host === 'www.musigod.com' || /^[a-z0-9-]+\.vercel\.app$/.test(host)) return `https://${host}`
+  return null
 }
 
 function setCors(req, res) {

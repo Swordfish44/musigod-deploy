@@ -16,10 +16,14 @@ delete process.env.N8N_REGISTERED_WEBHOOK_URL
 const paypal = require('../lib/paypal-billing')
 paypal.isConfigured = () => true
 paypal.planIdFor = plan => (['starter', 'growth', 'pro', 'label'].includes(plan) ? `P-SANDBOX-${plan}` : null)
-paypal.createSubscription = async ({ artistId, plan }) => ({
-  id: `I-${artistId}`,
-  url: `https://www.sandbox.paypal.com/webapps/billing/subscriptions?ba_token=${plan}`,
-})
+let lastSubscriptionArgs = null
+paypal.createSubscription = async args => {
+  lastSubscriptionArgs = args
+  return {
+    id: `I-${args.artistId}`,
+    url: `https://www.sandbox.paypal.com/webapps/billing/subscriptions?ba_token=${args.plan}`,
+  }
+}
 
 const register = require('../api/register-artist')
 const createPaypal = require('../api/create-paypal-subscription')
@@ -231,6 +235,7 @@ test('9. checkout creation succeeds after pending artist reuse (PayPal sandbox U
   assert.strictEqual(res.statusCode, 200, JSON.stringify(res.body))
   assert.strictEqual(res.body.provider, 'paypal')
   assert(res.body.url.startsWith('https://www.sandbox.paypal.com/'))
+  assert.strictEqual(lastSubscriptionArgs.siteUrl, 'https://preview.vercel.app', 'PayPal returns buyer to the originating deployment')
 })
 
 test('10. valid pending retry never returns generic "Registration failed"', async () => {
