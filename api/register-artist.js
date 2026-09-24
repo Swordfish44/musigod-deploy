@@ -98,21 +98,8 @@ async function createArtist(payload) {
   // A registration may be retried after checkout or UI failure. Reuse the
   // canonical unpaid artist record instead of burning the email address or
   // creating a duplicate artist.
-  const existingRows = await sbFetch(
-    `artists_v1?email=eq.${encodeURIComponent(payload.email)}&select=*&limit=1`,
-    'artists'
-  )
-  const existing = existingRows?.[0]
-  if (existing) {
-    const status = String(existing.plan_status || '').toUpperCase()
-    if (status === 'PENDING_CHECKOUT' || status === 'PENDING' || !status) {
-      return existing
-    }
-    const err = new Error('An active MusiGod account already exists for this email. Please sign in or contact support.')
-    err.statusCode = 409
-    err.publicMessage = err.message
-    throw err
-  }
+  const existing = await findArtistByEmail(payload.email)
+  if (existing) return reusableArtistOrThrow(existing)
 
   const artistPayload = {
     legal_first_name: payload.legal_first_name,
@@ -136,13 +123,42 @@ async function createArtist(payload) {
     },
   }
 
-  const rows = await sbFetch('artists_v1', 'artists', {
-    method: 'POST',
-    body: artistPayload,
-    prefer: 'return=representation',
-  })
-  if (!rows?.[0]?.id) throw new Error('Artist insert returned no id')
-  return rows[0]
+  try {
+    const rows = await sbFetch('artists_v1', 'artists', {
+      method: 'POST',
+      body: artistPayload,
+      prefer: 'return=representation',
+    })
+    if (!rows?.[0]?.id) throw new Error('Artist insert returned no id')
+    return rows[0]
+  } catch (err) {
+    // A retry can race with an earlier successful registration. If the
+    // canonical unique email constraint wins, resolve the existing artist
+    // and continue instead of returning a generic registration failure.
+    if (err.statusCode === 409 || err.code === '23505') {
+      const racedExisting = await findArtistByEmail(payload.email)
+      if (racedExisting) return reusableArtistOrThrow(racedExisting)
+    }
+    throw err
+  }
+}
+
+async function findArtistByEmail(email) {
+  const rows = await sbFetch(
+    `artists_v1?email=eq.${encodeURIComponent(email)}&select=*&limit=1`,
+    'artists'
+  )
+  return rows?.[0] || null
+}
+
+function reusableArtistOrThrow(existing) {
+  const status = String(existing.plan_status || '').toUpperCase()
+  if (status === 'PENDING_CHECKOUT' || status === 'PENDING' || !status) return existing
+
+  const err = new Error('An active MusiGod account already exists for this email. Please sign in or contact support.')
+  err.statusCode = 409
+  err.publicMessage = err.message
+  throw err
 }
 
 async function createRegistration(artistId, payload) {
@@ -189,7 +205,16 @@ async function sbFetch(path, schema, options = {}) {
   })
 
   const text = await response.text()
-  if (!response.ok) throw new Error(`Supabase ${options.method || 'GET'} ${path} failed: ${response.status} ${text}`)
+  if (!response.ok) {
+    const err = new Error(`Supabase ${options.method || 'GET'} ${path} failed: ${response.status} ${text}`)
+    err.statusCode = response.status
+    try {
+      const parsed = JSON.parse(text)
+      err.code = parsed.code
+      err.details = parsed.details
+    } catch {}
+    throw err
+  }
   return text ? JSON.parse(text) : null
 }
 
