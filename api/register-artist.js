@@ -62,7 +62,8 @@ module.exports = withSentry(async function handler(req, res) {
       statusCode: 500,
       plan: normalized.plan,
     })
-    return res.status(500).json({ error: 'Registration failed' })
+    const statusCode = Number(err.statusCode) || 500
+    return res.status(statusCode).json({ error: err.publicMessage || 'Registration failed' })
   }
 }, 'register-artist')
 
@@ -94,6 +95,25 @@ function validate(payload) {
 }
 
 async function createArtist(payload) {
+  // A registration may be retried after checkout or UI failure. Reuse the
+  // canonical unpaid artist record instead of burning the email address or
+  // creating a duplicate artist.
+  const existingRows = await sbFetch(
+    `artists_v1?email=eq.${encodeURIComponent(payload.email)}&select=*&limit=1`,
+    'artists'
+  )
+  const existing = existingRows?.[0]
+  if (existing) {
+    const status = String(existing.plan_status || '').toUpperCase()
+    if (status === 'PENDING_CHECKOUT' || status === 'PENDING' || !status) {
+      return existing
+    }
+    const err = new Error('An active MusiGod account already exists for this email. Please sign in or contact support.')
+    err.statusCode = 409
+    err.publicMessage = err.message
+    throw err
+  }
+
   const artistPayload = {
     legal_first_name: payload.legal_first_name,
     legal_last_name: payload.legal_last_name,
