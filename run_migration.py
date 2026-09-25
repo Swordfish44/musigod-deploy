@@ -5,7 +5,7 @@ Falls back to instructions if the management API token is unavailable.
 import urllib.request, urllib.error, json, os, sys
 
 SB_REF = "uykzkrnoetcldeuxzqyy"
-SVC    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDYxOSwiZXhwIjoyMDkzMTA2NjE5fQ.jmBLX9VwFvFT4rc3lzqSJS9hFjis2QxRkmWpFizQtKk"
+SVC    = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 
 with open("supabase/migrations/20260515_affiliates_wiring.sql", encoding="utf-8") as f:
     SQL = f.read()

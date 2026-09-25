@@ -179,25 +179,18 @@ async function loadFindings() {
   const type     = document.getElementById('filter-type').value
 
   try {
-    const filters = ['order=estimated_recovery_amount.desc', 'limit=100']
-    if (email)    filters.push(`artist_email=eq.${encodeURIComponent(email)}`)
-    if (severity) filters.push(`severity=eq.${encodeURIComponent(severity)}`)
-    if (status)   filters.push(`status=eq.${encodeURIComponent(status)}`)
-    if (type)     filters.push(`finding_type=eq.${encodeURIComponent(type)}`)
-
-    const res = await fetch(`/api/get-audit-report?email=${encodeURIComponent(email || 'all')}`, {
+    // Server-side, admin-key protected. No database key ever reaches the browser.
+    const params = new URLSearchParams()
+    if (email)    params.set('email', email)
+    if (severity) params.set('severity', severity)
+    if (status)   params.set('status', status)
+    if (type)     params.set('finding_type', type)
+    const res = await fetch(`/api/admin/list-audit-findings?${params}`, {
       headers: { 'x-admin-key': ADMIN_KEY }
     })
-
-    // Use direct Supabase via API proxy — fetch all findings
-    const sbRes = await fetch(`${SB_URL}/rest/v1/audit_findings_v1?${filters.join('&')}`, {
-      headers: {
-        apikey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDYxOSwiZXhwIjoyMDkzMTA2NjE5fQ.jmBLX9VwFvFT4rc3lzqSJS9hFjis2QxRkmWpFizQtKk',
-        Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDYxOSwiZXhwIjoyMDkzMTA2NjE5fQ.jmBLX9VwFvFT4rc3lzqSJS9hFjis2QxRkmWpFizQtKk',
-        'Accept-Profile': 'registrations',
-      }
-    })
-    const findings = await sbRes.json()
+    if (res.status === 401) throw new Error('Admin key rejected')
+    if (!res.ok) throw new Error(`Could not load findings (${res.status})`)
+    const findings = await res.json()
 
     renderSummary(findings)
     renderFindings(findings)
