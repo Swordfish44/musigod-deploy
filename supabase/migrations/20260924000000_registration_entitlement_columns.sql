@@ -7,5 +7,6 @@ BEGIN;
 ALTER TABLE registrations.registrations_v1 ADD COLUMN IF NOT EXISTS plan_status TEXT;
 ALTER TABLE registrations.registrations_v1 ADD COLUMN IF NOT EXISTS plan_type TEXT;
 ALTER TABLE registrations.registrations_v1 ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
+ALTER TABLE registrations.registrations_v1 ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT;
 COMMIT;
 NOTIFY pgrst, 'reload schema';

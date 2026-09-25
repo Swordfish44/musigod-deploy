@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>MusiGod Admin · Publishing Agreements</title>
+<style>
+:root{--bg:#0a0a0a;--card:#141414;--line:#2a2a2a;--text:#f2f2f2;--dim:#a0a0a0;--red:#e8262a;--green:#2ecc71}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:920px;margin:0 auto;padding:32px 16px}h1{font-size:24px;margin:0 0 4px}h2{font-size:17px;margin:28px 0 10px}
+p.lead{color:var(--dim);margin:0 0 20px}.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px}
+label{display:block;font-size:13px;color:var(--dim);margin:12px 0 4px}input{width:100%;padding:10px 12px;border-radius:7px;border:1px solid var(--line);background:#0e0e0e;color:var(--text);font:inherit}
+button{margin-top:16px;background:var(--red);color:#fff;border:0;border-radius:7px;padding:11px 18px;font-weight:700;cursor:pointer}button.secondary{background:#262626}
+button:disabled{opacity:.5;cursor:not-allowed}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--dim);font-weight:600}td button{margin:0;padding:6px 10px;font-size:13px}.msg{margin-top:14px;font-size:14px;white-space:pre-wrap}.ok{color:var(--green)}.err{color:#ff8d8d}.row{display:flex;gap:12px;flex-wrap:wrap}.row>div{flex:1 1 260px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Publishing Administration Agreements</h1>
+  <p class="lead">Record a signed agreement for an artist. If the artist has already paid, they are activated immediately.</p>
+
+  <div class="card">
+    <label for="admin-key">Admin key</label>
+    <input id="admin-key" type="password" autocomplete="off" placeholder="ADMIN_API_KEY">
+    <button class="secondary" id="load">Load artists awaiting agreement</button>
+    <div class="msg" id="list-msg"></div>
+  </div>
+
+  <h2>Paid, awaiting agreement</h2>
+  <div class="card"><table><thead><tr><th>Artist</th><th>Email</th><th>Plan</th><th>Paid via</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="5" style="color:var(--dim)">Load the list above.</td></tr></tbody></table></div>
+
+  <h2>Record signed agreement</h2>
+  <div class="card">
+    <div class="row">
+      <div><label for="email">Artist email (or artist ID)</label><input id="email" placeholder="artist@example.com"></div>
+      <div><label for="signed-by">Signed by (full legal name)</label><input id="signed-by" placeholder="First Last"></div>
+    </div>
+    <div class="row">
+      <div><label for="doc-url">Signed agreement link (https)</label><input id="doc-url" placeholder="https://…/signed-agreement.pdf"></div>
+      <div><label for="signed-at">Signed on (optional)</label><input id="signed-at" type="datetime-local"></div>
+    </div>
+    <button id="record">Record agreement &amp; activate</button>
+    <div class="msg" id="record-msg"></div>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id)
+try { $('admin-key').value = sessionStorage.getItem('musigod_admin_key') || '' } catch {}
+const key = () => { const k = $('admin-key').value.trim(); try { sessionStorage.setItem('musigod_admin_key', k) } catch {}; return k }
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+const show = (el, text, ok) => { el.textContent = text; el.className = 'msg ' + (ok ? 'ok' : 'err') }
+
+async function loadList() {
+  const msg = $('list-msg'); msg.textContent = 'Loading…'; msg.className = 'msg'
+  const res = await fetch('/api/admin/publishing-agreements', { headers: { 'x-admin-key': key() } })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) return show(msg, body.error || `Failed (${res.status})`, false)
+  const artists = body.artists || []
+  show(msg, `${artists.length} artist(s) paid and awaiting agreement.`, true)
+  $('rows').innerHTML = artists.length ? artists.map(a => `<tr>
+      <td>${esc([a.legal_first_name, a.legal_last_name].filter(Boolean).join(' '))}${a.artist_name ? `<br><span style="color:var(--dim)">${esc(a.artist_name)}</span>` : ''}</td>
+      <td>${esc(a.email)}</td><td>${esc(a.plan_tier)}</td>
+      <td>${esc(a.meta?.billing_provider || '')}<br><span style="color:var(--dim)">${esc(a.meta?.billing_subscription_id || '')}</span></td>
+      <td><button data-email="${esc(a.email)}" data-name="${esc([a.legal_first_name, a.legal_last_name].filter(Boolean).join(' '))}">Use</button></td></tr>`).join('')
+    : '<tr><td colspan="5" style="color:var(--dim)">None.</td></tr>'
+}
+
+$('rows').addEventListener('click', e => {
+  const b = e.target.closest('button[data-email]'); if (!b) return
+  $('email').value = b.dataset.email; $('signed-by').value = b.dataset.name; $('doc-url').focus()
+})
+
+$('load').addEventListener('click', () => loadList().catch(err => show($('list-msg'), err.message, false)))
+
+$('record').addEventListener('click', async () => {
+  const msg = $('record-msg'), btn = $('record')
+  const who = $('email').value.trim()
+  const payload = {
+    signed_by: $('signed-by').value.trim(),
+    document_url: $('doc-url').value.trim(),
+    ...(/^[0-9a-f-]{36}$/i.test(who) ? { artist_id: who } : { email: who }),
+    ...($('signed-at').value ? { signed_at: new Date($('signed-at').value).toISOString() } : {}),
+  }
+  btn.disabled = true; msg.textContent = 'Saving…'; msg.className = 'msg'
+  try {
+    const res = await fetch('/api/admin/publishing-agreements', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-key': key() }, body: JSON.stringify(payload),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return show(msg, body.error || `Failed (${res.status})`, false)
+    const activated = body.activation?.activated
+    show(msg, activated
+      ? `Agreement recorded. Artist is now ACTIVE.`
+      : `Agreement recorded. Artist status: ${body.plan_status}${body.billing_status ? '' : ' (no payment received yet, activates when payment arrives)'}.`, true)
+    loadList().catch(() => {})
+  } catch (err) { show(msg, err.message, false) } finally { btn.disabled = false }
+})
+</script>
+</body>
+</html>

@@ -25,7 +25,7 @@ global.fetch = async (url, opts = {}) => {
   const u = String(url); const method = opts.method || 'GET'; const body = opts.body ? JSON.parse(opts.body) : null
   if (u.includes('/artists_v1')) {
     if (method === 'GET') return ok([db.artist])
-    if (body.plan_status === 'ACTIVE' && !db.artist.agreement_signed_at) {
+    if (body.plan_status === 'ACTIVE' && !(body.agreement_signed_at || db.artist.agreement_signed_at)) {
       const t = JSON.stringify({ code: 'P0001', message: 'Artist cannot be activated without a signed Publishing Administration Agreement. Set agreement_signed_at, agreement_signed_by, and agreement_document_url first.' })
       return { ok: false, status: 400, text: async () => t }
     }
@@ -104,6 +104,41 @@ const quiet = console.info; console.info = () => {}
   assert.strictEqual(primary[0].provider_subscription_id, 'I-SUB')
   assert.strictEqual(db.accounts.find(a => a.provider_subscription_id === 'I-ABANDONED').is_primary, false)
   assert.strictEqual(db.artist.meta.billing_status, 'PAID_AWAITING_AGREEMENT')
+
+  // 7. Admin records the Publishing Administration Agreement -> paid artist activates
+  reset(false)
+  await send({ ...activated, id: 'WH-5' })
+  assert.strictEqual(db.artist.meta.billing_status, 'PAID_AWAITING_AGREEMENT')
+  const recorded = await entitlement.recordPublishingAgreement({ artistId: 'a1', signedBy: 'Roger Jackson', documentUrl: 'https://docs.example/signed.pdf' })
+  assert.strictEqual(recorded.ok, true)
+  assert.deepStrictEqual(recorded.activation, { activated: true })
+  assert.strictEqual(db.artist.plan_status, 'ACTIVE')
+  assert.strictEqual(db.artist.agreement_signed_by, 'Roger Jackson')
+  assert.strictEqual(db.artist.agreement_document_url, 'https://docs.example/signed.pdf')
+
+  // 8. Agreement recorded before payment -> payment activates directly
+  reset(false)
+  await entitlement.recordPublishingAgreement({ artistId: 'a1', signedBy: 'Roger Jackson', documentUrl: 'https://docs.example/signed.pdf' })
+  assert.strictEqual(db.artist.plan_status, 'PENDING_CHECKOUT', 'no payment => not active')
+  await send({ ...activated, id: 'WH-6' })
+  assert.strictEqual(db.artist.plan_status, 'ACTIVE')
+
+  // 9. Admin endpoint fails closed
+  delete process.env.ADMIN_API_KEY
+  const admin = require('../api/admin/publishing-agreements')
+  const call = async (method, headers, body) => {
+    const req = Readable.from([Buffer.from(body ? JSON.stringify(body) : '')]); req.method = method; req.headers = headers
+    const res = { statusCode: 200, setHeader() {}, status(c) { this.statusCode = c; return this }, json(b) { this.body = b; return this } }
+    await admin(req, res); return res
+  }
+  assert.strictEqual((await call('GET', {})).statusCode, 503)
+  process.env.ADMIN_API_KEY = 'adm-1'
+  assert.strictEqual((await call('GET', { 'x-admin-key': 'nope' })).statusCode, 401)
+  reset(false)
+  let r = await call('POST', { 'x-admin-key': 'adm-1' }, { artist_id: '00000000-0000-0000-0000-0000000000a1', signed_by: 'R', document_url: 'https://x' })
+  assert.strictEqual(r.statusCode, 400, 'signer name too short')
+  r = await call('POST', { 'x-admin-key': 'adm-1' }, { artist_id: '00000000-0000-0000-0000-0000000000a1', signed_by: 'Roger Jackson', document_url: 'http://insecure' })
+  assert.strictEqual(r.statusCode, 400, 'https required')
 
   console.info = quiet
   console.log('paid-entitlement tests passed')

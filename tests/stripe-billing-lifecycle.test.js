@@ -124,6 +124,35 @@ function patches(result, schema) {
   assert.equal(stale.res.statusCode, 400)
   assert.equal(stale.calls.length, 0)
 
+  // Paid but Publishing Administration Agreement unsigned: DB guard refuses ACTIVE.
+  {
+    const calls = []
+    let meta = { genre: 'rap' }
+    global.fetch = async (url, options = {}) => {
+      const u = String(url); const method = options.method || 'GET'
+      calls.push({ url: u, options })
+      const body = options.body ? JSON.parse(options.body) : {}
+      if (u.includes('/artists_v1') && method === 'PATCH' && body.plan_status === 'ACTIVE') {
+        return { ok: false, status: 400, text: async () => JSON.stringify({ code: 'P0001', message: 'Artist cannot be activated without a signed Publishing Administration Agreement.' }) }
+      }
+      if (u.includes('/artists_v1') && method === 'PATCH' && body.meta) { meta = body.meta; return fetchResponse('') }
+      if (u.includes('/artists_v1') && method === 'GET') return fetchResponse([{ id: 'artist-123', plan_status: 'PENDING_CHECKOUT', meta }])
+      if (method === 'GET') return fetchResponse([{ artist_id: 'artist-123' }])
+      return fetchResponse('')
+    }
+    const res = response()
+    await handler(request(event('checkout.session.completed', {
+      id: 'cs_unsigned', mode: 'subscription', payment_status: 'paid', customer: 'cus_9', subscription: 'sub_9',
+      metadata: { artist_id: 'artist-123', plan: 'starter' },
+    })), res)
+    assert.equal(res.statusCode, 200, 'webhook must not fail (Stripe would retry forever)')
+    assert.equal(meta.billing_status, 'PAID_AWAITING_AGREEMENT')
+    assert.equal(meta.billing_provider, 'stripe')
+    assert.equal(meta.genre, 'rap')
+    const reg = calls.filter(c => c.options.method === 'PATCH' && c.options.headers?.['Content-Profile'] === 'registrations')
+    assert.equal(JSON.parse(reg[0].options.body).plan_status, 'PAID_AWAITING_AGREEMENT')
+  }
+
   console.log('Stripe billing lifecycle: paid activation, canonical entitlements, failed renewals, refunds, and replay protection passed')
 })().catch(error => {
   console.error(error)

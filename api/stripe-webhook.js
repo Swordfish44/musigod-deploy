@@ -1,4 +1,5 @@
 const crypto = require('crypto')
+const entitlement = require('../lib/paid-entitlement')
 const { captureException, withSentry } = require('./_sentry')
 const { STATUS, correlationId, log, safeLogAuditEvent, safeUpsertAuditStatus } = require('./_fulfillment')
 
@@ -522,8 +523,20 @@ function invoicePlan(invoice) {
 }
 
 async function syncSubscriptionState(artistId, data) {
-  const registrationData = compact(data)
-  const artistData = compact({
+  // The DB refuses plan_status=ACTIVE until the Publishing Administration
+  // Agreement is signed. A paid-but-unsigned artist is recorded as
+  // PAID_AWAITING_AGREEMENT instead of failing the webhook.
+  let effectiveStatus = data.plan_status
+  if (data.plan_status === 'ACTIVE') {
+    effectiveStatus = await entitlement.activateOrHoldForAgreement({
+      artistId,
+      plan: data.plan_type,
+      provider: 'stripe',
+      subscriptionId: data.stripe_subscription_id,
+    })
+  }
+  const registrationData = compact({ ...data, plan_status: effectiveStatus })
+  const artistData = data.plan_status === 'ACTIVE' ? {} : compact({
     plan_status: data.plan_status,
     plan_tier: data.plan_type ? String(data.plan_type).toUpperCase() : undefined,
   })

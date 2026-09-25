@@ -58,6 +58,9 @@ module.exports = withSentry(async function handler(req, res) {
     if (billingTarget.artist.plan_status === 'ACTIVE') {
       return res.status(409).json({ error: 'Subscription is already active' })
     }
+    if (billingTarget.artist.meta?.billing_status === 'PAID_AWAITING_AGREEMENT') {
+      return res.status(409).json({ error: 'Payment already received. Sign your Publishing Administration Agreement to activate your account.', code: 'PAID_AWAITING_AGREEMENT' })
+    }
   }
 
   const params = new URLSearchParams()
@@ -137,7 +140,7 @@ function getRawBody(req) {
 
 async function getBillingTarget(artistId) {
   const artistResponse = await fetch(
-    `${SB_URL}/rest/v1/artists_v1?id=eq.${encodeURIComponent(artistId)}&select=id,email,plan_tier,plan_status&limit=1`,
+    `${SB_URL}/rest/v1/artists_v1?id=eq.${encodeURIComponent(artistId)}&select=id,email,plan_tier,plan_status,meta&limit=1`,
     { headers: sbHeaders('artists') }
   )
   if (!artistResponse.ok) throw new Error(`Artist billing lookup failed: ${artistResponse.status}`)
