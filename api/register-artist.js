@@ -1,5 +1,6 @@
 const { captureException, withSentry } = require('./_sentry')
 const { syncArtistToGraph } = require('./graph-sync')
+const entitlement = require('../lib/paid-entitlement')
 
 const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
@@ -153,8 +154,9 @@ async function resolveArtist(payload) {
 async function resumePendingArtist(artist, payload, resolution) {
   const status = String(artist.plan_status || '').toUpperCase()
   if (artist.meta?.billing_status === 'PAID_AWAITING_AGREEMENT') {
+    await entitlement.sendSigningEmail(artist).catch(() => null)
     throw publicError(409, 'PAID_AWAITING_AGREEMENT',
-      'Your payment has been received. Check your email to sign your Publishing Administration Agreement and activate your account.')
+      'Your payment has been received. We just emailed you a link to sign your Publishing Administration Agreement and activate your account.')
   }
   if (!RESUMABLE_STATUSES.has(status)) throw publicError(409, 'ACCOUNT_ACTIVE', ACCOUNT_ACTIVE_MESSAGE)
 

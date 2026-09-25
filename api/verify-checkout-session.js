@@ -1,4 +1,5 @@
 const { captureException, withSentry } = require('./_sentry')
+const signing = require('../lib/agreement-signing')
 
 module.exports = withSentry(async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
@@ -32,7 +33,12 @@ module.exports = withSentry(async function handler(req, res) {
     const verified = sameArtist && isSubscription && isComplete && isPaid
 
     if (!verified) return res.status(409).json({ verified: false })
-    return res.status(200).json({ verified: true, plan: session.metadata?.plan || null })
+    const signUrl = signing.optionalSigningUrl(req, artistId)
+    return res.status(200).json({
+      verified: true,
+      plan: session.metadata?.plan || null,
+      ...(signUrl ? { sign_url: signUrl } : {}),
+    })
   } catch (error) {
     captureException(error, { route: 'verify-checkout-session', method: req.method, statusCode: 502 })
     return res.status(502).json({ error: 'Checkout verification unavailable', verified: false })

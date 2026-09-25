@@ -1,6 +1,7 @@
 'use strict'
 
 const { captureException, withSentry } = require('./_sentry')
+const signing = require('../lib/agreement-signing')
 const paypal = require('../lib/paypal-billing')
 
 module.exports = withSentry(async function handler(req, res) {
@@ -25,7 +26,10 @@ module.exports = withSentry(async function handler(req, res) {
     const verified = subscription.status === 'ACTIVE' &&
       subscription.custom_id === artistId &&
       Boolean(plan)
-    return res.status(verified ? 200 : 409).json({ verified, provider: 'paypal', plan })
+    return res.status(verified ? 200 : 409).json({
+      verified, provider: 'paypal', plan,
+      ...(verified && signing.optionalSigningUrl(req, artistId) ? { sign_url: signing.optionalSigningUrl(req, artistId) } : {}),
+    })
   } catch (error) {
     captureException(error, { route: 'verify-paypal-subscription', method: req.method, statusCode: 502 })
     return res.status(502).json({ verified: false })

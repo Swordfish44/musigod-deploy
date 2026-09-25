@@ -126,11 +126,21 @@
         if (!response.ok || !result.verified) throw new Error('unverified');
 
         localStorage.setItem('musigod_artist_id', artistId);
-        headline.textContent = 'Payment Confirmed';
-        copy.textContent = 'Your subscription is active. Welcome to MusiGod Publishing Administration — your onboarding is now being prepared.';
         icon.textContent = '\u2713';
-        portalLink.href = `/portal?artist_id=${encodeURIComponent(artistId)}`;
-        portalLink.hidden = false;
+        if (result.sign_url) {
+          // Last step: the artist signs the Publishing Administration Agreement.
+          headline.textContent = 'Payment Confirmed \u2014 One Last Step';
+          copy.textContent = 'Sign your Publishing Administration Agreement to activate your membership. Taking you there now\u2026';
+          portalLink.textContent = 'SIGN YOUR AGREEMENT';
+          portalLink.href = result.sign_url;
+          portalLink.hidden = false;
+          setTimeout(() => { window.location.href = result.sign_url; }, 2500);
+        } else {
+          headline.textContent = 'Payment Confirmed';
+          copy.textContent = 'Welcome to MusiGod Publishing Administration \u2014 your onboarding is now being prepared.';
+          portalLink.href = `/portal?artist_id=${encodeURIComponent(artistId)}`;
+          portalLink.hidden = false;
+        }
       } catch (_) {
         headline.textContent = 'Confirmation Pending';
         copy.textContent = `${provider === 'paypal' ? 'PayPal' : 'Stripe'} has not confirmed this checkout yet. Refresh shortly or contact support@musigod.com if this continues.`;
