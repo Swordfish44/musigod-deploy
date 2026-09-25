@@ -886,6 +886,14 @@ async function submitForm() {
       body: JSON.stringify(payload),
     });
     const regBody = await regRes.json().catch(() => ({}));
+    // Account-state answers are notices, not errors.
+    const NOTICE_CODES = { PAID_AWAITING_AGREEMENT: 'Check your email', ACCOUNT_ACTIVE: 'Already registered', EMAIL_ALREADY_REGISTERED: 'Check your email' };
+    if (!regRes.ok && NOTICE_CODES[regBody.code]) {
+      toast(regBody.error, false, 12000);
+      btn.disabled = false;
+      label.textContent = 'Submit Registration';
+      return;
+    }
     if (!regRes.ok) throw new Error(regBody.error || `Registration failed (${regRes.status})`);
 
     const artistId = regBody.artist_id;
@@ -1066,12 +1074,13 @@ async function legacySubmitForm() {
 }
 
 // ── TOAST ─────────────────────────────────────────────────────
-function toast(msg, isErr = false) {
+function toast(msg, isErr = false, durationMs = 4500) {
   const t = document.getElementById('toast');
   document.getElementById('toast-msg').textContent = msg;
   document.getElementById('toast-icon').textContent = isErr ? '⚠' : '✓';
   t.className = `toast ${isErr ? 'err' : ''} show`;
-  setTimeout(() => { t.className = `toast ${isErr ? 'err' : ''}`; }, 4500);
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => { t.className = `toast ${isErr ? 'err' : ''}`; }, durationMs);
 }
 
 // ── PRE-FILL REF CODE FROM URL ────────────────────────────────
