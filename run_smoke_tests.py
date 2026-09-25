@@ -3,10 +3,11 @@ run_smoke_tests.py
 Executes smoke tests T-01 through T-08 against production MusiGod via PostgREST.
 Replaces BEGIN/ROLLBACK wrappers with idempotency-verified RPC calls.
 """
+import os
 import json, sys, urllib.request, urllib.parse
 
 URL = "https://uykzkrnoetcldeuxzqyy.supabase.co"
-SVC = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDYxOSwiZXhwIjoyMDkzMTA2NjE5fQ.jmBLX9VwFvFT4rc3lzqSJS9hFjis2QxRkmWpFizQtKk"
+SVC = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 
 HEADERS = {
     "apikey": SVC,

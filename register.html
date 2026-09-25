@@ -271,15 +271,18 @@
   .mg-legal-footer__copy { font-size: 11px; color: #4a5a6a; line-height: 1.5; }
   </style>
   <script>
+    window.MUSIGOD_CHECKOUT_PROVIDER = 'stripe';
     window.MUSIGOD_PUBLIC_CONFIG_READY = fetch('/api/public-config', { credentials: 'same-origin' })
       .then(function (response) { return response.ok ? response.json() : {}; })
       .then(function (config) {
         window.MUSIGOD_SENTRY_DSN = config.sentryDsn || '';
         window.MUSIGOD_ENVIRONMENT = config.environment || 'production';
+        window.MUSIGOD_CHECKOUT_PROVIDER = config.checkoutProvider === 'paypal' ? 'paypal' : 'stripe';
       })
       .catch(function () {
         window.MUSIGOD_SENTRY_DSN = '';
         window.MUSIGOD_ENVIRONMENT = 'production';
+        window.MUSIGOD_CHECKOUT_PROVIDER = 'stripe';
       });
   </script>
   <script src="/sentry-browser.js"></script>
@@ -546,7 +549,7 @@
         <div class="section-icon">⚡</div>
         <div>
           <div class="section-card-title">Choose Your Plan</div>
-          <div class="section-card-sub">Both plans include full publishing administration</div>
+          <div class="section-card-sub">Every plan includes publishing administration</div>
         </div>
       </div>
       <div class="section-card-body">
@@ -578,6 +581,36 @@
                 <li>13 international PROs</li>
                 <li>Neighboring rights — 40+ territories</li>
                 <li>SoundCharts + Chartmetric analytics</li>
+              </ul>
+            </label>
+          </div>
+          <div class="plan-card">
+            <input type="radio" name="plan" id="plan-pro" value="pro">
+            <label class="plan-label" for="plan-pro">
+              <div class="plan-name">Pro</div>
+              <div class="plan-price">$179<span>/mo</span></div>
+              <ul class="plan-features">
+                <li>Everything in Growth</li>
+                <li>Royalty reconciliation engine</li>
+                <li>Underpayment detection + recovery</li>
+                <li>Airplay monitoring</li>
+                <li>Sync licensing pitching</li>
+                <li>Quarterly royalty reports</li>
+              </ul>
+            </label>
+          </div>
+          <div class="plan-card">
+            <input type="radio" name="plan" id="plan-label" value="label">
+            <label class="plan-label" for="plan-label">
+              <div class="plan-name">Label</div>
+              <div class="plan-price">$699<span>/mo</span></div>
+              <ul class="plan-features">
+                <li>Everything in Pro</li>
+                <li>Multi-artist roster dashboard</li>
+                <li>Bulk catalog registrations</li>
+                <li>Full neighboring rights admin</li>
+                <li>API access</li>
+                <li>Dedicated account support</li>
               </ul>
             </label>
           </div>
@@ -648,24 +681,29 @@
     </div>
   </div>
 
-  <!-- SUCCESS -->
+  <!-- SUCCESS / PAYMENT REQUIRED -->
   <div class="success-screen" id="success-screen">
     <div class="success-icon">✓</div>
-    <h2>Registration received.</h2>
-    <p>Redirecting you to secure checkout. Your onboarding starts as soon as payment is confirmed.</p>
+    <h2>Registration received. Payment required.</h2>
+    <p><strong>You have not been charged yet.</strong> Complete secure checkout to activate your MusiGod membership and begin onboarding.</p>
     <div class="success-id" id="success-artist-id">—</div>
+    <div id="success-plan" style="margin:.8rem 0 1.25rem;color:var(--text-dim);font-size:.85rem"></div>
+    <a id="checkout-continue" href="#" class="btn-next" style="display:inline-flex;text-decoration:none;margin:0 auto 1.5rem;justify-content:center;max-width:320px">
+      Continue to Secure Checkout <span>→</span>
+    </a>
+    <p id="checkout-status" style="font-size:.75rem;color:var(--text-muted);margin-bottom:1.5rem">Preparing secure checkout…</p>
     <div class="success-next">
       <div class="success-step">
         <div class="success-step-num">01</div>
-        <p><strong>Check your email</strong> — confirmation with your next steps is on the way to the address you provided.</p>
+        <p><strong>Complete payment</strong> — your membership stays pending until payment is verified.</p>
       </div>
       <div class="success-step">
         <div class="success-step-num">02</div>
-        <p><strong>DocuSign agreement</strong> arrives within 1 business day — sign electronically to complete onboarding.</p>
+        <p><strong>Account activation</strong> — after payment, we send your activation and onboarding instructions.</p>
       </div>
       <div class="success-step">
         <div class="success-step-num">03</div>
-        <p><strong>VA begins your setup</strong> — PRO registrations, rights infrastructure, and retroactive recovery kick off.</p>
+        <p><strong>Rights &amp; catalog intake</strong> — then MusiGod begins the administration, audit, and registration workflow included in your plan.</p>
       </div>
     </div>
   </div>
@@ -788,7 +826,7 @@ function buildReview() {
     ['Catalog Size', v('catalog_size') || '—'],
     ['Works Registered', v('works_registered') || '—'],
     ['Genre', v('genre') || '—'],
-    ['Plan', plan === 'growth' ? 'Growth - $129/mo' : 'Starter - $79/mo'],
+    ['Plan', ({ starter: 'Starter - $79/mo', growth: 'Growth - $129/mo', pro: 'Pro - $179/mo', label: 'Label - $699/mo' })[plan] || 'Starter - $79/mo'],
     ['Ref Code', v('ref_code') || '—'],
   ];
   document.getElementById('review-summary').innerHTML = rows.map(([k, val]) =>
@@ -801,10 +839,17 @@ function v(id) { return (document.getElementById(id)?.value || '').trim(); }
 // Carry the selected public pricing tier into onboarding. Only tiers with a
 // configured self-service checkout are accepted; everything else fails closed.
 const requestedPlan = new URLSearchParams(window.location.search).get('plan');
-if (requestedPlan === 'starter' || requestedPlan === 'growth') {
+if (['starter', 'growth', 'pro', 'label'].includes(requestedPlan)) {
   const selectedPlan = document.getElementById(`plan-${requestedPlan}`);
   if (selectedPlan) selectedPlan.checked = true;
 }
+
+const PLAN_DISPLAY = {
+  starter: 'Starter — $79/month',
+  growth: 'Growth — $129/month',
+  pro: 'Pro — $179/month',
+  label: 'Label — $699/month',
+};
 
 // ── SUBMIT ────────────────────────────────────────────────────
 async function submitForm() {
@@ -841,6 +886,14 @@ async function submitForm() {
       body: JSON.stringify(payload),
     });
     const regBody = await regRes.json().catch(() => ({}));
+    // Account-state answers are notices, not errors.
+    const NOTICE_CODES = { PAID_AWAITING_AGREEMENT: 'Check your email', ACCOUNT_ACTIVE: 'Already registered', EMAIL_ALREADY_REGISTERED: 'Check your email' };
+    if (!regRes.ok && NOTICE_CODES[regBody.code]) {
+      toast(regBody.error, false, 12000);
+      btn.disabled = false;
+      label.textContent = 'Submit Registration';
+      return;
+    }
     if (!regRes.ok) throw new Error(regBody.error || `Registration failed (${regRes.status})`);
 
     const artistId = regBody.artist_id;
@@ -862,24 +915,51 @@ async function submitForm() {
     document.querySelectorAll('.progress-steps, .section-card').forEach(el => el.style.opacity = '0.3');
     document.getElementById('success-screen').classList.add('show');
     document.getElementById('success-artist-id').textContent = `Artist ID: ${artistId}`;
+    document.getElementById('success-plan').textContent = PLAN_DISPLAY[plan] || plan;
+    const continueBtn = document.getElementById('checkout-continue');
+    const checkoutStatus = document.getElementById('checkout-status');
+    const resumeUrl = `/checkout.html?artist_id=${encodeURIComponent(artistId)}&plan=${encodeURIComponent(plan)}`;
+    continueBtn.href = resumeUrl;
+    checkoutStatus.textContent = 'Preparing secure checkout… If it does not open automatically, use the button above.';
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     label.textContent = 'Opening checkout...';
-    const checkoutRes = await fetch('/api/create-checkout-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ artist_id: artistId, plan }),
-    });
-    const checkoutBody = await checkoutRes.json().catch(() => ({}));
-    if (!checkoutRes.ok || !checkoutBody.url) throw new Error(checkoutBody.error || `Checkout failed (${checkoutRes.status})`);
-
-    window.location.href = checkoutBody.url;
+    try {
+      const checkoutUrl = await createCheckoutForArtist(artistId, plan);
+      continueBtn.href = checkoutUrl;
+      checkoutStatus.textContent = 'Secure checkout is ready. Opening now…';
+      setTimeout(() => { window.location.href = checkoutUrl; }, 1200);
+    } catch (checkoutErr) {
+      console.error('checkout preparation failed:', checkoutErr);
+      checkoutStatus.textContent = 'Your registration is saved, but checkout did not open automatically. Click “Continue to Secure Checkout” to retry safely.';
+      label.textContent = 'Registration Saved';
+      btn.disabled = true;
+      return;
+    }
   } catch (err) {
     console.error(err);
     toast(`Error: ${err.message}`, true);
     btn.disabled = false;
     label.textContent = 'Submit Registration';
   }
+}
+
+async function createCheckoutForArtist(artistId, plan) {
+  await window.MUSIGOD_PUBLIC_CONFIG_READY;
+  const paymentProvider = window.MUSIGOD_CHECKOUT_PROVIDER === 'paypal' ? 'paypal' : 'stripe';
+  const checkoutEndpoint = paymentProvider === 'paypal'
+    ? '/api/create-paypal-subscription'
+    : '/api/create-checkout-session';
+  const checkoutRes = await fetch(checkoutEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ artist_id: artistId, plan }),
+  });
+  const checkoutBody = await checkoutRes.json().catch(() => ({}));
+  if (!checkoutRes.ok || !checkoutBody.url) {
+    throw new Error(checkoutBody.error || `Checkout failed (${checkoutRes.status})`);
+  }
+  return checkoutBody.url;
 }
 
 async function legacySubmitForm() {
@@ -994,12 +1074,13 @@ async function legacySubmitForm() {
 }
 
 // ── TOAST ─────────────────────────────────────────────────────
-function toast(msg, isErr = false) {
+function toast(msg, isErr = false, durationMs = 4500) {
   const t = document.getElementById('toast');
   document.getElementById('toast-msg').textContent = msg;
   document.getElementById('toast-icon').textContent = isErr ? '⚠' : '✓';
   t.className = `toast ${isErr ? 'err' : ''} show`;
-  setTimeout(() => { t.className = `toast ${isErr ? 'err' : ''}`; }, 4500);
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => { t.className = `toast ${isErr ? 'err' : ''}`; }, durationMs);
 }
 
 // ── PRE-FILL REF CODE FROM URL ────────────────────────────────

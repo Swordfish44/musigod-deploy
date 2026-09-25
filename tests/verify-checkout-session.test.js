@@ -44,6 +44,11 @@ async function run(body, stripeSession) {
   const verified = await run({ artist_id: 'artist-123', session_id: base.id }, base)
   assert.equal(verified.statusCode, 200)
   assert.deepEqual(verified.body, { verified: true, plan: 'starter' })
+  // With the signing secret available, the artist is also handed their signing link.
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-test'
+  const withLink = await run({ artist_id: 'artist-123', session_id: base.id }, base)
+  assert(withLink.body.sign_url && withLink.body.sign_url.includes('/agreement.html?token='))
+  delete process.env.SUPABASE_SERVICE_ROLE_KEY
   assert.equal(verified.headers['Cache-Control'], 'no-store')
 
   const wrongArtist = await run({ artist_id: 'artist-other', session_id: base.id }, base)

@@ -1,3 +1,4 @@
+import os
 import requests
 import time
 import sys
@@ -5,7 +6,7 @@ import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 SUPABASE_URL = "https://uykzkrnoetcldeuxzqyy.supabase.co"
-SUPABASE_SVC = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDYxOSwiZXhwIjoyMDkzMTA2NjE5fQ.jmBLX9VwFvFT4rc3lzqSJS9hFjis2QxRkmWpFizQtKk"
+SUPABASE_SVC = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 ARTIST_ID    = "3d4788b6-2a86-4ed5-8f27-ab95b3a230d3"
 N8N_WEBHOOK  = "https://musigod-n8n.onrender.com/webhook/registration-task"
 

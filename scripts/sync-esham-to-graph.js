@@ -3,7 +3,7 @@
 // Writes directly to graph/works schema tables via Accept-Profile headers
 // Run: node scripts/sync-esham-to-graph.js
 
-const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDYxOSwiZXhwIjoyMDkzMTA2NjE5fQ.jmBLX9VwFvFT4rc3lzqSJS9hFjis2QxRkmWpFizQtKk'
+const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const SB  = 'https://uykzkrnoetcldeuxzqyy.supabase.co'
 const H   = { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY }
 

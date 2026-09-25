@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>MusiGod — Sign Your Agreement</title>
+<style>
+:root{--red:#e8262a;--bg:#0a0a0a;--surface:#151515;--text:#fff;--dim:#aaa;--border:#2a2a2a;--green:#2ecc71}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,sans-serif;min-height:100vh;display:grid;place-items:center;padding:24px 16px}
+.card{width:min(760px,100%);background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:32px}
+.logo{font-weight:800;font-size:22px;margin-bottom:28px}.logo span{color:var(--red)}
+h1{font-size:28px;margin:0 0 10px} p{color:var(--dim);line-height:1.55}
+.doc{background:#fff;color:#111;border-radius:8px;padding:22px;max-height:420px;overflow:auto;font:15px/1.6 Georgia,serif;white-space:pre-wrap;margin:18px 0}
+label{display:block;font-size:14px;color:var(--dim);margin:16px 0 6px}
+input[type=text]{width:100%;padding:12px;border-radius:7px;border:1px solid var(--border);background:#0e0e0e;color:var(--text);font-size:16px}
+.consent{display:flex;gap:10px;align-items:flex-start;margin:16px 0;color:var(--text);font-size:14px;line-height:1.5}
+.consent input{margin-top:3px;width:18px;height:18px;flex:none}
+.btn{width:100%;border:0;border-radius:7px;background:var(--red);color:#fff;padding:14px 18px;font-weight:800;font-size:15px;cursor:pointer;margin-top:6px}
+.btn:disabled{opacity:.55;cursor:not-allowed}.note{font-size:13px;margin-top:14px}.error{color:#ff8d8d}.ok{color:var(--green)}
+.summary{border:1px solid var(--border);border-radius:8px;padding:14px 16px;background:#101010;font-size:14px}
+.summary div{display:flex;justify-content:space-between;gap:16px;margin:4px 0}.summary span:first-child{color:var(--dim)}
+a{color:#fff}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">MUSI<span>GOD</span></div>
+  <div id="loading"><p>Loading your agreement…</p></div>
+
+  <div id="signer" hidden>
+    <h1 id="title">Sign your agreement</h1>
+    <p id="lead">Read and sign your MusiGod Publishing Administration Agreement. Your account activates as soon as you sign.</p>
+    <div class="summary">
+      <div><span>Artist</span><strong id="s-name"></strong></div>
+      <div><span>Email</span><strong id="s-email"></strong></div>
+      <div><span>Plan</span><strong id="s-plan"></strong></div>
+      <div><span>Agreement</span><strong id="s-version"></strong></div>
+    </div>
+    <div class="doc" id="doc" tabindex="0" aria-label="Agreement text"></div>
+    <label for="typed-name">Type your full legal name to sign</label>
+    <input type="text" id="typed-name" autocomplete="name">
+    <label class="consent"><input type="checkbox" id="consent"><span>I have read this agreement, I agree to its terms, and I intend my typed name above to be my electronic signature. I consent to doing business electronically.</span></label>
+    <button class="btn" id="sign-btn">Sign Agreement</button>
+    <p class="note" id="status"></p>
+  </div>
+
+  <div id="done" hidden>
+    <h1 id="done-title">Agreement signed</h1>
+    <p id="done-copy"></p>
+    <p class="note" id="done-links"></p>
+  </div>
+
+  <div id="failed" hidden><h1>Link not valid</h1><p id="failed-copy"></p></div>
+</div>
+<script>
+const $ = id => document.getElementById(id)
+const token = new URLSearchParams(location.search).get('token') || ''
+const plans = { STARTER: 'Starter', GROWTH: 'Growth', PRO: 'Pro', LABEL: 'Label' }
+
+function fail(message) { $('loading').hidden = true; $('signer').hidden = true; $('failed').hidden = false; $('failed-copy').textContent = message }
+
+function finished(result) {
+  $('signer').hidden = true; $('loading').hidden = true; $('done').hidden = false
+  if (result.activated) {
+    $('done-title').textContent = 'You’re all set'
+    $('done-copy').textContent = 'Your agreement is signed and your MusiGod membership is now active. Watch your email for onboarding next steps.'
+  } else {
+    $('done-title').textContent = 'Agreement signed'
+    $('done-copy').textContent = 'Your agreement is signed. Your membership activates automatically as soon as your payment is confirmed.'
+  }
+  if (result.receipt_url) {
+    const a = document.createElement('a'); a.href = result.receipt_url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'View your signed agreement'
+    $('done-links').appendChild(a)
+  }
+}
+
+async function load() {
+  if (!token) return fail('This page needs the signing link from your MusiGod email or checkout confirmation.')
+  const res = await fetch(`/api/publishing-agreement?token=${encodeURIComponent(token)}`)
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) return fail(body.error || 'This signing link is invalid or has expired.')
+  if (body.already_signed) return finished({ activated: body.artist?.paid })
+  $('s-name').textContent = body.artist.legal_name
+  $('s-email').textContent = body.artist.email
+  $('s-plan').textContent = plans[body.artist.plan] || body.artist.plan || ''
+  $('s-version').textContent = `${body.agreement.title} (${body.agreement.version})`
+  $('doc').textContent = body.agreement.body_text
+  $('typed-name').placeholder = body.artist.legal_name || 'First Last'
+  $('loading').hidden = true; $('signer').hidden = false
+}
+
+$('sign-btn').addEventListener('click', async () => {
+  const status = $('status'), btn = $('sign-btn')
+  const typed = $('typed-name').value.trim()
+  if (!/\S+\s+\S+/.test(typed)) { status.textContent = 'Type your full legal name (first and last).'; status.className = 'note error'; return }
+  if (!$('consent').checked) { status.textContent = 'Check the box to agree and sign electronically.'; status.className = 'note error'; return }
+  btn.disabled = true; status.textContent = 'Signing…'; status.className = 'note'
+  try {
+    const res = await fetch('/api/publishing-agreement', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, typed_name: typed, consent: true }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(body.error || 'Signing failed. Please try again.')
+    finished(body)
+  } catch (err) {
+    status.textContent = err.message; status.className = 'note error'; btn.disabled = false
+  }
+})
+
+load().catch(() => fail('Could not load your agreement. Please refresh or contact support@musigod.com.'))
+</script>
+</body>
+</html>

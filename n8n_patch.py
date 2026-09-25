@@ -1,3 +1,4 @@
+import os
 import requests
 import json
 import sys
@@ -6,7 +7,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="repla
 
 # ── CONFIG ───────────────────────────────────────────────────────────────────
 N8N_BASE = "https://musigod-n8n.onrender.com/api/v1"
-N8N_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0YWMxNzFmYi0xMzZlLTQ2ZGEtOGU3My02MzhlYjQyYzlmMjAiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiYjljYjdlYjAtMTAwNS00N2JjLTlhNGEtODZjN2U2OGE2ZDU5IiwiaWF0IjoxNzc4NzI3OTgzLCJleHAiOjE3ODEyMzY4MDB9.A0k7EVpOJ9LqrNsvrjz9CRrYPE3nj4SvgY9iwHmjClA"
+N8N_API_KEY = os.environ["N8N_API_KEY"]
 
 OLD_HOST = "musigod.app.n8n.cloud"
 NEW_HOST = "musigod-n8n.onrender.com"

@@ -1,0 +1,7 @@
+{
+  "_note": "PayPal SANDBOX billing plan IDs (public identifiers, not secrets). Used only when PAYPAL_ENV !== 'live' and VERCEL_ENV !== 'production', and only if the matching PAYPAL_*_PLAN_ID env var is empty. Created by scripts/paypal/bootstrap-plans.js, product PROD-1T095579HD505934J.",
+  "starter": "P-4Y5092252B6617301NKZDX5Y",
+  "growth": "P-51W243080M161821PNKZDX6A",
+  "pro": "P-6VP05701UM885142LNKZDX6I",
+  "label": "P-2G274615XU012310DNKZDX6I"
+}

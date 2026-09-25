@@ -1,8 +1,13 @@
 const { captureException, withSentry } = require('./_sentry')
 
+const SB_URL = process.env.SUPABASE_URL || 'https://uykzkrnoetcldeuxzqyy.supabase.co'
+const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
+
 const PRICE_IDS = {
   starter: process.env.STRIPE_STARTER_PRICE_ID,
   growth:  process.env.STRIPE_GROWTH_PRICE_ID,
+  pro: process.env.STRIPE_PRO_PRICE_ID,
+  label: process.env.STRIPE_LABEL_PRICE_ID,
   rights_audit_unlock: process.env.STRIPE_RIGHTS_AUDIT_UNLOCK_PRICE_ID,
 }
 
@@ -37,6 +42,27 @@ module.exports = withSentry(async function handler(req, res) {
     return res.status(400).json({ error: 'configured plan required' })
   }
 
+  let billingTarget = null
+  if (plan !== 'rights_audit_unlock') {
+    if (!SB_KEY) return res.status(500).json({ error: 'Billing verification is not configured' })
+    try {
+      billingTarget = await getBillingTarget(artist_id)
+    } catch (error) {
+      captureException(error, { route: 'create-checkout-session', method: req.method, statusCode: 502 })
+      return res.status(502).json({ error: 'Billing verification unavailable' })
+    }
+    if (!billingTarget?.artist) return res.status(404).json({ error: 'Artist registration not found' })
+    if (String(billingTarget.artist.plan_tier || '').toLowerCase() !== plan) {
+      return res.status(409).json({ error: 'Checkout plan does not match artist registration' })
+    }
+    if (billingTarget.artist.plan_status === 'ACTIVE') {
+      return res.status(409).json({ error: 'Subscription is already active' })
+    }
+    if (billingTarget.artist.meta?.billing_status === 'PAID_AWAITING_AGREEMENT') {
+      return res.status(409).json({ error: 'Payment already received. Sign your Publishing Administration Agreement to activate your account.', code: 'PAID_AWAITING_AGREEMENT' })
+    }
+  }
+
   const params = new URLSearchParams()
   params.append('mode', plan === 'rights_audit_unlock' ? 'payment' : 'subscription')
   params.append('line_items[0][price]', PRICE_IDS[plan])
@@ -51,7 +77,13 @@ module.exports = withSentry(async function handler(req, res) {
   if (plan !== 'rights_audit_unlock') {
     params.append('subscription_data[metadata][artist_id]', artist_id)
     params.append('subscription_data[metadata][plan]', plan)
-    params.append('customer_creation', 'always')
+    params.append('client_reference_id', artist_id)
+    if (billingTarget.stripeCustomerId) {
+      params.append('customer', billingTarget.stripeCustomerId)
+    } else {
+      params.append('customer_creation', 'always')
+      if (billingTarget.artist.email) params.append('customer_email', billingTarget.artist.email)
+    }
     params.append('success_url', `https://musigod.com/success.html?artist_id=${encodeURIComponent(artist_id)}&session_id={CHECKOUT_SESSION_ID}`)
     params.append('cancel_url', `https://musigod.com/register.html?artist_id=${encodeURIComponent(artist_id)}&checkout=cancelled`)
   } else {
@@ -104,4 +136,31 @@ function getRawBody(req) {
     req.on('end', () => resolve(Buffer.concat(chunks)))
     req.on('error', reject)
   })
+}
+
+async function getBillingTarget(artistId) {
+  const artistResponse = await fetch(
+    `${SB_URL}/rest/v1/artists_v1?id=eq.${encodeURIComponent(artistId)}&select=id,email,plan_tier,plan_status,meta&limit=1`,
+    { headers: sbHeaders('artists') }
+  )
+  if (!artistResponse.ok) throw new Error(`Artist billing lookup failed: ${artistResponse.status}`)
+  const artists = await artistResponse.json()
+  const artist = artists?.[0] || null
+  if (!artist) return { artist: null, stripeCustomerId: null }
+
+  const registrationResponse = await fetch(
+    `${SB_URL}/rest/v1/registrations_v1?artist_id=eq.${encodeURIComponent(artistId)}&stripe_customer_id=not.is.null&select=stripe_customer_id&limit=1`,
+    { headers: sbHeaders('registrations') }
+  )
+  if (!registrationResponse.ok) throw new Error(`Registration billing lookup failed: ${registrationResponse.status}`)
+  const registrations = await registrationResponse.json()
+  return { artist, stripeCustomerId: registrations?.[0]?.stripe_customer_id || null }
+}
+
+function sbHeaders(schema) {
+  return {
+    apikey: SB_KEY,
+    Authorization: `Bearer ${SB_KEY}`,
+    'Accept-Profile': schema,
+  }
 }

@@ -16,7 +16,7 @@ import urllib.request, urllib.error, json, os, sys
 SB_URL  = "https://uykzkrnoetcldeuxzqyy.supabase.co"
 SB_REF  = "uykzkrnoetcldeuxzqyy"
 MGMT    = "https://api.supabase.com/v1"
-SVC     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDYxOSwiZXhwIjoyMDkzMTA2NjE5fQ.jmBLX9VwFvFT4rc3lzqSJS9hFjis2QxRkmWpFizQtKk"
+SVC     = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 ARTIST_ID = "3d4788b6-2a86-4ed5-8f27-ab95b3a230d3"
 
 PAT = os.environ.get("SUPABASE_ACCESS_TOKEN") or os.environ.get("SUPABASE_PAT") or ""
