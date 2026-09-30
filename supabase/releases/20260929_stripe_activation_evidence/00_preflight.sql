@@ -39,6 +39,7 @@ UNION ALL
 SELECT 'artist_activation_guard_present', EXISTS (
   SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
   WHERE n.nspname IN ('artists', 'public')
+    AND p.prokind = 'f'
     AND pg_get_functiondef(p.oid) ILIKE '%signed Publishing Administration Agreement%');
 
 -- B. plan_status CHECK constraint on artists.artists_v1 (confirms allowed values)

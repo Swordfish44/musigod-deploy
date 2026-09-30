@@ -9,6 +9,8 @@
 // This is code-level proof only; it is not evidence of production behaviour.
 const assert = require('assert')
 const crypto = require('crypto')
+const fs = require('fs')
+const path = require('path')
 const { Readable } = require('stream')
 
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_activation'
@@ -333,6 +335,13 @@ const loud = () => { [console.info, console.warn, console.error] = saved }
     await send(checkout('evt_unpaid', { payment_status: 'unpaid' }))
     await send(checkout('evt_payment_mode', { mode: 'payment', subscription: null }))
     assert.equal(artist().plan_status, 'PENDING_CHECKOUT'); assert.equal(db.accounts.length, 0); assert.equal(db.timeline.length, 0)
+  })
+
+  await check('production preflight excludes aggregates before pg_get_functiondef', async () => {
+    const sql = fs.readFileSync(path.join(__dirname, '../supabase/releases/20260929_stripe_activation_evidence/00_preflight.sql'), 'utf8')
+    const guardCheck = sql.slice(sql.indexOf("SELECT 'artist_activation_guard_present'"), sql.indexOf('-- B.'))
+    assert(guardCheck.includes("p.prokind = 'f'"))
+    assert(guardCheck.indexOf("p.prokind = 'f'") < guardCheck.indexOf('pg_get_functiondef(p.oid)'))
   })
 
   loud()
