@@ -41,11 +41,23 @@ function fetchResponse(body = '') {
   }
 }
 
+const SIGNED_ARTIST = {
+  id: 'artist-123', email: 'artist@example.com', plan_status: 'PENDING_CHECKOUT', plan_tier: 'GROWTH', meta: {},
+  agreement_signed_at: '2026-09-25T10:00:00Z', agreement_signed_by: 'Artist', agreement_document_url: 'legal/a.pdf',
+}
+
 async function run(event, timestamp) {
   const calls = []
+  const artist = JSON.parse(JSON.stringify(SIGNED_ARTIST))
   global.fetch = async (url, options = {}) => {
     calls.push({ url: String(url), options })
-    if ((options.method || 'GET') === 'GET') return fetchResponse([{ artist_id: 'artist-123' }])
+    const u = String(url)
+    if (u.includes('/artists_v1') && options.method === 'PATCH') Object.assign(artist, JSON.parse(options.body))
+    if ((options.method || 'GET') === 'GET') {
+      if (u.includes('/artists_v1')) return fetchResponse([artist])
+      if (u.includes('/payment_event_receipts_v1') || u.includes('/payment_accounts_v1')) return fetchResponse([])
+      return fetchResponse([{ artist_id: 'artist-123' }])
+    }
     return fetchResponse('')
   }
   const res = response()
@@ -74,11 +86,30 @@ function patches(result, schema) {
   }))
   assert.equal(paid.res.statusCode, 200)
   assert.equal(patches(paid, 'registrations').length, 1)
-  assert.equal(patches(paid, 'artists').length, 1)
   assert.deepEqual(JSON.parse(patches(paid, 'artists')[0].options.body), {
     plan_status: 'ACTIVE',
     plan_tier: 'GROWTH',
   })
+  // The transition into ACTIVE leaves an auditable activation record tied to
+  // the verified Stripe event, customer and subscription.
+  const activationMeta = patches(paid, 'artists')
+    .map(call => JSON.parse(call.options.body))
+    .find(body => body.meta?.activation_event)
+  assert(activationMeta, 'activation_event recorded on first activation')
+  assert.equal(activationMeta.meta.activation_event.trigger, 'payment_confirmed')
+  assert.equal(activationMeta.meta.activation_event.provider, 'stripe')
+  assert.equal(activationMeta.meta.activation_event.provider_event_id, 'evt_checkout_session_completed')
+  assert.equal(activationMeta.meta.activation_event.provider_customer_id, 'cus_123')
+  assert.equal(activationMeta.meta.activation_event.provider_subscription_id, 'sub_123')
+  assert.equal(activationMeta.meta.billing_status, 'ACTIVE')
+  const receipt = paid.calls.find(call => call.url.endsWith('/payment_event_receipts_v1') && call.options.method === 'POST')
+  assert(receipt, 'verified Stripe event recorded in the shared idempotency ledger')
+  const receiptBody = JSON.parse(receipt.options.body)
+  assert.equal(receiptBody.provider, 'stripe')
+  assert.equal(receiptBody.provider_event_id, 'evt_checkout_session_completed')
+  assert.equal(receiptBody.artist_id, 'artist-123')
+  assert.equal(receiptBody.payload.status, 'ACTIVE')
+  assert.equal(receiptBody.payload.provider_subscription_id, 'sub_123')
 
   const unpaid = await run(event('checkout.session.completed', {
     id: 'cs_live_unpaid',
@@ -136,7 +167,8 @@ function patches(result, schema) {
         return { ok: false, status: 400, text: async () => JSON.stringify({ code: 'P0001', message: 'Artist cannot be activated without a signed Publishing Administration Agreement.' }) }
       }
       if (u.includes('/artists_v1') && method === 'PATCH' && body.meta) { meta = body.meta; return fetchResponse('') }
-      if (u.includes('/artists_v1') && method === 'GET') return fetchResponse([{ id: 'artist-123', plan_status: 'PENDING_CHECKOUT', meta }])
+      if (u.includes('/artists_v1') && method === 'GET') return fetchResponse([{ id: 'artist-123', email: 'artist@example.com', plan_status: 'PENDING_CHECKOUT', meta }])
+      if (u.includes('/payment_event_receipts_v1') || u.includes('/payment_accounts_v1')) return fetchResponse([])
       if (method === 'GET') return fetchResponse([{ artist_id: 'artist-123' }])
       return fetchResponse('')
     }

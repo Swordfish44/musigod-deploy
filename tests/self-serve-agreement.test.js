@@ -38,7 +38,7 @@ global.fetch = async (url, opts = {}) => {
   if (u.includes('/signed_agreements_v1')) return ok(db.signed.filter(r => u.includes(r.id)))
   if (u.includes('/artists_v1')) {
     if (m === 'GET') return ok([db.artist])
-    if (body.plan_status === 'ACTIVE' && !(body.agreement_signed_at || db.artist.agreement_signed_at)) {
+    if (body.plan_status === 'ACTIVE' && !['agreement_signed_at', 'agreement_signed_by', 'agreement_document_url'].every(f => body[f] || db.artist[f])) {
       return { ok: false, status: 400, text: async () => '{"code":"P0001","message":"Artist cannot be activated without a signed Publishing Administration Agreement."}' }
     }
     Object.assign(db.artist, body); return ok([db.artist])
