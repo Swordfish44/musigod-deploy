@@ -15,7 +15,7 @@ const webhook = require('../api/paypal-webhook')
 let db
 function reset(signed) {
   db = {
-    artist: { id: 'a1', email: 'x@y.com', plan_status: 'PENDING_CHECKOUT', plan_tier: 'STARTER', meta: { genre: 'rap' }, agreement_signed_at: signed ? '2026-09-24' : null },
+    artist: { id: 'a1', email: 'x@y.com', plan_status: 'PENDING_CHECKOUT', plan_tier: 'STARTER', meta: { genre: 'rap' }, agreement_signed_at: signed ? '2026-09-24' : null, agreement_signed_by: signed ? 'Roger Jackson' : null, agreement_document_url: signed ? 'https://docs.example/signed.pdf' : null },
     registration: { artist_id: 'a1', status: 'PENDING', plan_status: null, plan_type: null },
     accounts: [], receipts: [],
   }
@@ -25,7 +25,7 @@ global.fetch = async (url, opts = {}) => {
   const u = String(url); const method = opts.method || 'GET'; const body = opts.body ? JSON.parse(opts.body) : null
   if (u.includes('/artists_v1')) {
     if (method === 'GET') return ok([db.artist])
-    if (body.plan_status === 'ACTIVE' && !(body.agreement_signed_at || db.artist.agreement_signed_at)) {
+    if (body.plan_status === 'ACTIVE' && !['agreement_signed_at', 'agreement_signed_by', 'agreement_document_url'].every(f => body[f] || db.artist[f])) {
       const t = JSON.stringify({ code: 'P0001', message: 'Artist cannot be activated without a signed Publishing Administration Agreement. Set agreement_signed_at, agreement_signed_by, and agreement_document_url first.' })
       return { ok: false, status: 400, text: async () => t }
     }
@@ -76,7 +76,7 @@ const quiet = console.info; console.info = () => {}
   assert.strictEqual(db.receipts.length, 1)
 
   // 3. Signing later activates
-  db.artist.agreement_signed_at = '2026-09-25'
+  Object.assign(db.artist, { agreement_signed_at: '2026-09-25', agreement_signed_by: 'Roger Jackson', agreement_document_url: 'https://docs.example/signed.pdf' })
   const a = await entitlement.activatePaidArtist('a1')
   assert.deepStrictEqual(a, { activated: true })
   assert.strictEqual(db.artist.plan_status, 'ACTIVE')
