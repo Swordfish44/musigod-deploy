@@ -1159,45 +1159,32 @@ async function handleSubmit(e) {
   btn.disabled = true;
 
   try {
-    const SUPABASE_URL  = 'https://uykzkrnoetcldeuxzqyy.supabase.co';
-    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a3prcm5vZXRjbGRldXh6cXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MzA2MTksImV4cCI6MjA5MzEwNjYxOX0.r4Dx_Jkgje2kYNGh9PQtuyuJgBGJwVAviHM9QmAJcrs';
+    const requestedPlan = new URLSearchParams(window.location.search).get('plan');
+    const plan = ['starter', 'growth', 'pro', 'label'].includes(requestedPlan) ? requestedPlan : 'starter';
+    const refCode = new URLSearchParams(window.location.search).get('ref');
 
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/artists_v1`, {
+    const res = await fetch('/api/register-artist', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_ANON,
-        'Authorization': `Bearer ${SUPABASE_ANON}`,
-        'Content-Profile': 'artists',
-        'Prefer': 'return=minimal'
-      },
-      body: (() => {
-        const _ref = new URLSearchParams(window.location.search).get('ref');
-        const _payload = {
-          legal_first_name: first,
-          legal_last_name:  last,
-          artist_name:      artist,
-          email:            email,
-          country:          country,
-          plan_status:      'ACTIVE'
-        };
-        if (_ref) _payload.ref_code = _ref;
-        return JSON.stringify(_payload);
-      })()
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        legal_first_name: first,
+        legal_last_name: last,
+        artist_name: artist,
+        email,
+        plan,
+        ref_code: refCode || null
+      })
     });
 
+    const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const body = await res.text();
-      console.error('Supabase error response:', body);
-      let msg = 'Submission failed. Please try again or email support@musigod.com';
-      try { const j = JSON.parse(body); msg = j.message || j.error || j.hint || msg; } catch(_) {}
-      throw new Error(msg);
+      throw new Error(body.error || 'Registration failed. Please try again or email support@musigod.com');
+    }
+    if (!body.artist_id || body.status !== 'PENDING_CHECKOUT') {
+      throw new Error('Registration was not safely placed in pending checkout. Please contact support@musigod.com');
     }
 
-    btn.textContent = "You're in. We'll be in touch shortly.";
-    btn.style.opacity = '0.6';
-    e.target.querySelectorAll('input, select').forEach(el => el.disabled = true);
-
+    window.location.assign(`/checkout.html?artist_id=${encodeURIComponent(body.artist_id)}&plan=${encodeURIComponent(body.plan || plan)}`);
   } catch(ex) {
     btn.textContent = 'Request access';
     btn.disabled = false;

@@ -124,8 +124,19 @@ const webhookHeaders = {
   assert.equal(verifyRes.body.verified, true)
 
   const webhookCalls = []
+  // Signed artist; the activation path reads it, checks the agreement fields
+  // and confirms ACTIVE after the guarded PATCH.
+  const paypalArtist = {
+    id: '11111111-1111-1111-1111-111111111111', email: 'artist@example.com', plan_status: 'PENDING_CHECKOUT', plan_tier: 'STARTER', meta: {},
+    agreement_signed_at: '2026-09-21T00:00:00Z', agreement_signed_by: 'Artist', agreement_document_url: 'legal/a.pdf',
+  }
   global.fetch = async (url, options = {}) => {
     webhookCalls.push({ url: String(url), options })
+    if (String(url).includes('/artists_v1')) {
+      if ((options.method || 'GET') === 'GET') return fetchResponse([paypalArtist])
+      Object.assign(paypalArtist, JSON.parse(options.body))
+      return fetchResponse('')
+    }
     if (String(url).endsWith('/v1/oauth2/token')) return fetchResponse({ access_token: 'access-token' })
     if (String(url).endsWith('/v1/notifications/verify-webhook-signature')) {
       return fetchResponse({ verification_status: 'SUCCESS' })

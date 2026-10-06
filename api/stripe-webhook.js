@@ -29,7 +29,15 @@ module.exports = withSentry(async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid JSON' })
   }
 
+  if (!event?.id || !event?.type) return res.status(400).json({ error: 'Invalid event' })
+
+  let result = null
   try {
+    // Step 1 (idempotency): a verified event already recorded is never re-applied.
+    if (await stripeEventAlreadyProcessed(event.id)) {
+      console.info('STRIPE_WEBHOOK_DUPLICATE', { stripeEventId: event.id, stripeEventType: event.type })
+      return res.status(200).json({ received: true, duplicate: true })
+    }
     if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       await safeLogAuditEvent({
         audit_id: event.data.object?.metadata?.audit_id || null,
@@ -40,22 +48,25 @@ module.exports = withSentry(async function handler(req, res) {
         payload: { stripe_event_id: event.id, stripe_event_type: event.type },
       })
       log('info', 'STRIPE_WEBHOOK_RECEIVED', { request_id: requestId, stripe_event_id: event.id, stripe_event_type: event.type })
-      await handleCheckoutComplete(event.data.object, requestId)
+      result = await handleCheckoutComplete(event.data.object, requestId, event)
     } else if (event.type === 'customer.subscription.created') {
-      await handleSubscriptionCreated(event.data.object)
+      result = await handleSubscriptionCreated(event.data.object, event)
     } else if (event.type === 'customer.subscription.updated') {
-      await handleSubscriptionUpdated(event.data.object)
+      result = await handleSubscriptionUpdated(event.data.object, event)
     } else if (event.type === 'customer.subscription.deleted') {
-      await handleSubscriptionDeleted(event.data.object)
+      result = await handleSubscriptionDeleted(event.data.object, event)
     } else if (event.type === 'invoice.paid') {
-      await handleInvoicePaid(event.data.object)
+      result = await handleInvoicePaid(event.data.object, event)
     } else if (event.type === 'invoice.payment_failed' || event.type === 'invoice.payment_action_required') {
-      await handleInvoicePaymentFailed(event.data.object)
+      result = await handleInvoicePaymentFailed(event.data.object, event)
     } else if (event.type === 'charge.refunded') {
-      await handleChargeRefunded(event.data.object)
+      result = await handleChargeRefunded(event.data.object, event)
     } else {
       console.info('Stripe webhook ignored event', { eventType: event.type, eventId: event.id })
     }
+    // Final step: receipt written only after successful handling, so a
+    // failed delivery is always reprocessed on Stripe's retry.
+    await recordStripeEvent(event, result)
   } catch (e) {
     console.error('Webhook handler error:', e)
     captureException(e, {
@@ -76,7 +87,7 @@ module.exports = withSentry(async function handler(req, res) {
   res.status(200).json({ received: true })
 }, 'stripe-webhook')
 
-async function handleCheckoutComplete(session, requestId) {
+async function handleCheckoutComplete(session, requestId, event = {}) {
   const artistId = session.metadata?.artist_id
   const plan = session.metadata?.plan
   const productType = session.metadata?.product_type
@@ -98,7 +109,7 @@ async function handleCheckoutComplete(session, requestId) {
 
   if (isRightsAuditUnlockSession(session)) {
     await handleRightsAuditUnlock(session, requestId)
-    return
+    return { handled: true, kind: 'rights_audit_unlock' }
   }
   if (!artistId) {
     console.info('Checkout session completed without artist_id; registration update skipped', {
@@ -106,7 +117,7 @@ async function handleCheckoutComplete(session, requestId) {
       plan: clean(plan) || null,
       product_type: clean(productType) || null,
     })
-    return
+    return { handled: false }
   }
 
   if (!isPaidCheckout(session)) {
@@ -114,15 +125,20 @@ async function handleCheckoutComplete(session, requestId) {
       stripe_session_id: session.id,
       payment_status: session.payment_status || null,
     })
-    return
+    return { handled: false, artistId, reason: 'payment_not_confirmed' }
   }
 
-  await syncSubscriptionState(artistId, {
+  if (session.mode !== 'subscription' || !session.subscription) {
+    console.warn('Paid artist checkout is not a subscription; entitlement unchanged', { stripe_session_id: session.id, mode: session.mode || null })
+    return { handled: false, artistId, reason: 'not_subscription_checkout' }
+  }
+
+  return syncSubscriptionState(artistId, {
     stripe_customer_id: session.customer,
     stripe_subscription_id: session.subscription,
     plan_status: 'ACTIVE',
     plan_type: plan,
-  })
+  }, event, { clientReferenceId: session.client_reference_id || null })
 }
 
 function isPaidCheckout(session) {
@@ -435,57 +451,69 @@ async function handleRightsAuditUnlock(session, requestId = correlationId('right
   }
 }
 
-async function handleSubscriptionCreated(subscription) {
-  const artistId = subscription.metadata?.artist_id || await artistIdByCustomer(subscription.customer)
-  if (!artistId) return
-  await syncSubscriptionState(artistId, {
-    stripe_subscription_id: subscription.id,
-    plan_status: normalizeSubscriptionStatus(subscription.status),
-    plan_type: subscription.metadata?.plan || undefined,
-  })
+async function handleSubscriptionCreated(subscription, event) {
+  return handleSubscriptionStatus(subscription, event)
 }
 
-async function handleSubscriptionUpdated(subscription) {
-  const artistId = subscription.metadata?.artist_id || await artistIdByCustomer(subscription.customer)
-  if (!artistId) return
-  await syncSubscriptionState(artistId, {
-    stripe_subscription_id: subscription.id,
-    plan_status: normalizeSubscriptionStatus(subscription.status),
-    plan_type: subscription.metadata?.plan || undefined,
-  })
+async function handleSubscriptionUpdated(subscription, event) {
+  return handleSubscriptionStatus(subscription, event)
 }
 
-async function handleSubscriptionDeleted(subscription) {
+// A subscription status only changes entitlement when it is definitive.
+// Stripe Checkout emits `incomplete` before the first payment settles, and
+// `trialing`/`paused` carry no verified payment — none of these may activate
+// an artist or be written into the plan_status enum (CHECK violation -> 500
+// -> Stripe retry storm, and a late `incomplete` would revert a paid artist).
+async function handleSubscriptionStatus(subscription, event) {
   const artistId = subscription.metadata?.artist_id || await artistIdByCustomer(subscription.customer)
-  if (!artistId) return
-  await syncSubscriptionState(artistId, {
+  if (!artistId) return { handled: false }
+  const planStatus = normalizeSubscriptionStatus(subscription.status)
+  if (!planStatus) {
+    console.info('Stripe subscription status is not definitive; entitlement unchanged', {
+      stripe_subscription_id: subscription.id || null,
+      stripe_status: subscription.status || null,
+    })
+    return { handled: false, artistId, reason: `non_definitive_status:${subscription.status || 'unknown'}` }
+  }
+  return syncSubscriptionState(artistId, {
+    stripe_customer_id: subscription.customer || undefined,
+    stripe_subscription_id: subscription.id,
+    plan_status: planStatus,
+    plan_type: subscription.metadata?.plan || undefined,
+  }, event)
+}
+
+async function handleSubscriptionDeleted(subscription, event) {
+  const artistId = subscription.metadata?.artist_id || await artistIdByCustomer(subscription.customer)
+  if (!artistId) return { handled: false }
+  return syncSubscriptionState(artistId, {
     plan_status: 'SUSPENDED',
-  })
+  }, event)
 }
 
-async function handleInvoicePaid(invoice) {
+async function handleInvoicePaid(invoice, event) {
   const artistId = invoiceArtistId(invoice) || await artistIdByCustomer(invoice.customer)
-  if (!artistId) return
-  await syncSubscriptionState(artistId, {
+  if (!artistId) return { handled: false }
+  return syncSubscriptionState(artistId, {
     stripe_customer_id: invoice.customer || undefined,
     stripe_subscription_id: invoiceSubscriptionId(invoice) || undefined,
     plan_status: 'ACTIVE',
     plan_type: invoicePlan(invoice) || undefined,
-  })
+  }, event)
 }
 
-async function handleInvoicePaymentFailed(invoice) {
+async function handleInvoicePaymentFailed(invoice, event) {
   const artistId = invoiceArtistId(invoice) || await artistIdByCustomer(invoice.customer)
-  if (!artistId) return
-  await syncSubscriptionState(artistId, {
+  if (!artistId) return { handled: false }
+  return syncSubscriptionState(artistId, {
     stripe_customer_id: invoice.customer || undefined,
     stripe_subscription_id: invoiceSubscriptionId(invoice) || undefined,
     plan_status: 'PAST_DUE',
     plan_type: invoicePlan(invoice) || undefined,
-  })
+  }, event)
 }
 
-async function handleChargeRefunded(charge) {
+async function handleChargeRefunded(charge, event) {
   const isFullRefund = charge.refunded === true || (
     Number.isFinite(charge.amount) && Number.isFinite(charge.amount_refunded) &&
     charge.amount > 0 && charge.amount_refunded >= charge.amount
@@ -496,14 +524,14 @@ async function handleChargeRefunded(charge) {
       amount: charge.amount || null,
       amount_refunded: charge.amount_refunded || null,
     })
-    return
+    return { handled: false, reason: 'partial_refund' }
   }
   const artistId = charge.metadata?.artist_id || await artistIdByCustomer(charge.customer)
-  if (!artistId) return
-  await syncSubscriptionState(artistId, {
+  if (!artistId) return { handled: false }
+  return syncSubscriptionState(artistId, {
     stripe_customer_id: charge.customer || undefined,
     plan_status: 'SUSPENDED',
-  })
+  }, event)
 }
 
 function invoiceArtistId(invoice) {
@@ -522,7 +550,25 @@ function invoicePlan(invoice) {
     invoice.metadata?.plan || null
 }
 
-async function syncSubscriptionState(artistId, data) {
+// Chain for every entitlement-changing Stripe event (signature and the
+// idempotency ledger were already checked by the handler):
+//   bind event -> artist  ->  record payment (payment_accounts_v1 upsert)
+//   ->  agreement check + guarded activation + audit (lib/paid-entitlement)
+async function syncSubscriptionState(artistId, data, event = {}, context = {}) {
+  const binding = await verifyArtistBinding(artistId, {
+    clientReferenceId: context.clientReferenceId,
+    customerId: data.stripe_customer_id,
+  })
+  if (!binding.ok) {
+    const err = new Error(`Stripe event not bound to artist: ${binding.reason}`)
+    console.error('STRIPE_ARTIST_BINDING_REJECTED', { stripe_event_id: event.id || null, artist_id: artistId, reason: binding.reason })
+    captureException(err, { route: 'stripe-webhook', stage: 'artist-binding', stripeEventId: event.id, reason: binding.reason })
+    // Not retryable: record the receipt (by returning) and change nothing.
+    return { handled: false, artistId, reason: `binding_rejected:${binding.reason}` }
+  }
+
+  await recordPaymentAccount(binding.artist, data, event)
+
   // The DB refuses plan_status=ACTIVE until the Publishing Administration
   // Agreement is signed. A paid-but-unsigned artist is recorded as
   // PAID_AWAITING_AGREEMENT instead of failing the webhook.
@@ -533,6 +579,7 @@ async function syncSubscriptionState(artistId, data) {
       plan: data.plan_type,
       provider: 'stripe',
       subscriptionId: data.stripe_subscription_id,
+      evidence: { customerId: data.stripe_customer_id, eventId: event.id, eventType: event.type },
     })
   }
   const registrationData = compact({ ...data, plan_status: effectiveStatus })
@@ -547,6 +594,111 @@ async function syncSubscriptionState(artistId, data) {
       ? sbPatchWithSchema('artists', `artists_v1?id=eq.${encodeURIComponent(artistId)}`, artistData)
       : Promise.resolve(),
   ])
+  return {
+    handled: true,
+    artistId,
+    status: effectiveStatus,
+    customerId: data.stripe_customer_id || null,
+    subscriptionId: data.stripe_subscription_id || null,
+    plan: data.plan_type || null,
+  }
+}
+
+// Idempotency ledger (registrations.payment_event_receipts_v1, shared with the
+// PayPal rail). Fails closed: if the ledger is unreachable the webhook returns
+// 500 and Stripe retries, rather than applying a payment it cannot record.
+async function stripeEventAlreadyProcessed(eventId) {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/payment_event_receipts_v1?provider=eq.stripe&provider_event_id=eq.${encodeURIComponent(eventId)}&select=provider_event_id&limit=1`,
+    { headers: sbReadHeaders() }
+  )
+  if (!res.ok) throw new Error(`Payment event lookup failed: ${res.status}`)
+  const rows = await res.json()
+  return Array.isArray(rows) && rows.some(row => row?.provider_event_id === eventId)
+}
+
+async function recordStripeEvent(event, result) {
+  const res = await fetch(`${SB_URL}/rest/v1/payment_event_receipts_v1`, {
+    method: 'POST',
+    headers: sbWriteHeaders('registrations', { Prefer: 'resolution=ignore-duplicates,return=minimal' }),
+    body: JSON.stringify({
+      provider: 'stripe',
+      provider_event_id: event.id,
+      event_type: event.type,
+      artist_id: result?.artistId || null,
+      occurred_at: Number.isFinite(event.created) ? new Date(event.created * 1000).toISOString() : null,
+      payload: {
+        handled: Boolean(result?.handled),
+        livemode: event.livemode ?? null,
+        provider_customer_id: result?.customerId || null,
+        provider_subscription_id: result?.subscriptionId || null,
+        plan_code: result?.plan || null,
+        status: result?.status || null,
+        reason: result?.reason || null,
+      },
+    }),
+  })
+  if (!res.ok) throw new Error(`Payment event receipt failed: ${res.status}`)
+}
+
+// The event must resolve to exactly one existing artist:
+//  - Checkout's client_reference_id (set server-side) must equal metadata.artist_id
+//  - the artist must exist in artists.artists_v1
+//  - a Stripe customer already bound to a different artist is refused
+async function verifyArtistBinding(artistId, { clientReferenceId, customerId } = {}) {
+  if (!artistId) return { ok: false, reason: 'missing_artist_id' }
+  if (clientReferenceId && clientReferenceId !== artistId) return { ok: false, reason: 'client_reference_mismatch' }
+  const artists = await sbGetWithSchema('artists', `artists_v1?id=eq.${encodeURIComponent(artistId)}&select=id,plan_tier,plan_status&limit=1`)
+  const artist = Array.isArray(artists) ? artists.find(row => row?.id === artistId) : null
+  if (!artist) return { ok: false, reason: 'artist_not_found' }
+  if (customerId) {
+    const owners = await sbGetWithSchema('registrations', `registrations_v1?stripe_customer_id=eq.${encodeURIComponent(customerId)}&select=artist_id&limit=5`)
+    const others = (owners || []).filter(row => row?.artist_id && row.artist_id !== artistId)
+    if (others.length) return { ok: false, reason: 'customer_bound_to_other_artist' }
+  }
+  return { ok: true, artist }
+}
+
+// Authoritative Stripe payment record, recorded BEFORE any entitlement change.
+// Upsert keyed on (provider, provider_subscription_id) is idempotent.
+async function recordPaymentAccount(artist, data, event) {
+  const subscriptionId = data.stripe_subscription_id
+  if (!subscriptionId) return
+  const plan = String(data.plan_type || artist.plan_tier || '').toLowerCase() || 'unknown'
+  const status = data.plan_status
+  const primaries = await sbGetWithSchema('registrations', `payment_accounts_v1?artist_id=eq.${encodeURIComponent(artist.id)}&is_primary=eq.true&select=provider_subscription_id,status&limit=1`)
+  const current = Array.isArray(primaries) ? primaries.find(row => row && 'provider_subscription_id' in row) || null : null
+  const isPrimary = !current || current.provider_subscription_id === subscriptionId || status === 'ACTIVE' || current.status !== 'ACTIVE'
+  if (isPrimary && current && current.provider_subscription_id !== subscriptionId) {
+    await sbPatchWithSchema('registrations', `payment_accounts_v1?artist_id=eq.${encodeURIComponent(artist.id)}&is_primary=eq.true`, { is_primary: false, updated_at: new Date().toISOString() })
+  }
+  const res = await fetch(`${SB_URL}/rest/v1/payment_accounts_v1?on_conflict=provider,provider_subscription_id`, {
+    method: 'POST',
+    headers: sbWriteHeaders('registrations', { Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    body: JSON.stringify({
+      artist_id: artist.id,
+      provider: 'stripe',
+      provider_customer_id: data.stripe_customer_id || null,
+      provider_subscription_id: subscriptionId,
+      plan_code: plan,
+      status,
+      is_primary: isPrimary,
+      metadata: { last_event_id: event.id || null, last_event_type: event.type || null, livemode: event.livemode ?? null },
+      updated_at: new Date().toISOString(),
+    }),
+  })
+  if (!res.ok) throw new Error(`Payment account upsert failed: ${res.status}`)
+}
+
+function sbWriteHeaders(schema, extra = {}) {
+  return {
+    apikey: SB_KEY,
+    Authorization: `Bearer ${SB_KEY}`,
+    'Content-Type': 'application/json',
+    'Accept-Profile': schema,
+    'Content-Profile': schema,
+    ...extra,
+  }
 }
 
 function compact(value) {
@@ -887,11 +1039,13 @@ function verifySignature(payload, header, secret) {
   })
 }
 
+// Returns a plan_status the DB accepts, or null when the Stripe status is not
+// definitive evidence of payment or of a lapse (incomplete, trialing, paused, ...).
 function normalizeSubscriptionStatus(status) {
-  if (status === 'active' || status === 'trialing') return 'ACTIVE'
+  if (status === 'active') return 'ACTIVE'
   if (status === 'past_due' || status === 'unpaid') return 'PAST_DUE'
   if (status === 'canceled' || status === 'incomplete_expired') return 'SUSPENDED'
-  return String(status || 'PENDING').toUpperCase()
+  return null
 }
 
 function getRawBody(req) {
@@ -902,3 +1056,5 @@ function getRawBody(req) {
     req.on('error', reject)
   })
 }
+
+module.exports._test = { normalizeSubscriptionStatus, verifyArtistBinding }
