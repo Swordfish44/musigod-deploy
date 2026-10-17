@@ -109,6 +109,16 @@ async function handleCheckoutComplete(session, requestId) {
     return
   }
 
+  const subscriptionId = typeof session.subscription === 'string'
+    ? session.subscription : session.subscription?.id
+  if (session.mode !== 'subscription' || typeof subscriptionId !== 'string' || !subscriptionId.trim()) {
+    console.info('Checkout is not bound to a subscription; activation skipped', {
+      stripe_session_id: session.id,
+      mode: session.mode || null,
+    })
+    return
+  }
+
   if (!isPaidCheckout(session)) {
     console.info('Subscription checkout completed without confirmed payment; activation skipped', {
       stripe_session_id: session.id,
@@ -119,7 +129,7 @@ async function handleCheckoutComplete(session, requestId) {
 
   await syncSubscriptionState(artistId, {
     stripe_customer_id: session.customer,
-    stripe_subscription_id: session.subscription,
+    stripe_subscription_id: subscriptionId,
     plan_status: 'ACTIVE',
     plan_type: plan,
   })
