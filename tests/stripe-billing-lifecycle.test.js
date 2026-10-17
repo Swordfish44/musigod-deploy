@@ -91,6 +91,40 @@ function patches(result, schema) {
   assert.equal(patches(unpaid, 'artists').length, 0)
   assert.equal(patches(unpaid, 'registrations').length, 0)
 
+  // A one-time or incomplete checkout must not grant a subscription even
+  // if it carries an artist ID and subscription-looking metadata.
+  for (const type of ['checkout.session.completed', 'checkout.session.async_payment_succeeded']) {
+    for (const fields of [
+      { mode: 'payment', subscription: null },
+      { mode: 'payment', subscription: 'sub_123' },
+      { mode: 'setup', subscription: null },
+      { mode: 'subscription', subscription: null },
+      { mode: 'subscription', subscription: '' },
+      { subscription: 'sub_123' },
+    ]) {
+      const unrelated = await run(event(type, {
+        id: 'cs_unrelated', payment_status: 'paid', customer: 'cus_123',
+        metadata: { artist_id: 'artist-123', plan: 'growth' }, ...fields,
+      }))
+      assert.equal(unrelated.res.statusCode, 200)
+      assert.equal(patches(unrelated, 'artists').length, 0, `${type}: checkout must be a bound subscription`)
+      assert.equal(patches(unrelated, 'registrations').length, 0, `${type}: unrelated checkout must not mutate billing`)
+    }
+  }
+
+  for (const type of ['checkout.session.completed', 'checkout.session.async_payment_succeeded']) {
+    for (const paymentStatus of ['paid', 'no_payment_required']) {
+      const subscription = await run(event(type, {
+        id: 'cs_subscription', mode: 'subscription', payment_status: paymentStatus,
+        customer: 'cus_123', subscription: { id: 'sub_expanded', object: 'subscription' },
+        metadata: { artist_id: 'artist-123', plan: 'growth' },
+      }))
+      assert.equal(subscription.res.statusCode, 200)
+      assert.equal(JSON.parse(patches(subscription, 'artists')[0].options.body).plan_status, 'ACTIVE')
+      assert.equal(JSON.parse(patches(subscription, 'registrations')[0].options.body).stripe_subscription_id, 'sub_expanded')
+    }
+  }
+
   const failed = await run(event('invoice.payment_failed', {
     id: 'in_failed',
     customer: 'cus_123',
