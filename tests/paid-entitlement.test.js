@@ -123,6 +123,33 @@ const quiet = console.info; console.info = () => {}
   await send({ ...activated, id: 'WH-6' })
   assert.strictEqual(db.artist.plan_status, 'ACTIVE')
 
+  // A failed registration write must remain retryable and must not be
+  // reported as a completed activation.
+  const normalFetch = global.fetch
+  for (const failure of ['http', 'network']) {
+    reset(true)
+    db.artist.meta.billing_status = 'PAID_AWAITING_AGREEMENT'
+    db.registration.plan_status = 'PAID_AWAITING_AGREEMENT'
+    global.fetch = async (url, opts = {}) => {
+      if (String(url).includes('/registrations_v1') && opts.method === 'PATCH') {
+        if (failure === 'network') throw new Error('fixture network failure')
+        return { ok: false, status: 503, text: async () => 'fixture unavailable' }
+      }
+      return normalFetch(url, opts)
+    }
+    try {
+      await assert.rejects(() => entitlement.activatePaidArtist('a1'),
+        error => /fixture|Supabase/.test(error.message), `${failure}: activation must fail visibly`)
+      assert.strictEqual(db.artist.meta.billing_status, 'PAID_AWAITING_AGREEMENT', 'pending marker retained for retry')
+      assert.strictEqual(db.registration.plan_status, 'PAID_AWAITING_AGREEMENT')
+      assert.strictEqual(db.artist.meta.activated_at, undefined, 'no completed activation timestamp on failure')
+    } finally { global.fetch = normalFetch }
+    assert.deepStrictEqual(await entitlement.activatePaidArtist('a1'), { activated: true })
+    assert.strictEqual(db.registration.plan_status, 'ACTIVE', 'retry repairs registration')
+    assert.strictEqual(db.artist.meta.billing_status, 'ACTIVE', 'completion recorded only after both writes')
+    assert.strictEqual(db.artist.meta.genre, 'rap', 'unrelated metadata survives')
+  }
+
   // 9. Admin endpoint fails closed
   delete process.env.ADMIN_API_KEY
   const admin = require('../api/admin/publishing-agreements')
