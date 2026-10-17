@@ -64,7 +64,14 @@ module.exports = withSentry(async function handler(req, res) {
   }
 
   // Mark consumed before DB write — fail-closed
-  await sbConsumeToken(tokenRecord.token_hash, 'sign-agreement')
+  try {
+    if (!await sbConsumeToken(tokenRecord.token_hash, 'sign-agreement')) {
+      return res.status(401).json({ error: 'Token is no longer available' })
+    }
+  } catch (err) {
+    captureException(err, { route: 'sign-agreement', stage: 'token-consumption' })
+    return res.status(503).json({ error: 'Token verification is temporarily unavailable' })
+  }
 
   const ip_address = clean(req.headers['x-forwarded-for']).split(',')[0] || null
   const user_agent = clean(req.headers['user-agent']) || null
@@ -203,17 +210,19 @@ async function sbFetchToken(tokenHash) {
 async function sbConsumeToken(tokenHash, consumedBy) {
   const update = buildConsumptionUpdate(consumedBy)
   const encoded = encodeURIComponent(tokenHash)
-  const r = await fetch(`${SB_URL}/rest/v1/${TOKEN_TABLE}?token_hash=eq.${encoded}`, {
+  const r = await fetch(`${SB_URL}/rest/v1/${TOKEN_TABLE}?token_hash=eq.${encoded}&used_at=is.null&revoked_at=is.null&expires_at=gt.${encodeURIComponent(update.used_at)}&select=token_hash`, {
     method: 'PATCH',
     headers: {
       apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
       'Content-Type': 'application/json',
       'Accept-Profile': TOKEN_SCHEMA, 'Content-Profile': TOKEN_SCHEMA,
-      Prefer: 'return=minimal',
+      Prefer: 'return=representation',
     },
     body: JSON.stringify(update),
   })
   if (!r.ok) { const t = await r.text(); throw new Error(`Token consumption failed: ${r.status} ${t}`) }
+  const rows = await r.json()
+  return Array.isArray(rows) && rows.length === 1 && rows[0]?.token_hash === tokenHash
 }
 
 async function sbFetch(path, schema, options = {}) {
