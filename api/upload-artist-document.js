@@ -94,7 +94,9 @@ module.exports = withSentry(async function handler(req, res) {
     }
 
     // Mark token consumed before storage write — fail-closed
-    await sbConsumeToken(tokenRecord.token_hash, 'upload-artist-document')
+    if (!await sbConsumeToken(tokenRecord.token_hash, 'upload-artist-document')) {
+      return res.status(401).json({ error: 'Token is no longer available' })
+    }
     if (!file) {
       return res.status(400).json({ error: 'File is required' })
     }
@@ -292,7 +294,7 @@ async function sbConsumeToken(tokenHash, consumedBy) {
   const update = buildConsumptionUpdate(consumedBy)
   const encoded = encodeURIComponent(tokenHash)
   const res = await fetch(
-    `${SB_URL}/rest/v1/${TOKEN_TABLE}?token_hash=eq.${encoded}`,
+    `${SB_URL}/rest/v1/${TOKEN_TABLE}?token_hash=eq.${encoded}&used_at=is.null&revoked_at=is.null&expires_at=gt.${encodeURIComponent(update.used_at)}&select=token_hash`,
     {
       method: 'PATCH',
       headers: {
@@ -301,7 +303,7 @@ async function sbConsumeToken(tokenHash, consumedBy) {
         'Content-Type':    'application/json',
         'Accept-Profile':  TOKEN_SCHEMA,
         'Content-Profile': TOKEN_SCHEMA,
-        Prefer:            'return=minimal',
+        Prefer:            'return=representation',
       },
       body: JSON.stringify(update),
     }
@@ -310,6 +312,8 @@ async function sbConsumeToken(tokenHash, consumedBy) {
     const text = await res.text()
     throw new Error(`Token consumption update failed: ${res.status} ${text}`)
   }
+  const rows = await res.json()
+  return Array.isArray(rows) && rows.length === 1 && rows[0]?.token_hash === tokenHash
 }
 
 // ---------------------------------------------------------------------------
