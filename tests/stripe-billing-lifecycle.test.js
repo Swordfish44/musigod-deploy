@@ -108,6 +108,33 @@ function patches(result, schema) {
   }))
   assert.equal(JSON.parse(patches(renewed, 'artists')[0].options.body).plan_status, 'ACTIVE')
 
+  // A customer can have standalone invoices as well as a subscription. Those
+  // invoices must never activate or downgrade the customer's artist plan.
+  for (const type of ['invoice.paid', 'invoice.payment_failed', 'invoice.payment_action_required']) {
+    const standalone = await run(event(type, {
+      id: 'in_standalone', customer: 'cus_123', parent: null,
+      metadata: { artist_id: 'artist-123', plan: 'starter' },
+    }))
+    assert.equal(standalone.res.statusCode, 200)
+    assert.equal(patches(standalone, 'artists').length, 0, `${type}: standalone invoice must not change artist entitlement`)
+    assert.equal(patches(standalone, 'registrations').length, 0, `${type}: standalone invoice must not change subscription record`)
+    assert.equal(standalone.calls.length, 0, `${type}: reject before customer lookup or storage access`)
+  }
+
+  // Current invoice payloads carry the subscription under parent; expanded
+  // subscription objects must still persist only their stable ID.
+  for (const subscription of ['sub_current', { id: 'sub_current', object: 'subscription' }]) {
+    const current = await run(event('invoice.paid', {
+      id: 'in_current', customer: 'cus_123',
+      parent: { type: 'subscription_details', subscription_details: {
+        subscription, metadata: { artist_id: 'artist-123', plan: 'growth' },
+      } },
+    }))
+    assert.equal(current.res.statusCode, 200)
+    assert.equal(JSON.parse(patches(current, 'registrations')[0].options.body).stripe_subscription_id, 'sub_current')
+    assert.equal(JSON.parse(patches(current, 'artists')[0].options.body).plan_status, 'ACTIVE')
+  }
+
   const refunded = await run(event('charge.refunded', {
     id: 'ch_refunded', customer: 'cus_123', amount: 7900, amount_refunded: 7900, refunded: true,
   }))

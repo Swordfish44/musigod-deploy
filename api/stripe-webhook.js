@@ -464,22 +464,26 @@ async function handleSubscriptionDeleted(subscription) {
 }
 
 async function handleInvoicePaid(invoice) {
+  const subscriptionId = invoiceSubscriptionId(invoice)
+  if (!subscriptionId) return
   const artistId = invoiceArtistId(invoice) || await artistIdByCustomer(invoice.customer)
   if (!artistId) return
   await syncSubscriptionState(artistId, {
     stripe_customer_id: invoice.customer || undefined,
-    stripe_subscription_id: invoiceSubscriptionId(invoice) || undefined,
+    stripe_subscription_id: subscriptionId,
     plan_status: 'ACTIVE',
     plan_type: invoicePlan(invoice) || undefined,
   })
 }
 
 async function handleInvoicePaymentFailed(invoice) {
+  const subscriptionId = invoiceSubscriptionId(invoice)
+  if (!subscriptionId) return
   const artistId = invoiceArtistId(invoice) || await artistIdByCustomer(invoice.customer)
   if (!artistId) return
   await syncSubscriptionState(artistId, {
     stripe_customer_id: invoice.customer || undefined,
-    stripe_subscription_id: invoiceSubscriptionId(invoice) || undefined,
+    stripe_subscription_id: subscriptionId,
     plan_status: 'PAST_DUE',
     plan_type: invoicePlan(invoice) || undefined,
   })
@@ -513,7 +517,9 @@ function invoiceArtistId(invoice) {
 }
 
 function invoiceSubscriptionId(invoice) {
-  return invoice.subscription || invoice.parent?.subscription_details?.subscription || null
+  const subscription = invoice.subscription || invoice.parent?.subscription_details?.subscription
+  const id = typeof subscription === 'string' ? subscription : subscription?.id
+  return typeof id === 'string' && id.trim() ? id : null
 }
 
 function invoicePlan(invoice) {
