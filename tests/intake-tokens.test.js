@@ -159,10 +159,11 @@ assert('full-match returns valid', okFull.valid, true)
 assert('full-match reason is OK',  okFull.reason, 'OK')
 
 const okNoScope = verifyToken(rawV, recV, {})
-assert('no-scope options also valid', okNoScope.valid, true)
+assert('scoped token rejects no-scope options', okNoScope.valid, false)
 
 const okEmailCaseInsensitive = verifyToken(rawV, recV, {
   artistEmail: 'ESHAM@MUSIGOD.COM',
+  engagementId: 'eng-pilot',
 })
 assert('artist_email match is case-insensitive', okEmailCaseInsensitive.valid, true)
 
@@ -279,6 +280,15 @@ assert('scoped token rejects wrong engagement',
   verifyToken(rawScoped, recScoped, { engagementId: 'eng-B' }).valid, false)
 assert('scoped token accepts correct engagement',
   verifyToken(rawScoped, recScoped, { engagementId: 'eng-A' }).valid, true)
+
+// Scope remains mandatory even when the caller omits the optional field.
+for (const options of [{}, { engagementId: null }, { engagementId: '' }]) {
+  assert('scoped token rejects missing engagement', verifyToken(rawScoped, recScoped, options).valid, false)
+}
+for (const expiresAt of [undefined, '', 'not-a-date', 12345, {}]) {
+  assert('malformed expiration fails closed',
+    verifyToken(rawAny, { ...recAny, expires_at: expiresAt }).valid, false)
+}
 
 // ── Results ───────────────────────────────────────────────────────────────────
 console.log(`\n── Results: ${passed} passed, ${failed} failed ──\n`)
